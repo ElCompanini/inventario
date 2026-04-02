@@ -141,8 +141,8 @@
     </div>
 </div>
 
-{{-- Sección Trasladar Container --}}
-<div class="mt-6 bg-white rounded-xl shadow p-6">
+{{-- Sección Trasladar Container (oculta por defecto) --}}
+<div class="mt-6 bg-white rounded-xl shadow p-6 hidden" id="seccion-traslado">
     <h2 class="text-base font-semibold text-gray-700 mb-1 pb-2 border-b">Trasladar a otro Container</h2>
     <p class="text-xs text-gray-400 mb-4">Mueve este producto a un container diferente. La acción queda registrada en el historial.</p>
 
