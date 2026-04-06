@@ -38,7 +38,7 @@
 
 {{-- Buscador de productos --}}
 <div class="mb-4">
-    <input id="buscador-productos" type="text" placeholder="🔍  Buscar por producto, descripción, contenedor, stock o estado..."
+    <input id="buscador-productos" type="text" placeholder="🔍  Buscar por categoría, descripción, contenedor, stock o estado..."
            class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
                   focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
 </div>
@@ -76,9 +76,16 @@
                 <td class="px-4 py-3 font-medium text-gray-900">
                     <div class="flex items-center gap-2">
                         @if($pendienteSalida > 0)
+                            @if(auth()->user()->esAdmin())
+                            <a href="{{ route('admin.solicitudes') }}"
+                               style="position:relative; display:inline-flex; align-items:center; cursor:pointer; text-decoration:none;"
+                               onmouseenter="this.querySelector('span').style.display='block'"
+                               onmouseleave="this.querySelector('span').style.display='none'">
+                            @else
                             <span style="position:relative; display:inline-flex; align-items:center; cursor:default;"
                                   onmouseenter="this.querySelector('span').style.display='block'"
                                   onmouseleave="this.querySelector('span').style.display='none'">
+                            @endif
                                 <svg width="20" height="20" viewBox="0 0 10 10" style="flex-shrink:0;">
                                     <circle cx="5" cy="5" r="5" fill="#f59e0b">
                                         <animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite"/>
@@ -92,34 +99,86 @@
                                         · {{ $sol->usuario->name ?? '—' }}: {{ $sol->cantidad }} u.<br>
                                     @endforeach
                                 </span>
+                            @if(auth()->user()->esAdmin())
+                            </a>
+                            @else
                             </span>
+                            @endif
                         @endif
+
                         <span>{{ $producto->nombre }}</span>
                     </div>
                 </td>
                 <td class="px-4 py-3 text-gray-500">{{ $producto->descripcion ?? '—' }}</td>
                 <td class="px-4 py-3 text-center">
-                    <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">
-                        {{ str_replace('Contenedor ', 'C', $producto->container->nombre ?? '—') }}
-                    </span>
+                    @if($producto->container)
+                        @if(auth()->user()->esAdmin())
+                            <a href="{{ route('admin.containers.index') }}#container-{{ $producto->container->id }}"
+                               class="inline-block bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full hover:bg-indigo-200 transition">
+                                {{ str_replace('Contenedor ', 'C', $producto->container->nombre) }}
+                            </a>
+                        @else
+                            <span class="inline-block bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">
+                                {{ str_replace('Contenedor ', 'C', $producto->container->nombre) }}
+                            </span>
+                        @endif
+                    @else
+                        <span class="inline-block bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">—</span>
+                    @endif
                 </td>
                 <td class="px-4 py-3 text-center font-bold
                         {{ $estado === 'critico' ? 'text-red-700' : ($estado === 'minimo' ? 'text-yellow-700' : 'text-gray-800') }}">
                     {{ $producto->stock_actual }}
                 </td>
-                <td class="px-4 py-3 text-center text-gray-600">{{ $producto->stock_minimo }}</td>
-                <td class="px-4 py-3 text-center text-gray-600">{{ $producto->stock_critico }}</td>
+                <td class="px-4 py-3 text-center text-gray-600">
+                    @if($estado === 'minimo')
+                        <span class="inline-block px-2 py-0.5 rounded-full estado-pulso-minimo">{{ $producto->stock_minimo }}</span>
+                    @else
+                        {{ $producto->stock_minimo }}
+                    @endif
+                </td>
+                <td class="px-4 py-3 text-center text-gray-600">
+                    @if($estado === 'critico')
+                        <span class="inline-block px-2 py-0.5 rounded-full estado-pulso-critico">{{ $producto->stock_critico }}</span>
+                    @else
+                        {{ $producto->stock_critico }}
+                    @endif
+                </td>
                 <td class="px-4 py-3 text-center">
                     @if($estado === 'critico')
-                    <span class="inline-flex items-center gap-1 bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded-full">
-                        <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span> Crítico
+                    <span style="position:relative; display:inline-flex; cursor:default;"
+                          onmouseenter="this.querySelector('.tt').style.display='block'"
+                          onmouseleave="this.querySelector('.tt').style.display='none'">
+                        <span class="inline-flex items-center gap-1 bg-red-100 text-red-700 text-sm font-semibold px-3 py-1.5 rounded-full estado-pulso-critico">
+                            <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5" fill="#ef4444"><animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/></circle></svg>
+                            Crítico
+                        </span>
+                        @if($producto->stock_critico_desde)
+                        <span class="tt" style="display:none; position:absolute; left:50%; bottom:calc(100% + 6px); transform:translateX(-50%); z-index:9999;
+                                     white-space:nowrap; background:#1f2937; color:#fff; font-size:11px; font-weight:500;
+                                     padding:5px 10px; border-radius:6px; box-shadow:0 4px 8px rgba(0,0,0,.35);">
+                            🔴 Crítico desde {{ $producto->stock_critico_desde->format('d/m/Y H:i') }}
+                        </span>
+                        @endif
                     </span>
                     @elseif($estado === 'minimo')
-                    <span class="inline-flex items-center gap-1 bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-1 rounded-full">
-                        <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> Mínimo
+                    <span style="position:relative; display:inline-flex; cursor:default;"
+                          onmouseenter="this.querySelector('.tt').style.display='block'"
+                          onmouseleave="this.querySelector('.tt').style.display='none'">
+                        <span class="inline-flex items-center gap-1 bg-yellow-100 text-yellow-700 text-sm font-semibold px-3 py-1.5 rounded-full estado-pulso-minimo">
+                            <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5" fill="#eab308"><animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/></circle></svg>
+                            Mínimo
+                        </span>
+                        @if($producto->stock_minimo_desde)
+                        <span class="tt" style="display:none; position:absolute; left:50%; bottom:calc(100% + 6px); transform:translateX(-50%); z-index:9999;
+                                     white-space:nowrap; background:#1f2937; color:#fff; font-size:11px; font-weight:500;
+                                     padding:5px 10px; border-radius:6px; box-shadow:0 4px 8px rgba(0,0,0,.35);">
+                            🟡 Mínimo desde {{ $producto->stock_minimo_desde->format('d/m/Y H:i') }}
+                        </span>
+                        @endif
                     </span>
                     @else
-                    <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">
+                    <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-sm font-semibold px-3 py-1.5 rounded-full">
                         <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Normal
                     </span>
                     @endif
@@ -129,7 +188,7 @@
                         @if(auth()->user()->esAdmin())
                         {{-- Admin: modificar stock directamente --}}
                         <a href="{{ route('admin.productos.editar', $producto->id) }}"
-                            class="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
+                            class="btn-accion-indigo inline-flex items-center gap-1 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg whitespace-nowrap">
                             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
@@ -138,7 +197,7 @@
                         {{-- Admin: trasladar container --}}
                         <button type="button"
                             onclick="abrirModalTrasladar({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', {{ $producto->contenedor }})"
-                            class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
+                            class="btn-accion-blue inline-flex items-center gap-1 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg whitespace-nowrap">
                             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                             </svg>
@@ -148,7 +207,7 @@
                         {{-- Usuario: solicitar entrada --}}
                         <button type="button"
                             onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'entrada', {{ $producto->stock_actual }})"
-                            class="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition">
+                            class="btn-accion-green inline-flex items-center gap-1 text-white text-xs font-medium px-3 py-1.5 rounded-lg">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                             </svg>
@@ -157,7 +216,7 @@
                         {{-- Usuario: solicitar salida --}}
                         <button type="button"
                             onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'salida', {{ $producto->stock_actual }})"
-                            class="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition"
+                            class="btn-accion-orange inline-flex items-center gap-1 text-white text-xs font-medium px-3 py-1.5 rounded-lg"
                             {{ $producto->stock_actual <= 0 ? 'disabled' : '' }}>
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
@@ -340,9 +399,10 @@
                         Motivo <span class="text-red-500">*</span>
                     </label>
                     <textarea name="motivo" id="traslado-motivo"
-                        rows="3" required maxlength="500"
+                        rows="3" maxlength="500"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                         placeholder="Describe el motivo del traslado..."></textarea>
+                    <p id="traslado-motivo-error" class="text-red-500 text-xs mt-1 hidden">El motivo es obligatorio.</p>
                 </div>
             </div>
 
@@ -351,7 +411,7 @@
                     class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
                     Cancelar
                 </button>
-                <button type="submit"
+                <button type="button" onclick="confirmarTraslado()"
                     class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">
                     Confirmar traslado
                 </button>
@@ -375,9 +435,30 @@
         document.getElementById('modal-traslado').classList.remove('hidden');
     }
 
+    function confirmarTraslado() {
+        const motivo = document.getElementById('traslado-motivo').value.trim();
+        const destino = document.getElementById('traslado-destino').value;
+        const errorMotivo = document.getElementById('traslado-motivo-error');
+
+        if (!motivo) {
+            errorMotivo.classList.remove('hidden');
+            document.getElementById('traslado-motivo').focus();
+            return;
+        }
+        errorMotivo.classList.add('hidden');
+        document.getElementById('form-traslado').submit();
+    }
+
+    document.getElementById('traslado-motivo').addEventListener('input', function () {
+        if (this.value.trim()) {
+            document.getElementById('traslado-motivo-error').classList.add('hidden');
+        }
+    });
+
     function cerrarModalTrasladar() {
         document.getElementById('modal-traslado').classList.add('hidden');
         document.getElementById('form-traslado').reset();
+        document.getElementById('traslado-motivo-error').classList.add('hidden');
     }
 
     document.getElementById('modal-traslado').addEventListener('click', function(e) {
@@ -462,7 +543,32 @@
             table.draw();
         });
     });
+
+    // Sincronizar todas las animaciones de pulso al mismo tiempo
+    document.addEventListener('DOMContentLoaded', function () {
+        const els = document.querySelectorAll('.estado-pulso-critico, .estado-pulso-minimo');
+        els.forEach(el => { el.style.animationDelay = '0s'; el.style.animationPlayState = 'paused'; });
+        requestAnimationFrame(() => els.forEach(el => { el.style.animationPlayState = 'running'; }));
+    });
 </script>
+@endpush
+
+@push('head')
+<style>
+    .btn-accion-indigo { background:#4f46e5; transition: background .25s, box-shadow .25s, transform .25s; }
+    .btn-accion-indigo:hover { background:#a5b4fc; box-shadow:0 0 14px 4px rgba(165,180,252,0.75); transform:scale(1.05); }
+    .btn-accion-blue { background:#2563eb; transition: background .25s, box-shadow .25s, transform .25s; }
+    .btn-accion-blue:hover { background:#93c5fd; box-shadow:0 0 14px 4px rgba(147,197,253,0.75); transform:scale(1.05); }
+    .btn-accion-green { background:#16a34a; transition: background .25s, box-shadow .25s, transform .25s; }
+    .btn-accion-green:hover { background:#86efac; box-shadow:0 0 14px 4px rgba(134,239,172,0.75); transform:scale(1.05); }
+    .btn-accion-orange { background:#f97316; transition: background .25s, box-shadow .25s, transform .25s; }
+    .btn-accion-orange:hover { background:#fdba74; box-shadow:0 0 14px 4px rgba(253,186,116,0.75); transform:scale(1.05); }
+    .btn-accion-orange:disabled { opacity:0.5; cursor:not-allowed; transform:none; box-shadow:none; }
+    @keyframes pulso-critico { 0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,.5); } 50% { box-shadow:0 0 0 6px rgba(239,68,68,0); } }
+    @keyframes pulso-minimo  { 0%,100% { box-shadow:0 0 0 0 rgba(234,179,8,.5); } 50% { box-shadow:0 0 0 6px rgba(234,179,8,0); } }
+    .estado-pulso-critico { animation: pulso-critico 1.5s ease-in-out infinite; }
+    .estado-pulso-minimo  { animation: pulso-minimo  1.5s ease-in-out infinite; }
+</style>
 @endpush
 
 @endsection

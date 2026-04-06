@@ -93,7 +93,7 @@
             language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json' },
             order: [[5, 'desc']],
             paging: false,
-            layout: { topStart: 'buttons', topEnd: null, bottomStart: 'info', bottomEnd: null },
+            layout: { topStart: 'buttons', topEnd: null, bottomStart: null, bottomEnd: null },
             buttons: [
                 { extend: 'excelHtml5', text: 'Excel', className: 'dt-btn-excel' },
                 { extend: 'csvHtml5',   text: 'CSV',   className: 'dt-btn' },

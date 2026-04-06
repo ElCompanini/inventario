@@ -51,7 +51,8 @@
                         @if($oc->estado === 'recibido')
                             <span class="inline-flex items-center bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">✓ Recibido</span>
                         @else
-                            <span class="inline-flex items-center bg-yellow-100 text-yellow-700 text-xs font-semibold px-2.5 py-1 rounded-full">⏳ Pendiente</span>
+                            <a href="{{ route('admin.ordenes.show', $oc->id) }}"
+                               class="inline-flex items-center bg-yellow-100 text-yellow-700 text-xs font-semibold px-2.5 py-1 rounded-full hover:bg-yellow-200 transition">⏳ Pendiente</a>
                         @endif
                     </td>
                     <td class="px-4 py-2 text-center">
@@ -92,7 +93,7 @@
             language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json' },
             order: [[6, 'desc']],
             paging: false,
-            layout: { topStart: 'buttons', topEnd: null, bottomStart: 'info', bottomEnd: null },
+            layout: { topStart: 'buttons', topEnd: null, bottomStart: null, bottomEnd: null },
             buttons: [
                 { extend: 'excelHtml5', text: 'Excel', className: 'dt-btn-excel' },
                 { extend: 'csvHtml5',   text: 'CSV',   className: 'dt-btn' },

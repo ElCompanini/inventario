@@ -185,9 +185,18 @@ class OrdenCompraController extends Controller
             foreach ($oc->sicds as $sicd) {
                 foreach ($sicd->detalles as $detalle) {
                     $recibido = (int) $request->input("recibido.{$detalle->id}", 0);
-                    $recibido = min($recibido, $detalle->cantidad_solicitada);
 
                     $detalle->cantidad_recibida = $recibido;
+
+                    $precioNeto = $request->input("precio_neto.{$detalle->id}");
+                    $totalNeto  = $request->input("total_neto.{$detalle->id}");
+                    if ($precioNeto !== null && $precioNeto !== '') {
+                        $detalle->precio_neto = (float) $precioNeto;
+                    }
+                    if ($totalNeto !== null && $totalNeto !== '') {
+                        $detalle->total_neto = (float) $totalNeto;
+                    }
+
                     $detalle->save();
 
                     if ($recibido > 0 && $detalle->producto) {
@@ -198,6 +207,7 @@ class OrdenCompraController extends Controller
                             $detalle->producto->contenedor = (int) $containerId;
                         }
 
+                        $detalle->producto->actualizarFechasStock();
                         $detalle->producto->save();
 
                         HistorialCambio::create([

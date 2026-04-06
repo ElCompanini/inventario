@@ -47,6 +47,7 @@ class AdminController extends Controller
             } else {
                 $producto->stock_actual -= $solicitud->cantidad;
             }
+            $producto->actualizarFechasStock();
             $producto->save();
 
             // Cambiar estado de la solicitud
@@ -102,7 +103,7 @@ class AdminController extends Controller
 
     public function historial()
     {
-        $historial = HistorialCambio::with(['producto', 'usuario'])
+        $historial = HistorialCambio::with(['producto', 'usuario', 'sicd'])
             ->orderByDesc('created_at')
             ->get();
 
@@ -146,6 +147,7 @@ class AdminController extends Controller
             } else {
                 $producto->stock_actual -= $data['cantidad'];
             }
+            $producto->actualizarFechasStock();
             $producto->save();
 
             HistorialCambio::create([

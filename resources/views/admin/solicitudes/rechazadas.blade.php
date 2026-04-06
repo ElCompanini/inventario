@@ -118,7 +118,7 @@
             layout: {
                 topStart: 'buttons',
                 topEnd: null,
-                bottomStart: 'info',
+                bottomStart: null,
                 bottomEnd: null
             },
             buttons: [{

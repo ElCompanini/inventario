@@ -16,6 +16,13 @@ class Producto extends Model
         'stock_minimo',
         'stock_critico',
         'contenedor',
+        'stock_minimo_desde',
+        'stock_critico_desde',
+    ];
+
+    protected $casts = [
+        'stock_minimo_desde'  => 'datetime',
+        'stock_critico_desde' => 'datetime',
     ];
 
     public function container()
@@ -42,5 +49,27 @@ class Producto extends Model
             return 'minimo';
         }
         return 'normal';
+    }
+
+    public function actualizarFechasStock(): void
+    {
+        $ahora = now();
+
+        if ($this->stock_actual <= $this->stock_critico) {
+            if (!$this->stock_critico_desde) {
+                $this->stock_critico_desde = $ahora;
+            }
+            // Si sale de crítico, limpiar
+        } else {
+            $this->stock_critico_desde = null;
+        }
+
+        if ($this->stock_actual <= $this->stock_minimo && $this->stock_actual > $this->stock_critico) {
+            if (!$this->stock_minimo_desde) {
+                $this->stock_minimo_desde = $ahora;
+            }
+        } else {
+            $this->stock_minimo_desde = null;
+        }
     }
 }

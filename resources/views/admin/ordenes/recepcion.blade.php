@@ -13,6 +13,7 @@
     </p>
 </div>
 
+
 <form method="POST" action="{{ route('admin.ordenes.recepcion.procesar', $oc->id) }}">
     @csrf
 
@@ -32,34 +33,50 @@
                     <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
+                                <th colspan="6" class="px-4 py-1"></th>
+                                <th class="px-4 py-1 text-left">
+                                    <div style="border:2px solid #3b82f6; border-radius:0.5rem; overflow:hidden;">
+                                        <p style="font-size:0.75rem; font-weight:700; color:#1d4ed8; background:#dbeafe; padding:4px 8px;">Cambiar todos los contenedores a:</p>
+                                        <select id="container-global"
+                                                style="width:100%; padding:0.375rem 0.5rem; font-size:0.75rem; font-weight:600; color:#1d4ed8; background:#fff; outline:none; border:none;">
+                                            <option value="">— seleccionar —</option>
+                                            @foreach($containers as $c)
+                                                <option value="{{ $c->id }}">{{ $c->nombre }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </th>
+                            </tr>
+                            <tr>
                                 <th class="px-4 py-3 text-left font-semibold text-gray-600">Producto</th>
                                 <th class="px-4 py-3 text-left font-semibold text-gray-600">Stock actual</th>
                                 <th class="px-4 py-3 text-center font-semibold text-gray-600">Solicitado</th>
                                 <th class="px-4 py-3 text-center font-semibold text-gray-600">Cantidad recibida</th>
+                                <th class="px-4 py-3 text-right font-semibold text-gray-600">Precio neto</th>
+                                <th class="px-4 py-3 text-right font-semibold text-gray-600">Total neto</th>
                                 <th class="px-4 py-3 text-left font-semibold text-gray-600">Container destino</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             @foreach($sicd->detalles as $det)
                                 <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-3">
+                                    <td class="px-4 py-3" style="vertical-align:middle;">
                                         <p class="font-medium text-gray-800">{{ $det->nombre_producto_excel }}</p>
                                         @if(!$det->producto)
                                             <p class="text-xs text-amber-500 mt-0.5">Sin enlace a producto — no actualizará stock</p>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3 text-gray-600">
+                                    <td class="px-4 py-3 text-gray-600" style="vertical-align:middle;">
                                         {{ $det->producto?->stock_actual ?? '—' }}
                                     </td>
-                                    <td class="px-4 py-3 text-center font-semibold text-gray-700">
+                                    <td class="px-4 py-3 text-center font-semibold text-gray-700" style="vertical-align:middle;">
                                         {{ $det->cantidad_solicitada }}
                                     </td>
-                                    <td class="px-4 py-3 text-center">
+                                    <td class="px-4 py-3 text-center" style="vertical-align:middle;">
                                         <input type="number"
                                                name="recibido[{{ $det->id }}]"
                                                value="{{ old("recibido.{$det->id}", $det->cantidad_solicitada) }}"
                                                min="0"
-                                               max="{{ $det->cantidad_solicitada }}"
                                                {{ !$det->producto ? 'disabled' : '' }}
                                                class="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400
                                                       {{ !$det->producto ? 'bg-gray-100 text-gray-400' : '' }}">
@@ -67,10 +84,41 @@
                                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                         @enderror
                                     </td>
-                                    <td class="px-4 py-3">
+                                    <td class="px-4 py-3 text-right" style="vertical-align:middle;">
+                                        <div style="display:inline-block; width:7.5rem;">
+                                            <input type="text"
+                                                   data-precio
+                                                   data-sicd="{{ $det->precio_neto ? (int) $det->precio_neto : '' }}"
+                                                   name="precio_neto[{{ $det->id }}]"
+                                                   value="{{ old("precio_neto.{$det->id}", $det->precio_neto ? (int) $det->precio_neto : '') }}"
+                                                   placeholder="—"
+                                                   style="width:100%;"
+                                                   class="input-precio border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none">
+                                            @if($det->precio_neto)
+                                                <span style="font-size:0.65rem; color:#9ca3af; white-space:nowrap;">SICD: ${{ number_format($det->precio_neto, 0, ',', '.') }}</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-right" style="vertical-align:middle;">
+                                        <div style="display:inline-block; width:7.5rem;">
+                                            <input type="text"
+                                                   data-precio
+                                                   data-sicd="{{ $det->total_neto ? (int) $det->total_neto : '' }}"
+                                                   name="total_neto[{{ $det->id }}]"
+                                                   value="{{ old("total_neto.{$det->id}", $det->total_neto ? (int) $det->total_neto : '') }}"
+                                                   placeholder="—"
+                                                   style="width:100%;"
+                                                   class="input-precio border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none">
+                                            @if($det->total_neto)
+                                                <span style="font-size:0.65rem; color:#9ca3af; white-space:nowrap;">SICD: ${{ number_format($det->total_neto, 0, ',', '.') }}</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3" style="vertical-align:middle;">
                                         @if($det->producto)
                                             <select name="container[{{ $det->id }}]"
-                                                    class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                                    style="width:100%; border:2px solid #3b82f6; border-radius:0.5rem; padding:0.375rem 0.5rem; font-size:0.75rem; font-weight:600; color:#1d4ed8; background:#eff6ff; outline:none;"
+                                                    class="w-full">
                                                 @foreach($containers as $c)
                                                     <option value="{{ $c->id }}"
                                                         {{ $det->producto->contenedor == $c->id ? 'selected' : '' }}>
@@ -93,7 +141,9 @@
 
     <div class="mt-6 flex justify-end gap-3">
         <a href="{{ route('admin.ordenes.show', $oc->id) }}"
-           class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+           style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:600; color:#fff; background:#f87171; border-radius:0.5rem; text-decoration:none; transition:background .2s;"
+           onmouseover="this.style.background='#ef4444'"
+           onmouseout="this.style.background='#f87171'">
             Cancelar
         </a>
         <button type="submit"
@@ -103,5 +153,83 @@
         </button>
     </div>
 </form>
+
+@push('scripts')
+<script>
+    document.getElementById('container-global').addEventListener('change', function () {
+        const val = this.value;
+        if (!val) return;
+        document.querySelectorAll('select[name^="container["]').forEach(function (sel) {
+            sel.value = val;
+        });
+    });
+
+    // ── Precio: formato visual $100.000 ─────────────────────────────────────
+    function colorearSegunSicd(input) {
+        const sicd = parseInt(input.dataset.sicd) || null;
+        const raw  = parseInt(input.value.replace(/\$/g,'').replace(/\./g,'').replace(/[^0-9]/g,'')) || null;
+        if (!sicd || !raw) { input.style.borderColor = ''; input.style.background = ''; return; }
+        if (raw === sicd) {
+            input.style.borderColor = '#22c55e';
+            input.style.background  = '#f0fdf4';
+        } else {
+            input.style.borderColor = '#f97316';
+            input.style.background  = '#fff7ed';
+        }
+    }
+
+    function formatearPrecio(input) {
+        const raw = input.value.replace(/\./g, '').replace(/[^0-9]/g, '');
+        if (!raw) { input.value = ''; return; }
+        input.value = '$' + parseInt(raw).toLocaleString('es-CL');
+    }
+
+    function rawNum(input) {
+        return parseInt(input.value.replace(/\$/g, '').replace(/\./g, '').replace(/[^0-9]/g, '')) || 0;
+    }
+
+    function recalcularTotal(precioInput) {
+        const name = precioInput.getAttribute('name'); // precio_neto[123]
+        const id = name.match(/\[(\d+)\]/)?.[1];
+        if (!id) return;
+        const cantInput  = document.querySelector(`input[name="recibido[${id}]"]`);
+        const totalInput = document.querySelector(`input[name="total_neto[${id}]"]`);
+        if (!cantInput || !totalInput) return;
+        const precio = rawNum(precioInput);
+        const cant   = parseInt(cantInput.value) || 0;
+        const total  = precio * cant;
+        totalInput.value = total ? '$' + total.toLocaleString('es-CL') : '';
+        colorearSegunSicd(totalInput);
+    }
+
+    document.querySelectorAll('.input-precio').forEach(function(input) {
+        if (input.value) { formatearPrecio(input); colorearSegunSicd(input); }
+
+        input.addEventListener('input', function () {
+            const raw = this.value.replace(/\$/g, '').replace(/\./g, '').replace(/[^0-9]/g, '');
+            if (!raw) { this.value = ''; } else { this.value = '$' + parseInt(raw).toLocaleString('es-CL'); }
+            colorearSegunSicd(this);
+            if (this.name && this.name.startsWith('precio_neto')) recalcularTotal(this);
+        });
+    });
+
+    // También recalcular si cambia la cantidad recibida
+    document.querySelectorAll('input[name^="recibido["]').forEach(function(cantInput) {
+        cantInput.addEventListener('input', function () {
+            const id = this.name.match(/\[(\d+)\]/)?.[1];
+            if (!id) return;
+            const precioInput = document.querySelector(`input[name="precio_neto[${id}]"]`);
+            if (precioInput) recalcularTotal(precioInput);
+        });
+    });
+
+    // Antes de enviar: convertir a número puro
+    document.querySelector('form').addEventListener('submit', function () {
+        document.querySelectorAll('.input-precio').forEach(function(input) {
+            input.value = input.value.replace(/\$/g, '').replace(/\./g, '').replace(/[^0-9]/g, '');
+        });
+    });
+</script>
+@endpush
 
 @endsection

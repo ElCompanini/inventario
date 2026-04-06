@@ -35,6 +35,7 @@
 
     @if($total === 0)
         <div class="bg-white rounded-xl shadow p-10 text-center text-gray-400">
+            
             Sin resultados. Intenta con otro término.
         </div>
     @endif

@@ -77,6 +77,7 @@ class RetiroController extends Controller
                     if ($user->esAdmin()) {
                         // — ADMIN: descuenta stock directamente —
                         $producto->stock_actual -= (int) $item['cantidad'];
+                        $producto->actualizarFechasStock();
                         $producto->save();
 
                         // Resolver solicitudes de salida pendientes para este producto

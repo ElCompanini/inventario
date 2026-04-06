@@ -10,6 +10,13 @@
     <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.tailwindcss.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/3.0.2/css/buttons.tailwindcss.min.css">
     @stack('head')
+<style>
+    input:focus, select:focus, textarea:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.25) !important;
+        outline: none !important;
+    }
+</style>
 </head>
 <body class="bg-gray-100 min-h-screen font-sans">
 
@@ -109,7 +116,7 @@
     </nav>
 
     {{-- Contenido principal --}}
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <main class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         {{-- Alertas globales --}}
         @if(session('success'))

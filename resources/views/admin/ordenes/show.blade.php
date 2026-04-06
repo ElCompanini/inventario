@@ -67,7 +67,11 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @foreach($sicd->detalles as $det)
-                            <tr class="hover:bg-gray-50">
+                            @php
+                                $pendiente = $oc->estado === 'pendiente';
+                                $diferente = !$pendiente && $det->cantidad_recibida != $det->cantidad_solicitada;
+                            @endphp
+                            <tr class="{{ $diferente ? 'bg-orange-50' : 'hover:bg-gray-50' }}">
                                 <td class="px-4 py-2 text-gray-800">
                                     {{ $det->nombre_producto_excel }}
                                     @unless($det->producto)
@@ -76,11 +80,20 @@
                                 </td>
                                 <td class="px-4 py-2 text-center text-gray-600">{{ $det->unidad ?? '—' }}</td>
                                 <td class="px-4 py-2 text-center font-semibold text-gray-700">{{ $det->cantidad_solicitada }}</td>
-                                <td class="px-4 py-2 text-center font-semibold {{ $det->cantidad_recibida > 0 ? 'text-green-600' : 'text-gray-400' }}">
-                                    {{ $det->cantidad_recibida }}
+                                <td class="px-4 py-2 text-center font-semibold">
+                                    @if($pendiente)
+                                        <span class="inline-flex items-center gap-1 bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                            <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> Pendiente
+                                        </span>
+                                    @elseif($diferente)
+                                        <span class="text-orange-500">{{ $det->cantidad_recibida }}</span>
+                                        <span class="text-xs font-normal text-orange-500">(solicitado: {{ $det->cantidad_solicitada }})</span>
+                                    @else
+                                        <span class="text-green-600">{{ $det->cantidad_recibida }}</span>
+                                    @endif
                                 </td>
-                                <td class="px-4 py-2 text-right text-gray-700">{{ $det->precio_neto !== null ? '$' . number_format($det->precio_neto, 2) : '—' }}</td>
-                                <td class="px-4 py-2 text-right font-semibold text-gray-800">{{ $det->total_neto !== null ? '$' . number_format($det->total_neto, 2) : '—' }}</td>
+                                <td class="px-4 py-2 text-right text-gray-700">{{ $det->precio_neto !== null ? '$' . number_format($det->precio_neto, 0, ',', '.') : '—' }}</td>
+                                <td class="px-4 py-2 text-right font-semibold text-gray-800">{{ $det->total_neto !== null ? '$' . number_format($det->total_neto, 0, ',', '.') : '—' }}</td>
                             </tr>
                         @endforeach
                     </tbody>

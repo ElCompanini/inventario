@@ -48,7 +48,7 @@
                         {{-- Info solicitud --}}
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-2">
-                                <span class="text-lg font-bold text-gray-800">
+                                <span class="text-lg font-bold" style="color: {{ $esEntrada ? '#15803d' : '#ea580c' }}">
                                     {{ $solicitud->producto->nombre }}
                                 </span>
                                 @if($esEntrada)
@@ -67,21 +67,22 @@
                                 @endif
                             </div>
 
-                            <p class="text-sm text-gray-600 mb-3">
-                                <span class="font-medium">Motivo:</span> {{ $solicitud->motivo }}
+                            <p class="text-base text-gray-700 mb-3">
+                                <span class="font-semibold text-gray-800">Motivo:</span>
+                                <span style="background:{{ $esEntrada ? '#dcfce7' : '#ffedd5' }}; color:{{ $esEntrada ? '#15803d' : '#c2410c' }}; border-radius:0.5rem; padding:2px 10px;">{{ $solicitud->motivo }}</span>
                             </p>
 
-                            <div class="flex items-center gap-6 text-xs text-gray-500">
+                            <div class="flex items-center gap-6 text-base text-gray-600">
                                 <span>
-                                    <span class="font-medium text-gray-700">Solicitante:</span>
+                                    <span class="font-semibold text-gray-800">Solicitante:</span>
                                     {{ $solicitud->usuario->name }}
                                 </span>
                                 <span>
-                                    <span class="font-medium text-gray-700">Fecha:</span>
+                                    <span class="font-semibold text-gray-800">Fecha:</span>
                                     {{ $solicitud->created_at->format('d/m/Y H:i') }}
                                 </span>
                                 <span>
-                                    <span class="font-medium text-gray-700">Contenedor:</span>
+                                    <span class="font-semibold text-gray-800">Contenedor:</span>
                                     {{ $solicitud->producto->container->nombre ?? '—' }}
                                 </span>
                             </div>
@@ -119,8 +120,7 @@
 
                     {{-- Botón que abre el modal de rechazo --}}
                     <button type="button"
-                            data-url="{{ route('admin.solicitudes.rechazar', $solicitud->id) }}"
-                            onclick="abrirModalRechazo({{ $solicitud->id }}, this.dataset.url)"
+                            onclick="abrirModalRechazo({{ $solicitud->id }}, '{{ route('admin.solicitudes.rechazar', $solicitud->id) }}')"
                             class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700
                                    text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -176,6 +176,8 @@
     .dt-btn:hover { background:#1d4ed8; }
     .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .15s; }
     .dt-btn-pdf:hover { background:#b91c1c; }
+    #tabla-solicitudes tbody tr { transition: background-color .2s ease; }
+    #tabla-solicitudes tbody tr:hover { background-color: #f3f4f6 !important; }
 </style>
 @endpush
 
@@ -198,10 +200,10 @@
         });
     }
 
-    function abrirModalRechazo(id, url) {
+    function abrirModalRechazo(id) {
         const modal = document.getElementById('modalRechazo');
         const form  = document.getElementById('formRechazo');
-        form.action = url;
+        form.action = `/admin/solicitudes/${id}/rechazar`;
         document.getElementById('motivo_rechazo').value = '';
         modal.classList.remove('hidden');
         modal.classList.add('flex');
