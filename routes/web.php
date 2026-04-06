@@ -9,6 +9,7 @@ use App\Http\Controllers\ContainerController;
 use App\Http\Controllers\SicdController;
 use App\Http\Controllers\OrdenCompraController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\RetiroController;
 
 // Raíz → login
 Route::get('/', fn() => redirect()->route('login'));
@@ -32,6 +33,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [ProductoController::class, 'index'])->name('dashboard');
     Route::get('/mis-solicitudes', [SolicitudController::class, 'index'])->name('solicitudes.mis');
     Route::post('/solicitudes', [SolicitudController::class, 'store'])->name('solicitudes.store');
+
+    // Retiro de piezas (todos los usuarios autenticados)
+    Route::get('/retiro', [RetiroController::class, 'form'])->name('retiro.form');
+    Route::get('/retiro/buscar', [RetiroController::class, 'buscar'])->name('retiro.buscar');
+    Route::post('/retiro', [RetiroController::class, 'procesar'])->name('retiro.procesar');
 });
 
 // Rutas solo admin
@@ -49,6 +55,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/sicd', [SicdController::class, 'index'])->name('sicd.index');
     Route::get('/sicd/crear', [SicdController::class, 'create'])->name('sicd.create');
     Route::post('/sicd', [SicdController::class, 'store'])->name('sicd.store');
+    Route::get('/sicd/resolver-conflictos', [SicdController::class, 'resolver'])->name('sicd.resolver');
+    Route::post('/sicd/confirmar', [SicdController::class, 'confirmar'])->name('sicd.confirmar');
     Route::get('/sicd/{id}', [SicdController::class, 'show'])->name('sicd.show');
     Route::get('/sicd/{id}/descargar', [SicdController::class, 'descargar'])->name('sicd.descargar');
 

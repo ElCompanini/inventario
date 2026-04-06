@@ -92,10 +92,10 @@
                                     {{ $det->cantidad_recibida }}
                                 </td>
                                 <td class="px-4 py-3 text-right text-gray-700">
-                                    {{ $det->precio_neto !== null ? '$' . number_format($det->precio_neto, 2) : '—' }}
+                                    {{ $det->precio_neto !== null ? '$' . number_format($det->precio_neto, 0, ',', '.') : '—' }}
                                 </td>
                                 <td class="px-4 py-3 text-right font-semibold text-gray-800">
-                                    {{ $det->total_neto !== null ? '$' . number_format($det->total_neto, 2) : '—' }}
+                                    {{ $det->total_neto !== null ? '$' . number_format($det->total_neto, 0, ',', '.') : '—' }}
                                 </td>
                             </tr>
                         @endforeach

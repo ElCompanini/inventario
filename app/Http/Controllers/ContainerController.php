@@ -13,7 +13,9 @@ class ContainerController extends Controller
 {
     public function index()
     {
-        $containers = Container::withCount('productos')->orderBy('id')->get();
+        $containers = Container::withCount('productos')
+            ->with('productos:id,nombre,descripcion,stock_actual,contenedor')
+            ->orderBy('id')->get();
         return view('admin.containers.index', compact('containers'));
     }
 

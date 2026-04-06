@@ -32,6 +32,11 @@
                               {{ request()->routeIs('dashboard') ? 'bg-indigo-800' : '' }}">
                         Productos
                     </a>
+                    <a href="{{ route('retiro.form') }}"
+                       class="px-3 py-2 rounded text-sm font-medium hover:bg-indigo-600 transition
+                              {{ request()->routeIs('retiro.*') ? 'bg-indigo-800' : '' }}">
+                        Retiro
+                    </a>
 
                     @if(auth()->user()->esAdmin())
                         {{-- Admin: solicitudes pendientes con badge --}}

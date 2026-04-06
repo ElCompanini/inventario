@@ -36,6 +36,7 @@
                                 <th class="px-4 py-3 text-left font-semibold text-gray-600">Stock actual</th>
                                 <th class="px-4 py-3 text-center font-semibold text-gray-600">Solicitado</th>
                                 <th class="px-4 py-3 text-center font-semibold text-gray-600">Cantidad recibida</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Container destino</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -65,6 +66,21 @@
                                         @error("recibido.{$det->id}")
                                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                         @enderror
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        @if($det->producto)
+                                            <select name="container[{{ $det->id }}]"
+                                                    class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                                @foreach($containers as $c)
+                                                    <option value="{{ $c->id }}"
+                                                        {{ $det->producto->contenedor == $c->id ? 'selected' : '' }}>
+                                                        {{ $c->nombre }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        @else
+                                            <span class="text-xs text-gray-400">—</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach

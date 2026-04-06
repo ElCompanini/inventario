@@ -12,7 +12,7 @@ class ProductoController extends Controller
     {
         $productos = Producto::with([
             'container',
-            'solicitudes' => fn($q) => $q->where('tipo', 'salida')->where('estado', 'pendiente'),
+            'solicitudes' => fn($q) => $q->where('tipo', 'salida')->where('estado', 'pendiente')->with('usuario:id,name'),
         ])->orderBy('nombre')->get();
         $containers = Container::orderBy('id')->get();
         return view('dashboard', compact('productos', 'containers'));

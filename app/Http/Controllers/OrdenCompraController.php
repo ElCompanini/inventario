@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Container;
 use App\Models\Factura;
 use App\Models\GuiaDespacho;
 use App\Models\HistorialCambio;
@@ -163,7 +164,9 @@ class OrdenCompraController extends Controller
                 ->with('error', 'Debes subir la factura antes de registrar la recepción.');
         }
 
-        return view('admin.ordenes.recepcion', compact('oc'));
+        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+
+        return view('admin.ordenes.recepcion', compact('oc', 'containers'));
     }
 
     public function procesarRecepcion(int $id, Request $request)
@@ -189,6 +192,12 @@ class OrdenCompraController extends Controller
 
                     if ($recibido > 0 && $detalle->producto) {
                         $detalle->producto->stock_actual += $recibido;
+
+                        $containerId = $request->input("container.{$detalle->id}");
+                        if ($containerId && Container::find((int) $containerId)) {
+                            $detalle->producto->contenedor = (int) $containerId;
+                        }
+
                         $detalle->producto->save();
 
                         HistorialCambio::create([

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan:*)",
+      "Bash(cmd /c \"icacls C:\\\\xampp\\\\htdocs\\\\inventario\\\\storage /grant Everyone:F /T\")",
+      "Bash(cmd /c \"icacls C:\\\\xampp\\\\htdocs\\\\inventario\\\\storage /grant Everyone:\\(OI\\)\\(CI\\)F /T && icacls C:\\\\xampp\\\\htdocs\\\\inventario\\\\bootstrap\\\\cache /grant Everyone:\\(OI\\)\\(CI\\)F /T\")"
+    ]
+  }
+}

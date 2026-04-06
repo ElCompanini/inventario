@@ -6,6 +6,7 @@
 
 <div class="mb-6 flex items-center justify-between">
     <div>
+
         <h1 class="text-2xl font-bold text-gray-800">Historial de Cambios</h1>
         <p class="text-sm text-gray-500 mt-1">Registro completo e inmutable de todos los movimientos de stock</p>
     </div>
@@ -15,7 +16,7 @@
 {{-- Buscador --}}
 <div class="mb-4">
     <input id="buscador-productos" type="text" placeholder="🔍  Buscar en historial..."
-           class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
+        class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
                   focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
 </div>
 
@@ -35,7 +36,7 @@
         </thead>
         <tbody>
 
-
+            <h1 class=" font-medium text-gray-900 sorting_1 ">Exportar archivo:</h1>
             @foreach($historial as $registro)
             <tr class="{{ $registro->tipo === 'traslado' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50' }} transition">
                 <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
@@ -177,7 +178,9 @@
                 },
             ],
         });
-        $('#buscador-productos').on('input', function () { table.search(this.value).draw(); });
+        $('#buscador-productos').on('input', function() {
+            table.search(this.value).draw();
+        });
     });
 </script>
 @endpush

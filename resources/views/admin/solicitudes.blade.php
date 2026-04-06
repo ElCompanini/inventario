@@ -119,7 +119,8 @@
 
                     {{-- Botón que abre el modal de rechazo --}}
                     <button type="button"
-                            onclick="abrirModalRechazo({{ $solicitud->id }})"
+                            data-url="{{ route('admin.solicitudes.rechazar', $solicitud->id) }}"
+                            onclick="abrirModalRechazo({{ $solicitud->id }}, this.dataset.url)"
                             class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700
                                    text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -197,10 +198,10 @@
         });
     }
 
-    function abrirModalRechazo(id) {
+    function abrirModalRechazo(id, url) {
         const modal = document.getElementById('modalRechazo');
         const form  = document.getElementById('formRechazo');
-        form.action = `/admin/solicitudes/${id}/rechazar`;
+        form.action = url;
         document.getElementById('motivo_rechazo').value = '';
         modal.classList.remove('hidden');
         modal.classList.add('flex');

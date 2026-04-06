@@ -45,7 +45,7 @@
 
 {{-- Tabla de productos --}}
 <div class="bg-white rounded-xl shadow overflow-hidden p-4">
-    <h1 class=" font-medium text-gray-900 sorting_1">Exportar archivo</h1>
+    <h1 class=" font-medium text-gray-900 sorting_1">Exportar archivo:</h1>
     <table id="tabla-inventario" class="w-full text-sm">
         <thead class="bg-gray-50 text-left">
             <tr>
@@ -87,7 +87,10 @@
                                 <span style="display:none; position:absolute; left:14px; top:50%; transform:translateY(-50%); z-index:9999;
                                              white-space:nowrap; background:#1f2937; color:#fff; font-size:11px; font-weight:500;
                                              padding:5px 10px; border-radius:6px; box-shadow:0 4px 8px rgba(0,0,0,.35);">
-                                    ⏳ {{ $pendienteSalida }} unidad(es) de salida pendiente(s)
+                                    ⏳ {{ $pendienteSalida }} unidad(es) de salida pendiente(s)<br>
+                                    @foreach($producto->solicitudes as $sol)
+                                        · {{ $sol->usuario->name ?? '—' }}: {{ $sol->cantidad }} u.<br>
+                                    @endforeach
                                 </span>
                             </span>
                         @endif
@@ -406,7 +409,7 @@
             layout: {
                 topStart: 'buttons',
                 topEnd: null,
-                bottomStart: 'info',
+                bottomStart: null,
                 bottomEnd: null,
             },
             buttons: [{

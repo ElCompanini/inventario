@@ -32,6 +32,7 @@
         <table id="tabla-containers" class="w-full text-sm">
             <thead class="bg-gray-50 text-left">
                 <tr>
+                    <th class="px-3 py-3 w-8"></th>
                     <th class="px-6 py-3 font-semibold text-gray-600">ID</th>
                     <th class="px-6 py-3 font-semibold text-gray-600">Nombre</th>
                     <th class="px-6 py-3 font-semibold text-gray-600">Descripción</th>
@@ -41,7 +42,14 @@
             </thead>
             <tbody>
                 @foreach($containers as $container)
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50 cursor-pointer fila-container"
+                        data-container-id="{{ $container->id }}">
+                        <td class="px-3 py-4 text-center">
+                            <svg class="chevron w-4 h-4 text-gray-400 transition-transform duration-200 inline-block"
+                                 fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $container->id }}</td>
                         <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $container->nombre }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $container->descripcion ?? '—' }}</td>
@@ -84,22 +92,82 @@
     </div>
 @endif
 
+@php
+    $productosMapData = $containers->mapWithKeys(fn($c) => [
+        $c->id => $c->productos->map(fn($p) => [
+            'descripcion' => $p->descripcion ?? $p->nombre,
+            'categoria'   => $p->nombre,
+            'stock'       => $p->stock_actual,
+        ])->values()
+    ]);
+@endphp
+
 @push('scripts')
 <script>
     $(document).ready(function () {
         const table = $('#tabla-containers').DataTable({
             language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json' },
-            order: [[0, 'asc']],
+            order: [[1, 'asc']],
             paging: false,
             layout: { topStart: 'buttons', topEnd: null, bottomStart: 'info', bottomEnd: null },
             buttons: [
-                { extend: 'excelHtml5', text: 'Excel', className: 'dt-btn-excel', exportOptions: { columns: ':not(:last-child)' } },
-                { extend: 'csvHtml5',   text: 'CSV',   className: 'dt-btn', exportOptions: { columns: ':not(:last-child)' } },
-                { extend: 'pdfHtml5',   text: 'PDF',   className: 'dt-btn-pdf', exportOptions: { columns: ':not(:last-child)' } },
+                { extend: 'excelHtml5', text: 'Excel', className: 'dt-btn-excel', exportOptions: { columns: ':not(:first-child):not(:last-child)' } },
+                { extend: 'csvHtml5',   text: 'CSV',   className: 'dt-btn',       exportOptions: { columns: ':not(:first-child):not(:last-child)' } },
+                { extend: 'pdfHtml5',   text: 'PDF',   className: 'dt-btn-pdf',   exportOptions: { columns: ':not(:first-child):not(:last-child)' } },
             ],
-            columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+            columnDefs: [
+                { orderable: false, searchable: false, targets: [0, -1] },
+            ],
         });
+
         $('#buscador-containers').on('input', function () { table.search(this.value).draw(); });
+
+        // ── Mapa de productos por container ──
+        const productosMap = @json($productosMapData);
+
+        // ── Child rows: expandir/contraer productos ──
+        $('#tabla-containers tbody').on('click', 'tr.fila-container', function (e) {
+            if ($(e.target).closest('button, form, a').length) return;
+
+            const tr          = $(this);
+            const row         = table.row(tr);
+            const chevron     = tr.find('.chevron');
+            const containerId = tr.data('container-id');
+
+            if (row.child.isShown()) {
+                row.child.hide();
+                tr.removeClass('bg-indigo-50');
+                chevron.css('transform', 'rotate(0deg)');
+            } else {
+                const productos = productosMap[containerId] || [];
+                let html = '<div style="padding:0.5rem 1rem 1rem 3.5rem; background:#f5f7ff;">';
+
+                if (!productos.length) {
+                    html += '<p style="color:#6b7280;font-size:0.8rem;padding-top:0.5rem;">Sin productos en este container.</p>';
+                } else {
+                    html += '<table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:0.5rem;">';
+                    html += '<thead><tr style="background:#e0e7ff;color:#3730a3;">'
+                          + '<th style="padding:6px 12px;text-align:left;">Descripción</th>'
+                          + '<th style="padding:6px 12px;text-align:left;">Categoría</th>'
+                          + '<th style="padding:6px 12px;text-align:center;">Stock</th>'
+                          + '</tr></thead><tbody>';
+                    productos.forEach(function (p, i) {
+                        const bg = i % 2 === 0 ? '#fff' : '#f1f5ff';
+                        html += '<tr style="background:' + bg + ';">'
+                              + '<td style="padding:6px 12px;color:#374151;">'       + (p.descripcion || '—') + '</td>'
+                              + '<td style="padding:6px 12px;color:#4f46e5;font-weight:600;">' + p.categoria + '</td>'
+                              + '<td style="padding:6px 12px;text-align:center;font-weight:700;color:#166534;">' + p.stock + '</td>'
+                              + '</tr>';
+                    });
+                    html += '</tbody></table>';
+                }
+                html += '</div>';
+
+                row.child(html).show();
+                tr.addClass('bg-indigo-50');
+                chevron.css('transform', 'rotate(90deg)');
+            }
+        });
     });
 </script>
 @endpush
