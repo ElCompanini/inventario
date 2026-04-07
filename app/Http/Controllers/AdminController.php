@@ -14,6 +14,7 @@ class AdminController extends Controller
 {
     public function solicitudes()
     {
+        abort_unless(auth()->user()->tienePermiso('solicitudes'), 403);
         $solicitudes = Solicitud::with(['producto', 'usuario'])
             ->where('estado', 'pendiente')
             ->orderBy('created_at')
@@ -24,6 +25,7 @@ class AdminController extends Controller
 
     public function aprobar(int $id)
     {
+        abort_unless(auth()->user()->tienePermiso('solicitudes'), 403);
         $solicitud = Solicitud::with('producto')->findOrFail($id);
 
         if ($solicitud->estado !== 'pendiente') {
@@ -70,6 +72,7 @@ class AdminController extends Controller
 
     public function rechazar(int $id, Request $request)
     {
+        abort_unless(auth()->user()->tienePermiso('solicitudes'), 403);
         $data = $request->validate([
             'motivo_rechazo' => ['required', 'string', 'max:500'],
         ], [
@@ -93,6 +96,7 @@ class AdminController extends Controller
 
     public function rechazadas()
     {
+        abort_unless(auth()->user()->tienePermiso('rechazadas'), 403);
         $solicitudes = Solicitud::with(['producto', 'usuario'])
             ->where('estado', 'rechazado')
             ->orderByDesc('created_at')
@@ -103,6 +107,7 @@ class AdminController extends Controller
 
     public function historial()
     {
+        abort_unless(auth()->user()->tienePermiso('historial'), 403);
         $historial = HistorialCambio::with(['producto', 'usuario', 'sicd'])
             ->orderByDesc('created_at')
             ->get();
@@ -112,6 +117,7 @@ class AdminController extends Controller
 
     public function editarStock(int $id)
     {
+        abort_unless(auth()->user()->tienePermiso('stock'), 403);
         $producto = Producto::with('container')->findOrFail($id);
         $containers = Container::orderBy('id')->get();
         return view('admin.productos.editar', compact('producto', 'containers'));
@@ -119,6 +125,7 @@ class AdminController extends Controller
 
     public function modificarStock(int $id, Request $request)
     {
+        abort_unless(auth()->user()->tienePermiso('stock'), 403);
         $data = $request->validate([
             'cantidad' => ['required', 'integer', 'min:1'],
             'tipo'     => ['required', 'in:entrada,salida'],
@@ -166,6 +173,7 @@ class AdminController extends Controller
 
     public function trasladarContainer(int $id, Request $request)
     {
+        abort_unless(auth()->user()->tienePermiso('stock'), 403);
         $data = $request->validate([
             'contenedor_destino' => ['required', 'integer', 'exists:containers,id'],
             'motivo'             => ['required', 'string', 'max:500'],

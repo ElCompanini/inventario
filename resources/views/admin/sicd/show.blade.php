@@ -81,10 +81,15 @@
                         @foreach($sicd->detalles as $det)
                             <tr class="hover:bg-gray-50">
                                 <td class="px-4 py-3 text-gray-800">
-                                    {{ $det->nombre_producto_excel }}
-                                    @unless($det->producto)
+                                    @if($det->producto)
+                                        {{ $det->producto->nombre }}
+                                        @if($det->producto->nombre !== $det->nombre_producto_excel)
+                                            <span class="block text-xs text-gray-400 mt-0.5">Excel: {{ $det->nombre_producto_excel }}</span>
+                                        @endif
+                                    @else
+                                        {{ $det->nombre_producto_excel }}
                                         <span class="ml-1 text-xs text-amber-500">(sin enlace)</span>
-                                    @endunless
+                                    @endif
                                 </td>
                                 <td class="px-4 py-3 text-center text-gray-600">{{ $det->unidad ?? '—' }}</td>
                                 <td class="px-4 py-3 text-center font-semibold text-gray-700">{{ $det->cantidad_solicitada }}</td>

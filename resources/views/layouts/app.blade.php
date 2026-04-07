@@ -45,14 +45,13 @@
                         Retiro
                     </a>
 
-                    @if(auth()->user()->esAdmin())
-                        {{-- Admin: solicitudes pendientes con badge --}}
-                        @php
-                            $pendientes = \App\Models\Solicitud::where('estado','pendiente')->count();
-                        @endphp
+                    @php $u = auth()->user(); @endphp
+
+                    @if($u->tienePermiso('solicitudes'))
+                        @php $pendientes = \App\Models\Solicitud::where('estado','pendiente')->count(); @endphp
                         <a href="{{ route('admin.solicitudes') }}"
                            class="relative px-3 py-2 rounded text-sm font-medium hover:bg-indigo-600 transition
-                                  {{ request()->routeIs('admin.solicitudes') ? 'bg-indigo-800' : '' }}">
+                                  {{ request()->routeIs('admin.solicitudes') && !request()->routeIs('admin.solicitudes.rechazadas') ? 'bg-indigo-800' : '' }}">
                             Solicitudes
                             @if($pendientes > 0)
                                 <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
@@ -60,39 +59,64 @@
                                 </span>
                             @endif
                         </a>
-                        <a href="{{ route('admin.historial') }}"
-                           class="px-3 py-2 rounded text-sm font-medium hover:bg-indigo-600 transition
-                                  {{ request()->routeIs('admin.historial') ? 'bg-indigo-800' : '' }}">
-                            Historial
-                        </a>
+                    @endif
+
+                    @if($u->tienePermiso('rechazadas'))
                         <a href="{{ route('admin.solicitudes.rechazadas') }}"
                            class="px-3 py-2 rounded text-sm font-medium hover:bg-indigo-600 transition
                                   {{ request()->routeIs('admin.solicitudes.rechazadas') ? 'bg-indigo-800' : '' }}">
                             Rechazadas
                         </a>
+                    @endif
+
+                    @if($u->tienePermiso('historial'))
+                        <a href="{{ route('admin.historial') }}"
+                           class="px-3 py-2 rounded text-sm font-medium hover:bg-indigo-600 transition
+                                  {{ request()->routeIs('admin.historial') ? 'bg-indigo-800' : '' }}">
+                            Historial
+                        </a>
+                    @endif
+
+                    @if($u->tienePermiso('sicd'))
                         <a href="{{ route('admin.sicd.index') }}"
                            class="px-3 py-2 rounded text-sm font-medium hover:bg-indigo-600 transition
                                   {{ request()->routeIs('admin.sicd.*') ? 'bg-indigo-800' : '' }}">
                             SICD
                         </a>
+                    @endif
+
+                    @if($u->tienePermiso('ordenes'))
                         <a href="{{ route('admin.ordenes.index') }}"
                            class="px-3 py-2 rounded text-sm font-medium hover:bg-indigo-600 transition
                                   {{ request()->routeIs('admin.ordenes.*') ? 'bg-indigo-800' : '' }}">
                             Órdenes de Compra
                         </a>
+                    @endif
+
+                    @if($u->tienePermiso('containers'))
                         <a href="{{ route('admin.containers.index') }}"
                            class="px-3 py-2 rounded text-sm font-medium hover:bg-indigo-600 transition
                                   {{ request()->routeIs('admin.containers.*') ? 'bg-indigo-800' : '' }}">
                             Containers
                         </a>
-                    @else
-                        {{-- Usuario normal --}}
+                    @endif
+
+                    @if($u->esAdmin())
+                        <a href="{{ route('admin.usuarios.index') }}"
+                           class="px-3 py-2 rounded text-sm font-medium hover:bg-indigo-600 transition
+                                  {{ request()->routeIs('admin.usuarios.*') ? 'bg-indigo-800' : '' }}">
+                            Usuarios
+                        </a>
+                    @endif
+
+                    @unless($u->esAdmin() || $u->tieneAlgunPermiso())
+                        {{-- Usuario sin permisos extra --}}
                         <a href="{{ route('solicitudes.mis') }}"
                            class="px-3 py-2 rounded text-sm font-medium hover:bg-indigo-600 transition
                                   {{ request()->routeIs('solicitudes.mis') ? 'bg-indigo-800' : '' }}">
                             Mis Solicitudes
                         </a>
-                    @endif
+                    @endunless
 
                     {{-- Usuario y logout --}}
                     <div class="flex items-center gap-2 ml-4 pl-4 border-l border-indigo-500">

@@ -73,10 +73,22 @@
                             @endphp
                             <tr class="{{ $diferente ? 'bg-orange-50' : 'hover:bg-gray-50' }}">
                                 <td class="px-4 py-2 text-gray-800">
-                                    {{ $det->nombre_producto_excel }}
-                                    @unless($det->producto)
+                                    @if($det->producto)
+                                        {{ $det->producto->nombre }}
+                                        @if($det->producto->nombre !== $det->nombre_producto_excel)
+                                            <span class="block text-xs text-gray-400 mt-0.5">Excel: {{ $det->nombre_producto_excel }}</span>
+                                        @endif
+                                    @else
+                                        {{ $det->nombre_producto_excel }}
                                         <span class="ml-1 text-xs text-amber-500">(sin enlace)</span>
-                                    @endunless
+                                    @endif
+                                    @if($diferente && $det->motivo_recepcion)
+                                        <span class="block mt-1 text-xs font-semibold" style="color:#c2410c;">
+                                            ⚠ Motivo: {{ $det->motivo_recepcion }}
+                                        </span>
+                                    @elseif($diferente)
+                                        <span class="block mt-1 text-xs" style="color:#f97316;">Sin motivo registrado</span>
+                                    @endif
                                 </td>
                                 <td class="px-4 py-2 text-center text-gray-600">{{ $det->unidad ?? '—' }}</td>
                                 <td class="px-4 py-2 text-center font-semibold text-gray-700">{{ $det->cantidad_solicitada }}</td>
@@ -92,8 +104,12 @@
                                         <span class="text-green-600">{{ $det->cantidad_recibida }}</span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-2 text-right text-gray-700">{{ $det->precio_neto !== null ? '$' . number_format($det->precio_neto, 0, ',', '.') : '—' }}</td>
-                                <td class="px-4 py-2 text-right font-semibold text-gray-800">{{ $det->total_neto !== null ? '$' . number_format($det->total_neto, 0, ',', '.') : '—' }}</td>
+                                <td class="px-4 py-2 text-right text-gray-700">
+                                    {{ $det->precio_neto ? '$' . number_format($det->precio_neto, 0, ',', '.') : '—' }}
+                                </td>
+                                <td class="px-4 py-2 text-right font-semibold text-gray-800">
+                                    {{ $det->total_neto ? '$' . number_format($det->total_neto, 0, ',', '.') : '—' }}
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>

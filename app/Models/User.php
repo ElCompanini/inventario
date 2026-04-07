@@ -19,16 +19,44 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
+    // Permisos disponibles para usuarios no-admin
+    public const PERMISOS_DISPONIBLES = [
+        'historial'   => 'Ver historial de cambios',
+        'solicitudes' => 'Ver y gestionar solicitudes pendientes',
+        'rechazadas'  => 'Ver solicitudes rechazadas',
+        'sicd'        => 'Ver y gestionar SICD',
+        'ordenes'     => 'Ver y gestionar órdenes de compra',
+        'containers'  => 'Ver contenedores',
+        'stock'       => 'Modificar stock de productos',
+    ];
+
     protected $fillable = [
         'name',
         'email',
         'password',
         'rol',
+        'centro_costo',
+        'permisos',
     ];
+
 
     public function esAdmin(): bool
     {
         return $this->rol === 'admin';
+    }
+
+    public function tienePermiso(string $permiso): bool
+    {
+        if ($this->esAdmin()) return true;
+        $permisos = $this->permisos ?? [];
+        return in_array($permiso, $permisos);
+    }
+
+    public function tieneAlgunPermiso(): bool
+    {
+        if ($this->esAdmin()) return true;
+        $permisos = $this->permisos ?? [];
+        return count($permisos) > 0;
     }
 
     public function solicitudes()
@@ -60,7 +88,8 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
+            'permisos'          => 'array',
         ];
     }
 }

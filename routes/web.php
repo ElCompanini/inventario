@@ -10,6 +10,7 @@ use App\Http\Controllers\SicdController;
 use App\Http\Controllers\OrdenCompraController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\RetiroController;
+use App\Http\Controllers\UsuarioController;
 
 // Raíz → login
 Route::get('/', fn() => redirect()->route('login'));
@@ -72,6 +73,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/ordenes/{id}/descargar-factura', [OrdenCompraController::class, 'descargarFactura'])->name('ordenes.factura.descargar');
     Route::get('/ordenes/{id}/descargar-guia', [OrdenCompraController::class, 'descargarGuia'])->name('ordenes.guia.descargar');
     Route::get('/ordenes/{id}/descargar', [OrdenCompraController::class, 'descargarOc'])->name('ordenes.descargar');
+    Route::post('/ordenes/subir-temp', [OrdenCompraController::class, 'subirArchivoTemp'])->name('ordenes.subir.temp');
+
+    // Usuarios
+    Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
+    Route::get('/usuarios/crear', [UsuarioController::class, 'create'])->name('usuarios.create');
+    Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
+    Route::get('/usuarios/{id}/editar', [UsuarioController::class, 'edit'])->name('usuarios.edit');
+    Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])->name('usuarios.update');
+    Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
 
     // Containers
     Route::get('/containers', [ContainerController::class, 'index'])->name('containers.index');

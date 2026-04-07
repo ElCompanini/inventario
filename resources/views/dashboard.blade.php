@@ -51,7 +51,7 @@
             <tr>
                 <th class="px-4 py-3 font-semibold text-gray-600">Producto</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Descripción</th>
-                <th class="px-4 py-3 font-semibold text-gray-600">Contenedor</th>
+                <th class="px-4 py-3 font-semibold text-gray-600" style="text-align:center;">Contenedor</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Stock Actual</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Mínimo</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Crítico</th>
@@ -110,20 +110,20 @@
                     </div>
                 </td>
                 <td class="px-4 py-3 text-gray-500">{{ $producto->descripcion ?? '—' }}</td>
-                <td class="px-4 py-3 text-center">
+                <td class="px-4 py-3" style="text-align:center; vertical-align:middle;">
                     @if($producto->container)
                         @if(auth()->user()->esAdmin())
                             <a href="{{ route('admin.containers.index') }}#container-{{ $producto->container->id }}"
-                               class="inline-block bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full hover:bg-indigo-200 transition">
+                               style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.875rem; font-weight:700; padding:2px 12px; border-radius:9999px; text-decoration:none;">
                                 {{ str_replace('Contenedor ', 'C', $producto->container->nombre) }}
                             </a>
                         @else
-                            <span class="inline-block bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">
+                            <span style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.875rem; font-weight:700; padding:2px 12px; border-radius:9999px;">
                                 {{ str_replace('Contenedor ', 'C', $producto->container->nombre) }}
                             </span>
                         @endif
                     @else
-                        <span class="inline-block bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">—</span>
+                        <span style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.875rem; font-weight:700; padding:2px 12px; border-radius:9999px;">—</span>
                     @endif
                 </td>
                 <td class="px-4 py-3 text-center font-bold

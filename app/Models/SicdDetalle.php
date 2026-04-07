@@ -18,6 +18,7 @@ class SicdDetalle extends Model
         'unidad',
         'cantidad_solicitada',
         'cantidad_recibida',
+        'motivo_recepcion',
         'precio_neto',
         'total_neto',
     ];

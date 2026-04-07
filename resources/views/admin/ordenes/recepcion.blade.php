@@ -61,8 +61,13 @@
                             @foreach($sicd->detalles as $det)
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-4 py-3" style="vertical-align:middle;">
-                                        <p class="font-medium text-gray-800">{{ $det->nombre_producto_excel }}</p>
-                                        @if(!$det->producto)
+                                        @if($det->producto)
+                                            <p class="font-medium text-gray-800">{{ $det->producto->nombre }}</p>
+                                            @if($det->producto->nombre !== $det->nombre_producto_excel)
+                                                <p class="text-xs text-gray-400 mt-0.5">Excel: {{ $det->nombre_producto_excel }}</p>
+                                            @endif
+                                        @else
+                                            <p class="font-medium text-gray-800">{{ $det->nombre_producto_excel }}</p>
                                             <p class="text-xs text-amber-500 mt-0.5">Sin enlace a producto — no actualizará stock</p>
                                         @endif
                                     </td>
@@ -75,10 +80,12 @@
                                     <td class="px-4 py-3 text-center" style="vertical-align:middle;">
                                         <input type="number"
                                                name="recibido[{{ $det->id }}]"
+                                               data-solicitado="{{ $det->cantidad_solicitada }}"
+                                               data-detid="{{ $det->id }}"
                                                value="{{ old("recibido.{$det->id}", $det->cantidad_solicitada) }}"
                                                min="0"
                                                {{ !$det->producto ? 'disabled' : '' }}
-                                               class="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400
+                                               class="input-recibido w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400
                                                       {{ !$det->producto ? 'bg-gray-100 text-gray-400' : '' }}">
                                         @error("recibido.{$det->id}")
                                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
@@ -129,6 +136,22 @@
                                         @else
                                             <span class="text-xs text-gray-400">—</span>
                                         @endif
+                                    </td>
+                                </tr>
+                                <tr id="motivo-row-{{ $det->id }}"
+                                    style="display:none; background:#fff7ed;">
+                                    <td colspan="7" class="px-4 py-3" style="border-top:1px dashed #fed7aa;">
+                                        <div style="display:flex; align-items:flex-start; gap:0.75rem;">
+                                            <span style="font-size:0.8rem; font-weight:700; color:#c2410c; white-space:nowrap; padding-top:0.4rem;">
+                                                ⚠ Cantidad diferente — Motivo:
+                                            </span>
+                                            <textarea name="motivo_recepcion[{{ $det->id }}]"
+                                                      rows="2"
+                                                      placeholder="Indica el motivo por el que la cantidad recibida difiere de la solicitada..."
+                                                      style="flex:1; border:1.5px solid #f97316; border-radius:0.5rem; padding:0.375rem 0.625rem; font-size:0.8rem; color:#7c2d12; background:#fff; resize:vertical; outline:none;"
+                                                      onfocus="this.style.borderColor='#ea580c'; this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.2)'"
+                                                      onblur="this.style.borderColor='#f97316'; this.style.boxShadow='none'">{{ old("motivo_recepcion.{$det->id}") }}</textarea>
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach
@@ -213,13 +236,33 @@
         });
     });
 
-    // También recalcular si cambia la cantidad recibida
-    document.querySelectorAll('input[name^="recibido["]').forEach(function(cantInput) {
+    // También recalcular si cambia la cantidad recibida + mostrar motivo si difiere
+    function verificarMotivo(cantInput) {
+        const id         = cantInput.dataset.detid;
+        const solicitado = parseInt(cantInput.dataset.solicitado) || 0;
+        const recibido   = parseInt(cantInput.value) || 0;
+        const motivoRow  = document.getElementById('motivo-row-' + id);
+        if (!motivoRow) return;
+        const textarea = motivoRow.querySelector('textarea');
+        if (recibido !== solicitado) {
+            motivoRow.style.display = '';
+            if (textarea) textarea.required = true;
+        } else {
+            motivoRow.style.display = 'none';
+            if (textarea) { textarea.required = false; textarea.value = ''; }
+        }
+    }
+
+    document.querySelectorAll('.input-recibido').forEach(function(cantInput) {
+        // Verificar al cargar (por si hay old() con valor distinto)
+        verificarMotivo(cantInput);
+
         cantInput.addEventListener('input', function () {
             const id = this.name.match(/\[(\d+)\]/)?.[1];
             if (!id) return;
             const precioInput = document.querySelector(`input[name="precio_neto[${id}]"]`);
             if (precioInput) recalcularTotal(precioInput);
+            verificarMotivo(this);
         });
     });
 

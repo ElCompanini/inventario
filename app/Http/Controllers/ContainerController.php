@@ -13,6 +13,7 @@ class ContainerController extends Controller
 {
     public function index()
     {
+        abort_unless(auth()->user()->tienePermiso('containers'), 403);
         $containers = Container::withCount('productos')
             ->with('productos:id,nombre,descripcion,stock_actual,contenedor')
             ->orderBy('id')->get();

@@ -17,6 +17,7 @@ class OrdenCompraController extends Controller
 {
     public function index()
     {
+        abort_unless(auth()->user()->tienePermiso('ordenes'), 403);
         $ordenes = OrdenCompra::with(['usuario', 'sicds', 'factura', 'guia'])
             ->orderByDesc('created_at')
             ->paginate(20);
@@ -50,7 +51,14 @@ class OrdenCompraController extends Controller
         $rutaOc   = null;
         $nombreOc = null;
 
-        if ($request->hasFile('archivo_oc')) {
+        $tempPath = $request->input('archivo_oc_temp');
+        if ($tempPath && Storage::disk('local')->exists($tempPath)) {
+            // Mover desde temp a destino definitivo
+            $nombreOc = basename($tempPath);
+            $destino  = 'documentos/oc/' . basename($tempPath);
+            Storage::disk('local')->move($tempPath, $destino);
+            $rutaOc   = $destino;
+        } elseif ($request->hasFile('archivo_oc')) {
             $archivo  = $request->file('archivo_oc');
             $nombreOc = $archivo->getClientOriginalName();
             $rutaOc   = $archivo->store('documentos/oc', 'local');
@@ -188,13 +196,13 @@ class OrdenCompraController extends Controller
 
                     $detalle->cantidad_recibida = $recibido;
 
-                    $precioNeto = $request->input("precio_neto.{$detalle->id}");
-                    $totalNeto  = $request->input("total_neto.{$detalle->id}");
-                    if ($precioNeto !== null && $precioNeto !== '') {
-                        $detalle->precio_neto = (float) $precioNeto;
+                    $precioRaw = preg_replace('/[^0-9]/', '', $request->input("precio_neto.{$detalle->id}", ''));
+                    $totalRaw  = preg_replace('/[^0-9]/', '', $request->input("total_neto.{$detalle->id}", ''));
+                    if ($precioRaw !== '') {
+                        $detalle->precio_neto = (float) $precioRaw;
                     }
-                    if ($totalNeto !== null && $totalNeto !== '') {
-                        $detalle->total_neto = (float) $totalNeto;
+                    if ($totalRaw !== '') {
+                        $detalle->total_neto = (float) $totalRaw;
                     }
 
                     $detalle->save();
@@ -210,11 +218,21 @@ class OrdenCompraController extends Controller
                         $detalle->producto->actualizarFechasStock();
                         $detalle->producto->save();
 
+                        $motivoExtra = $request->input("motivo_recepcion.{$detalle->id}");
+                        if ($motivoExtra) {
+                            $detalle->motivo_recepcion = $motivoExtra;
+                            $detalle->save();
+                        }
+                        $motivoBase = "OC {$oc->numero_oc} – SICD {$sicd->codigo_sicd}";
+                        if ($recibido != $detalle->cantidad_solicitada && $motivoExtra) {
+                            $motivoBase .= " (solicitado: {$detalle->cantidad_solicitada}, recibido: {$recibido})";
+                        }
+
                         HistorialCambio::create([
                             'producto_id'  => $detalle->producto_id,
                             'cantidad'     => $recibido,
                             'tipo'         => 'entrada',
-                            'motivo'       => "OC {$oc->numero_oc} – SICD {$sicd->codigo_sicd}",
+                            'motivo'       => $motivoBase,
                             'aprobado_por' => Auth::user()->name,
                             'usuario_id'   => Auth::id(),
                             'origen'       => 'sicd',
@@ -259,5 +277,40 @@ class OrdenCompraController extends Controller
         abort_unless($oc->archivo_ruta, 404, 'Esta OC no tiene archivo adjunto.');
 
         return Storage::disk('local')->download($oc->archivo_ruta, $oc->archivo_nombre);
+    }
+
+    public function subirArchivoTemp(Request $request)
+    {
+        $request->validate(['archivo_oc' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240']);
+
+        $file     = $request->file('archivo_oc');
+        $tempPath = $file->store('oc_temp', 'local');
+        $fullPath = Storage::disk('local')->path($tempPath);
+
+        $numeroOc = null;
+
+        if (strtolower($file->getClientOriginalExtension()) === 'pdf') {
+            try {
+                $binario  = 'C:\\Program Files\\Git\\mingw64\\bin\\pdftotext.exe';
+                $escaped  = escapeshellarg($fullPath);
+                $texto    = shell_exec('"' . $binario . '" ' . $escaped . ' -');
+
+                if ($texto && preg_match(
+                    '/ORDEN\s+DE\s+COMPRA\s+N[°º]?\s*:?\s*([0-9]{5,}-[0-9]+-[A-Z0-9]+)/iu',
+                    $texto,
+                    $match
+                )) {
+                    $numeroOc = 'N°' . strtoupper(trim($match[1]));
+                }
+            } catch (\Exception $e) {
+                // No se pudo leer — el campo quedará vacío para ingreso manual
+            }
+        }
+
+        return response()->json([
+            'temp_path' => $tempPath,
+            'nombre'    => $file->getClientOriginalName(),
+            'numero_oc' => $numeroOc,
+        ]);
     }
 }

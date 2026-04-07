@@ -11,11 +11,18 @@ class AdminMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check() || !Auth::user()->esAdmin()) {
-            return redirect()->route('dashboard')
-                ->with('error', 'No tienes permisos para acceder a esa sección.');
+        if (!Auth::check()) {
+            return redirect()->route('login');
         }
 
-        return $next($request);
+        $user = Auth::user();
+
+        // Admin completo o usuario con al menos un permiso asignado
+        if ($user->esAdmin() || $user->tieneAlgunPermiso()) {
+            return $next($request);
+        }
+
+        return redirect()->route('dashboard')
+            ->with('error', 'No tienes permisos para acceder a esa sección.');
     }
 }

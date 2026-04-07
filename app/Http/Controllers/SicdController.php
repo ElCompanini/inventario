@@ -14,6 +14,7 @@ class SicdController extends Controller
 {
     public function index()
     {
+        abort_unless(auth()->user()->tienePermiso('sicd'), 403);
         $sicds = Sicd::with(['usuario', 'detalles', 'ordenesCompra'])
             ->orderByDesc('created_at')
             ->paginate(20);
@@ -23,6 +24,7 @@ class SicdController extends Controller
 
     public function create()
     {
+        abort_unless(auth()->user()->tienePermiso('sicd'), 403);
         return view('admin.sicd.crear');
     }
 
@@ -217,6 +219,7 @@ class SicdController extends Controller
 
     public function show(int $id)
     {
+        abort_unless(auth()->user()->tienePermiso('sicd'), 403);
         $sicd = Sicd::with(['usuario', 'detalles.producto', 'ordenesCompra'])->findOrFail($id);
         return view('admin.sicd.show', compact('sicd'));
     }
