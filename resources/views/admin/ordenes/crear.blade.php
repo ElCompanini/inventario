@@ -184,20 +184,24 @@
         })
         .then(r => r.json())
         .then(data => {
+            console.log('Respuesta servidor:', data);
+
             document.getElementById('archivo-oc-temp').value = data.temp_path;
             btnSubir.style.background = '#16a34a';
             texto.textContent = '✓ Subido';
             estado.style.display = 'block';
             estado.style.color   = '#15803d';
-            estado.textContent   = '✓ Archivo subido: ' + data.nombre;
 
-            // Rellenar número OC desde servidor (pdftotext)
             if (data.numero_oc) {
                 const campo = document.getElementById('campo-numero-oc');
                 campo.value             = data.numero_oc;
                 campo.style.borderColor = '#22c55e';
                 campo.style.background  = '#f0fdf4';
                 document.getElementById('oc-detectado-badge').style.display = 'block';
+                estado.textContent = '✓ Archivo subido: ' + data.nombre + ' — N° detectado: ' + data.numero_oc;
+            } else {
+                estado.textContent = '✓ Archivo subido: ' + data.nombre + ' — N° no detectado, escribe manualmente.';
+                estado.style.color = '#92400e';
             }
         })
         .catch(() => {

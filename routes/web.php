@@ -64,6 +64,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Órdenes de Compra
     Route::get('/ordenes', [OrdenCompraController::class, 'index'])->name('ordenes.index');
     Route::get('/ordenes/crear', [OrdenCompraController::class, 'create'])->name('ordenes.create');
+    Route::post('/ordenes/subir-temp', [OrdenCompraController::class, 'subirArchivoTemp'])->name('ordenes.subir.temp');
     Route::post('/ordenes', [OrdenCompraController::class, 'store'])->name('ordenes.store');
     Route::get('/ordenes/{id}', [OrdenCompraController::class, 'show'])->name('ordenes.show');
     Route::post('/ordenes/{id}/factura', [OrdenCompraController::class, 'subirFactura'])->name('ordenes.factura.subir');
@@ -73,7 +74,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/ordenes/{id}/descargar-factura', [OrdenCompraController::class, 'descargarFactura'])->name('ordenes.factura.descargar');
     Route::get('/ordenes/{id}/descargar-guia', [OrdenCompraController::class, 'descargarGuia'])->name('ordenes.guia.descargar');
     Route::get('/ordenes/{id}/descargar', [OrdenCompraController::class, 'descargarOc'])->name('ordenes.descargar');
-    Route::post('/ordenes/subir-temp', [OrdenCompraController::class, 'subirArchivoTemp'])->name('ordenes.subir.temp');
 
     // Usuarios
     Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');

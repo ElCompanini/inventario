@@ -281,36 +281,39 @@ class OrdenCompraController extends Controller
 
     public function subirArchivoTemp(Request $request)
     {
-        $request->validate(['archivo_oc' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240']);
+        try {
+            $request->validate(['archivo_oc' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240']);
 
-        $file     = $request->file('archivo_oc');
-        $tempPath = $file->store('oc_temp', 'local');
-        $fullPath = Storage::disk('local')->path($tempPath);
+            $file     = $request->file('archivo_oc');
+            $tempPath = $file->store('oc_temp', 'local');
+            $fullPath = Storage::disk('local')->path($tempPath);
 
-        $numeroOc = null;
+            $numeroOc = null;
 
-        if (strtolower($file->getClientOriginalExtension()) === 'pdf') {
-            try {
-                $binario  = 'C:\\Program Files\\Git\\mingw64\\bin\\pdftotext.exe';
-                $escaped  = escapeshellarg($fullPath);
-                $texto    = shell_exec('"' . $binario . '" ' . $escaped . ' -');
+            if (strtolower($file->getClientOriginalExtension()) === 'pdf') {
+                $ocr      = new \App\Services\PDFOcrService();
+                $texto    = $ocr->extraerTexto($fullPath);
+                $numeroOc = $ocr->extraerNumeroOC($fullPath);
 
-                if ($texto && preg_match(
-                    '/ORDEN\s+DE\s+COMPRA\s+N[°º]?\s*:?\s*([0-9]{5,}-[0-9]+-[A-Z0-9]+)/iu',
-                    $texto,
-                    $match
-                )) {
-                    $numeroOc = 'N°' . strtoupper(trim($match[1]));
-                }
-            } catch (\Exception $e) {
-                // No se pudo leer — el campo quedará vacío para ingreso manual
+                \Illuminate\Support\Facades\Log::info('OCR Debug', [
+                    'fullPath'     => $fullPath,
+                    'file_exists'  => file_exists($fullPath),
+                    'texto_inicio' => $texto ? substr($texto, 0, 500) : 'NULL',
+                    'numero_oc'    => $numeroOc,
+                ]);
             }
-        }
 
-        return response()->json([
-            'temp_path' => $tempPath,
-            'nombre'    => $file->getClientOriginalName(),
-            'numero_oc' => $numeroOc,
-        ]);
+            return response()->json([
+                'temp_path' => $tempPath,
+                'nombre'    => $file->getClientOriginalName(),
+                'numero_oc' => $numeroOc,
+            ]);
+
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('subirArchivoTemp error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }
