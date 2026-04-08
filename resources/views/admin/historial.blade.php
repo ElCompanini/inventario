@@ -21,6 +21,7 @@
 </div>
 
 <div class="bg-white rounded-xl shadow overflow-hidden p-4">
+    <p class="font-medium text-gray-900 text-sm mb-1">Exportar archivo:</p>
     <table id="tabla-historial" class="w-full text-sm">
         <thead class="bg-gray-50 text-left">
             <tr>
@@ -36,7 +37,6 @@
         </thead>
         <tbody>
 
-            <h1 class=" font-medium text-gray-900 sorting_1 ">Exportar archivo:</h1>
             @foreach($historial as $registro)
             <tr class="{{ $registro->tipo === 'traslado' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50' }} transition">
                 <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
@@ -69,10 +69,16 @@
                 <td class="px-4 py-3 text-gray-700">{{ $registro->aprobado_por ?? '—' }}</td>
                 <td class="px-4 py-3">
                     @if($registro->origen === 'sicd')
+                    @if(auth()->user()->tienePermiso('sicd'))
                     <a href="{{ route('admin.sicd.show', $registro->origen_id) }}"
                         class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-indigo-200 transition">
                         {{ $registro->sicd?->codigo_sicd ?? 'SICD #' . $registro->origen_id }}
                     </a>
+                    @else
+                    <span class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                        {{ $registro->sicd?->codigo_sicd ?? 'SICD #' . $registro->origen_id }}
+                    </span>
+                    @endif
                     @elseif($registro->origen === 'solicitud')
                     <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">
                         Solicitud #{{ $registro->origen_id }}
@@ -89,47 +95,15 @@
 
 @push('head')
 <style>
-    .dt-btn-excel {
-        background: #16a34a;
-        color: #fff;
-        padding: 0.375rem 0.75rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        border-radius: 0.5rem;
-        transition: background .15s;
-    }
-
-    .dt-btn-excel:hover {
-        background: #15803d;
-    }
-
-    .dt-btn {
-        background: #2563eb;
-        color: #fff;
-        padding: 0.375rem 0.75rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        border-radius: 0.5rem;
-        transition: background .15s;
-    }
-
-    .dt-btn:hover {
-        background: #1d4ed8;
-    }
-
-    .dt-btn-pdf {
-        background: #dc2626;
-        color: #fff;
-        padding: 0.375rem 0.75rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        border-radius: 0.5rem;
-        transition: background .15s;
-    }
-
-    .dt-btn-pdf:hover {
-        background: #b91c1c;
-    }
+@keyframes btn-breathe-green { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.7)} 50%{box-shadow:0 0 0 6px rgba(22,163,74,0)} }
+    @keyframes btn-breathe-blue  { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.7)} 50%{box-shadow:0 0 0 6px rgba(37,99,235,0)} }
+    @keyframes btn-breathe-red   { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.7)} 50%{box-shadow:0 0 0 6px rgba(220,38,38,0)} }
+    .dt-btn-excel { background:#16a34a; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s,transform .15s; }
+    .dt-btn-excel:hover { background:#15803d; transform:translateY(-1px); animation:btn-breathe-green 1.6s ease-in-out infinite; }
+    .dt-btn { background:#2563eb; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s,transform .15s; }
+    .dt-btn:hover { background:#1d4ed8; transform:translateY(-1px); animation:btn-breathe-blue 1.6s ease-in-out infinite; }
+    .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s,transform .15s; }
+    .dt-btn-pdf:hover { background:#b91c1c; transform:translateY(-1px); animation:btn-breathe-red 1.6s ease-in-out infinite; }
 </style>
 @endpush
 
@@ -150,7 +124,8 @@
                 bottomStart: null,
                 bottomEnd: null
             },
-            buttons: [{
+            buttons: [
+                {
                     extend: 'excelHtml5',
                     text: 'Excel',
                     className: 'dt-btn-excel',

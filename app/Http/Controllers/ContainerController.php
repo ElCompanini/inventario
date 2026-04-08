@@ -40,6 +40,7 @@ class ContainerController extends Controller
 
     public function destroy(int $id)
     {
+        abort_unless(auth()->user()->esAdmin(), 403);
         $container = Container::withCount('productos')->findOrFail($id);
 
         if ($container->productos_count > 0) {

@@ -11,6 +11,7 @@ use App\Http\Controllers\OrdenCompraController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\RetiroController;
 use App\Http\Controllers\UsuarioController;
+use App\Http\Controllers\GastoMenorController;
 
 // Raíz → login
 Route::get('/', fn() => redirect()->route('login'));
@@ -82,6 +83,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/usuarios/{id}/editar', [UsuarioController::class, 'edit'])->name('usuarios.edit');
     Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])->name('usuarios.update');
     Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
+
+    // Gastos Menores
+    Route::get('/gastos-menores', [GastoMenorController::class, 'index'])->name('gastos-menores.index');
+    Route::post('/gastos-menores', [GastoMenorController::class, 'store'])->name('gastos-menores.store');
+    Route::get('/gastos-menores/{id}/boleta', [GastoMenorController::class, 'descargarBoleta'])->name('gastos-menores.boleta');
+    Route::get('/gastos-menores/{folio}/editar', [GastoMenorController::class, 'edit'])->name('gastos-menores.edit');
+    Route::put('/gastos-menores/{folio}', [GastoMenorController::class, 'update'])->name('gastos-menores.update');
 
     // Containers
     Route::get('/containers', [ContainerController::class, 'index'])->name('containers.index');

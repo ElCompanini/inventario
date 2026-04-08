@@ -52,7 +52,9 @@
                             <p class="text-xs text-gray-400 mt-0.5">{{ $sicd->descripcion }}</p>
                         @endif
                     </div>
+                    @if(auth()->user()->tienePermiso('sicd'))
                     <a href="{{ route('admin.sicd.show', $sicd->id) }}" class="text-xs text-indigo-600 hover:underline">Ver SICD →</a>
+                    @endif
                 </div>
                 <table class="min-w-full divide-y divide-gray-100 text-sm">
                     <thead class="bg-gray-50">

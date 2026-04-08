@@ -38,6 +38,11 @@ class SolicitudController extends Controller
             'motivo.max'           => 'El motivo no puede superar los 500 caracteres.',
         ]);
 
+        // Bloquear entrada si el usuario no tiene permiso
+        if ($data['tipo'] === 'entrada' && !auth()->user()->tienePermiso('entrada')) {
+            return back()->with('error', 'No tienes permiso para solicitar entradas de productos.');
+        }
+
         // Verificar que si es salida haya stock suficiente para la solicitud
         if ($data['tipo'] === 'salida') {
             $producto = Producto::findOrFail($data['producto_id']);

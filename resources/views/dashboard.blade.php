@@ -45,7 +45,8 @@
 
 {{-- Tabla de productos --}}
 <div class="bg-white rounded-xl shadow overflow-hidden p-4">
-    <h1 class=" font-medium text-gray-900 sorting_1">Exportar archivo:</h1>
+
+    <p class="font-medium text-gray-900 text-sm mb-1">Exportar archivo:</p>
     <table id="tabla-inventario" class="w-full text-sm">
         <thead class="bg-gray-50 text-left">
             <tr>
@@ -204,7 +205,8 @@
                             Trasladar
                         </button>
                         @else
-                        {{-- Usuario: solicitar entrada --}}
+                        {{-- Usuario: solicitar entrada (solo si tiene permiso) --}}
+                        @if(auth()->user()->tienePermiso('entrada'))
                         <button type="button"
                             onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'entrada', {{ $producto->stock_actual }})"
                             class="btn-accion-green inline-flex items-center gap-1 text-white text-xs font-medium px-3 py-1.5 rounded-lg">
@@ -213,6 +215,7 @@
                             </svg>
                             Entrada
                         </button>
+                        @endif
                         {{-- Usuario: solicitar salida --}}
                         <button type="button"
                             onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'salida', {{ $producto->stock_actual }})"
@@ -467,14 +470,255 @@
 </script>
 @endif
 
+{{-- Modal movido a gastos-menores/index.blade.php --}}
+@if(false)
+<div id="modal-gasto-menor"
+     style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.5); overflow-y:auto;">
+    <div style="min-height:100%; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1rem;">
+        <div class="gm-modal-inner" style="background:#fff; border-radius:1rem; width:100%; max-width:780px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+
+            {{-- Header --}}
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #e5e7eb;">
+                <div>
+                    <p style="font-size:1rem; font-weight:700; color:#92400e;">Compra de Gasto Menor</p>
+                    <p style="font-size:0.75rem; color:#6b7280; margin-top:0.1rem;">Registra la boleta y actualiza el stock de los productos comprados</p>
+                </div>
+                <button type="button" onclick="cerrarModalGastoMenor()"
+                        style="color:#9ca3af; font-size:1.25rem; line-height:1; background:none; border:none; cursor:pointer;">✕</button>
+            </div>
+
+            <form method="POST" action="{{ route('admin.gastos-menores.store') }}"
+                  enctype="multipart/form-data" id="form-gasto-menor">
+                @csrf
+                <div style="padding:1.25rem; display:flex; flex-direction:column; gap:1rem;">
+
+                    {{-- Datos de boleta --}}
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                RUT Proveedor <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="text" name="rut_proveedor" placeholder="Ej: 12.345.678-9" required
+                                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                Folio <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="text" name="folio" placeholder="Ej: 001234" required
+                                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                Fecha y hora de emisión <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="datetime-local" name="fecha_emision" required
+                                   max="{{ date('Y-m-d\TH:i') }}"
+                                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                Boleta PDF <span style="font-weight:400; color:#9ca3af;">(opcional)</span>
+                            </label>
+                            <input type="file" name="documento" accept=".pdf"
+                                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
+                        </div>
+                    </div>
+
+                    {{-- Buscador de productos --}}
+                    <div style="border-top:1px solid #e5e7eb; padding-top:0.75rem;">
+                        <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.4rem;">
+                            Agregar productos <span style="color:#ef4444;">*</span>
+                        </label>
+                        <div style="position:relative;">
+                            <input type="text" id="gm-buscador"
+                                   placeholder="🔍 Buscar producto por nombre o descripción..."
+                                   autocomplete="off"
+                                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                            <div id="gm-resultados"
+                                 style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #e5e7eb; border-radius:0.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.1); max-height:200px; overflow-y:auto; margin-top:2px;"></div>
+                        </div>
+                    </div>
+
+                    {{-- Tabla de productos seleccionados --}}
+                    <div id="gm-tabla-wrap" style="display:none;">
+                        <table style="width:100%; font-size:0.78rem; border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#fef3c7; color:#92400e;">
+                                    <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; border-radius:0.25rem 0 0 0;">Producto</th>
+                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:80px;">Cant.</th>
+                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">Monto ($)</th>
+                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:140px;">P. Neto s/IVA ($)</th>
+                                    <th style="padding:0.4rem 0.6rem; width:36px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="gm-items"></tbody>
+                        </table>
+                    </div>
+
+                    <p id="gm-sin-items" style="font-size:0.75rem; color:#9ca3af; text-align:center; display:none;">
+                        Agrega al menos un producto para continuar.
+                    </p>
+
+                </div>
+
+                {{-- Footer --}}
+                <div style="display:flex; align-items:center; justify-content:flex-end; gap:0.5rem; padding:0.75rem 1.25rem; border-top:1px solid #e5e7eb; background:#fafafa; border-radius:0 0 1rem 1rem;">
+                    <button type="button" onclick="cerrarModalGastoMenor()"
+                            style="padding:0.4rem 1rem; font-size:0.8rem; font-weight:600; color:#374151; background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="gm-btn-submit"
+                            style="padding:0.4rem 1.1rem; font-size:0.8rem; font-weight:600; color:#fff; background:#d97706; border:none; border-radius:0.5rem; cursor:pointer; transition:opacity .15s;">
+                        Registrar compra
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+// ── Datos de productos (JSON) ─────────────────────────────────────────────────
+const gmProductos = {!! json_encode($productos->map(fn($p) => ['id' => $p->id, 'nombre' => $p->nombre, 'descripcion' => $p->descripcion, 'stock' => $p->stock_actual])->values()) !!};
+
+let gmItems   = [];   // { idx, id, nombre }
+let gmCounter = 0;
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+document.getElementById('btn-abrir-gasto-menor').addEventListener('click', function() {
+    const modal = document.getElementById('modal-gasto-menor');
+    const inner = modal.querySelector('.gm-modal-inner');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    // Reiniciar animación
+    inner.style.animation = 'none';
+    inner.offsetHeight; // reflow
+    inner.style.animation = '';
+});
+function cerrarModalGastoMenor() {
+    document.getElementById('modal-gasto-menor').style.display = 'none';
+    document.body.style.overflow = '';
+}
+document.getElementById('modal-gasto-menor').addEventListener('click', function(e) {
+    if (e.target === this) cerrarModalGastoMenor();
+});
+
+// ── Buscador ──────────────────────────────────────────────────────────────────
+document.getElementById('gm-buscador').addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    const res = document.getElementById('gm-resultados');
+    if (q.length < 1) { res.style.display = 'none'; return; }
+
+    const matches = gmProductos.filter(p =>
+        p.nombre.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q)
+    ).slice(0, 10);
+
+    if (!matches.length) { res.style.display = 'none'; return; }
+
+    res.innerHTML = matches.map(p => `
+        <div onclick="gmAgregar(${p.id}, \`${p.nombre.replace(/`/g,'')}\`)"
+             style="padding:0.5rem 0.75rem; cursor:pointer; border-bottom:1px solid #f3f4f6; transition:background .1s;"
+             onmouseover="this.style.background='#fef3c7'" onmouseout="this.style.background=''">
+            <p style="font-size:0.8rem; font-weight:600; color:#1f2937;">${escHtmlGm(p.nombre)}</p>
+            <p style="font-size:0.72rem; color:#6b7280;">${escHtmlGm(p.descripcion || '')} · Stock: ${p.stock}</p>
+        </div>
+    `).join('');
+    res.style.display = 'block';
+});
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#gm-buscador') && !e.target.closest('#gm-resultados')) {
+        document.getElementById('gm-resultados').style.display = 'none';
+    }
+});
+
+// ── Agregar producto ──────────────────────────────────────────────────────────
+function gmAgregar(id, nombre) {
+    if (gmItems.find(i => i.id === id)) {
+        document.getElementById('gm-buscador').value = '';
+        document.getElementById('gm-resultados').style.display = 'none';
+        return;
+    }
+    const idx = gmCounter++;
+    gmItems.push({ idx, id, nombre });
+    gmRenderFila(idx, id, nombre);
+    document.getElementById('gm-buscador').value = '';
+    document.getElementById('gm-resultados').style.display = 'none';
+    gmActualizarTabla();
+}
+
+function gmRenderFila(idx, id, nombre) {
+    const tbody = document.getElementById('gm-items');
+    const tr = document.createElement('tr');
+    tr.id = `gm-row-${idx}`;
+    tr.style.borderBottom = '1px solid #f3f4f6';
+    tr.innerHTML = `
+        <td style="padding:0.4rem 0.6rem;">
+            <input type="hidden" name="items[${idx}][producto_id]" value="${id}">
+            <span style="font-size:0.8rem; font-weight:500; color:#1f2937;">${escHtmlGm(nombre)}</span>
+        </td>
+        <td style="padding:0.4rem 0.4rem; text-align:center;">
+            <input type="number" name="items[${idx}][cantidad]" value="1" min="1" required
+                   style="width:68px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
+        </td>
+        <td style="padding:0.4rem 0.4rem; text-align:center;">
+            <input type="number" name="items[${idx}][monto]" placeholder="0" min="0" step="1" required
+                   style="width:108px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
+        </td>
+        <td style="padding:0.4rem 0.4rem; text-align:center;">
+            <input type="number" name="items[${idx}][precio_neto]" placeholder="0" min="0" step="1"
+                   style="width:120px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
+        </td>
+        <td style="padding:0.4rem 0.3rem; text-align:center;">
+            <button type="button" onclick="gmQuitar(${idx})"
+                    style="color:#ef4444; background:none; border:none; cursor:pointer; font-size:1rem; line-height:1;">✕</button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function gmQuitar(idx) {
+    gmItems = gmItems.filter(i => i.idx !== idx);
+    const row = document.getElementById(`gm-row-${idx}`);
+    if (row) row.remove();
+    gmActualizarTabla();
+}
+
+function gmActualizarTabla() {
+    const wrap = document.getElementById('gm-tabla-wrap');
+    const sin  = document.getElementById('gm-sin-items');
+    wrap.style.display = gmItems.length ? '' : 'none';
+    sin.style.display  = gmItems.length ? 'none' : '';
+}
+
+function escHtmlGm(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+@endpush
+@endif
+
 @push('head')
 <style>
-    .dt-btn-excel { background:#16a34a; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .15s; }
-    .dt-btn-excel:hover { background:#15803d; }
-    .dt-btn { background:#2563eb; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .15s; }
-    .dt-btn:hover { background:#1d4ed8; }
-    .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .15s; }
-    .dt-btn-pdf:hover { background:#b91c1c; }
+    @keyframes btn-breathe-green { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.7)} 50%{box-shadow:0 0 0 6px rgba(22,163,74,0)} }
+    @keyframes btn-breathe-blue  { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.7)} 50%{box-shadow:0 0 0 6px rgba(37,99,235,0)} }
+    @keyframes btn-breathe-red   { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.7)} 50%{box-shadow:0 0 0 6px rgba(220,38,38,0)} }
+
+    .dt-btn-excel { background:#16a34a; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s, transform .15s; }
+    .dt-btn-excel:hover { background:#15803d; transform:translateY(-1px); animation:btn-breathe-green 1.6s ease-in-out infinite; }
+
+    .dt-btn { background:#2563eb; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s, transform .15s; }
+    .dt-btn:hover { background:#1d4ed8; transform:translateY(-1px); animation:btn-breathe-blue 1.6s ease-in-out infinite; }
+
+    .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s, transform .15s; }
+    .dt-btn-pdf:hover { background:#b91c1c; transform:translateY(-1px); animation:btn-breathe-red 1.6s ease-in-out infinite; }
+    @keyframes gmFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .gm-modal-inner { animation: gmFadeUp 0.35s cubic-bezier(.22,.68,0,1.2) both; }
 </style>
 @endpush
 
@@ -493,32 +737,10 @@
                 bottomStart: null,
                 bottomEnd: null,
             },
-            buttons: [{
-                    extend: 'excelHtml5',
-                    text: 'Excel',
-                    className: 'dt-btn-excel',
-                    exportOptions: {
-                        columns: ':not(:last-child)'
-                    }
-                },
-                {
-                    extend: 'csvHtml5',
-                    text: 'CSV',
-                    className: 'dt-btn',
-                    exportOptions: {
-                        columns: ':not(:last-child)'
-                    }
-                },
-                {
-                    extend: 'pdfHtml5',
-                    text: 'PDF',
-                    className: 'dt-btn-pdf',
-                    exportOptions: {
-                        columns: ':not(:last-child)'
-                    },
-                    orientation: 'landscape',
-                    pageSize: 'A4'
-                },
+            buttons: [
+                { extend: 'excelHtml5', text: 'Excel', className: 'dt-btn-excel', exportOptions: { columns: ':not(:last-child)' } },
+                { extend: 'csvHtml5',   text: 'CSV',   className: 'dt-btn',       exportOptions: { columns: ':not(:last-child)' } },
+                { extend: 'pdfHtml5',   text: 'PDF',   className: 'dt-btn-pdf',   exportOptions: { columns: ':not(:last-child)' }, orientation: 'landscape', pageSize: 'A4' },
             ],
             columnDefs: [{
                 orderable: false,
@@ -526,6 +748,8 @@
                 targets: -1
             }],
         });
+
+
 
         // Filtro personalizado: busca en texto visible de cada celda
         $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {

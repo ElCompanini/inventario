@@ -1,0 +1,417 @@
+@extends('layouts.app')
+@section('title', 'Gastos Menores')
+
+@section('content')
+
+<div class="mb-5 flex items-center justify-between gap-4">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">Gastos Menores</h1>
+        <p class="text-sm text-gray-500 mt-1">Registro de compras de gasto menor con sus boletas y productos asociados</p>
+    </div>
+    <button type="button" id="btn-abrir-gasto-menor"
+            style="background:#d97706; color:#fff; font-size:0.82rem; font-weight:600; padding:0.5rem 1.1rem; border-radius:0.5rem; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:0.4rem; transition:background .15s; white-space:nowrap;"
+            onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#d97706'">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+        </svg>
+        Nueva Compra
+    </button>
+</div>
+
+@if(session('success'))
+    <div class="mb-4 bg-green-50 border border-green-300 text-green-700 rounded-lg px-4 py-3 text-sm">
+        {{ session('success') }}
+    </div>
+@endif
+
+@php
+function formatearRut(string $rut): string {
+    $limpio = strtoupper(preg_replace('/[^0-9kK]/', '', $rut));
+    if (strlen($limpio) < 2) return $rut;
+    $dv  = substr($limpio, -1);
+    $num = substr($limpio, 0, -1);
+    return number_format((int) $num, 0, ',', '.') . '-' . $dv;
+}
+@endphp
+
+{{-- Buscador --}}
+<div class="mb-4">
+    <input type="text" id="buscador-gm"
+           placeholder="🔍  Buscar por ID, folio, RUT proveedor o producto..."
+           class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
+                  focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
+</div>
+
+<p id="gm-sin-resultados" class="hidden text-sm text-gray-400 text-center py-6">Sin resultados para la búsqueda.</p>
+
+@if($registros->isEmpty())
+    <div class="bg-white rounded-xl shadow p-10 text-center text-gray-400">
+        <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-3-3v6M4.5 19.5l15-15M3 10.5A7.5 7.5 0 1110.5 3"/>
+        </svg>
+        <p class="text-sm">No hay gastos menores registrados aún.</p>
+    </div>
+@else
+    <div class="space-y-4">
+        @foreach($registros as $folio => $items)
+        @php
+            $primero    = $items->first();
+            $totalMonto = $items->sum('monto');
+            $fecha      = \Carbon\Carbon::parse($primero->fecha_emision);
+        @endphp
+
+        @php
+            $searchText = strtolower(
+                'gm-' . str_pad($primero->id_gm ?? 0, 4, '0', STR_PAD_LEFT) . ' ' .
+                $folio . ' ' .
+                $primero->rut_proveedor . ' ' .
+                $items->pluck('producto.nombre')->implode(' ') . ' ' .
+                $items->pluck('producto.descripcion')->implode(' ')
+            );
+        @endphp
+        <div class="bg-white rounded-xl shadow overflow-hidden gm-card" data-search="{{ $searchText }}">
+            {{-- Header de boleta --}}
+            <div style="background:#fef3c7; border-left:4px solid #d97706;"
+                 class="px-5 py-3 flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-center gap-4 flex-wrap">
+                    <div style="background:#d97706; border-radius:0.5rem; padding:0.25rem 0.6rem; min-width:56px; text-align:center;">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color:#fef3c7;">ID</p>
+                        <p class="text-base font-bold font-mono" style="color:#fff;">
+                            GM-{{ str_pad($primero->id_gm ?? 0, 4, '0', STR_PAD_LEFT) }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Folio</p>
+                        <p class="text-base font-bold text-amber-900 font-mono">{{ $folio }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">RUT Proveedor</p>
+                        <p class="text-sm font-semibold text-amber-900">{{ formatearRut($primero->rut_proveedor) }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Fecha Emisión</p>
+                        <p class="text-sm font-semibold text-amber-900">{{ $fecha->format('d/m/Y H:i') }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Registrado por</p>
+                        <p class="text-sm font-semibold text-amber-900">{{ $primero->user->name ?? '—' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Fecha Ingreso</p>
+                        <p class="text-sm font-semibold text-amber-900">
+                            {{ $primero->fecha_ingreso ? $primero->fecha_ingreso->format('d/m/Y H:i') : '—' }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Total Monto</p>
+                        <p class="text-sm font-bold text-amber-900">${{ number_format($totalMonto, 0, ',', '.') }}</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    @if($primero->documento_path)
+                        <a href="{{ route('admin.gastos-menores.boleta', $primero->id) }}"
+                           target="_blank"
+                           class="inline-flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg transition"
+                           style="background:#dc2626;">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                            </svg>
+                            Ver Boleta PDF
+                        </a>
+                    @else
+                        <span class="text-xs text-gray-400 italic">Sin documento</span>
+                    @endif
+
+                    <a href="{{ route('admin.gastos-menores.edit', urlencode($folio)) }}"
+                       onclick="return confirm('¿Seguro que deseas editar el folio {{ $folio }}? Los cambios quedarán registrados.')"
+                       class="inline-flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg transition"
+                       style="background:#ea580c;">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                        Editar
+                    </a>
+                </div>
+            </div>
+
+            {{-- Tabla de productos --}}
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Producto</th>
+                        <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500">Cantidad</th>
+                        <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Monto</th>
+                        <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Precio Neto s/IVA</th>
+                        <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500">Fecha registro</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @foreach($items as $item)
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="px-4 py-2.5 font-medium text-gray-800">
+                            {{ $item->producto->nombre ?? '—' }}
+                            @if($item->producto?->descripcion)
+                                <p class="text-xs text-gray-400 font-normal">{{ $item->producto->descripcion }}</p>
+                            @endif
+                        </td>
+                        <td class="px-4 py-2.5 text-center text-gray-700">{{ $item->cantidad }}</td>
+                        <td class="px-4 py-2.5 text-right text-gray-700">${{ number_format($item->monto, 0, ',', '.') }}</td>
+                        <td class="px-4 py-2.5 text-right text-gray-700">
+                            {{ $item->precio_neto ? '$' . number_format($item->precio_neto, 0, ',', '.') : '—' }}
+                        </td>
+                        <td class="px-4 py-2.5 text-center text-gray-400 text-xs">
+                            {{ $item->created_at->format('d/m/Y H:i') }}
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @endforeach
+    </div>
+@endif
+
+{{-- ══ MODAL NUEVA COMPRA ══ --}}
+<div id="modal-gasto-menor"
+     style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.5); overflow-y:auto;">
+    <div style="min-height:100%; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1rem;">
+        <div class="gm-modal-inner" style="background:#fff; border-radius:1rem; width:100%; max-width:780px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+
+            {{-- Header --}}
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #e5e7eb;">
+                <div>
+                    <p style="font-size:1rem; font-weight:700; color:#92400e;">Compra de Gasto Menor</p>
+                    <p style="font-size:0.75rem; color:#6b7280; margin-top:0.1rem;">Registra la boleta y actualiza el stock de los productos comprados</p>
+                </div>
+                <button type="button" onclick="cerrarModalGastoMenor()"
+                        style="color:#9ca3af; font-size:1.25rem; line-height:1; background:none; border:none; cursor:pointer;">✕</button>
+            </div>
+
+            <form method="POST" action="{{ route('admin.gastos-menores.store') }}"
+                  enctype="multipart/form-data" id="form-gasto-menor">
+                @csrf
+                <div style="padding:1.25rem; display:flex; flex-direction:column; gap:1rem;">
+
+                    {{-- Datos de boleta --}}
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                RUT Proveedor <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="text" name="rut_proveedor" placeholder="Ej: 12.345.678-9" required
+                                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                Folio <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="text" name="folio" placeholder="Ej: 001234" required
+                                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                Fecha y hora de emisión <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="datetime-local" name="fecha_emision" required
+                                   max="{{ date('Y-m-d\TH:i') }}"
+                                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                Boleta PDF <span style="font-weight:400; color:#9ca3af;">(opcional)</span>
+                            </label>
+                            <input type="file" name="documento" accept=".pdf"
+                                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
+                        </div>
+                    </div>
+
+                    {{-- Buscador de productos --}}
+                    <div style="border-top:1px solid #e5e7eb; padding-top:0.75rem;">
+                        <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.4rem;">
+                            Agregar productos <span style="color:#ef4444;">*</span>
+                        </label>
+                        <div style="position:relative;">
+                            <input type="text" id="gm-buscador"
+                                   placeholder="🔍 Buscar producto por nombre o descripción..."
+                                   autocomplete="off"
+                                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                            <div id="gm-resultados"
+                                 style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #e5e7eb; border-radius:0.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.1); max-height:200px; overflow-y:auto; margin-top:2px;"></div>
+                        </div>
+                    </div>
+
+                    {{-- Tabla de productos seleccionados --}}
+                    <div id="gm-tabla-wrap" style="display:none;">
+                        <table style="width:100%; font-size:0.78rem; border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#fef3c7; color:#92400e;">
+                                    <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; border-radius:0.25rem 0 0 0;">Producto</th>
+                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:80px;">Cant.</th>
+                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">Monto ($)</th>
+                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:140px;">P. Neto s/IVA ($)</th>
+                                    <th style="padding:0.4rem 0.6rem; width:36px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="gm-items"></tbody>
+                        </table>
+                    </div>
+
+                    <p id="gm-sin-items" style="font-size:0.75rem; color:#9ca3af; text-align:center; display:none;">
+                        Agrega al menos un producto para continuar.
+                    </p>
+
+                </div>
+
+                {{-- Footer --}}
+                <div style="display:flex; align-items:center; justify-content:flex-end; gap:0.5rem; padding:0.75rem 1.25rem; border-top:1px solid #e5e7eb; background:#fafafa; border-radius:0 0 1rem 1rem;">
+                    <button type="button" onclick="cerrarModalGastoMenor()"
+                            style="padding:0.4rem 1rem; font-size:0.8rem; font-weight:600; color:#374151; background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="gm-btn-submit"
+                            style="padding:0.4rem 1.1rem; font-size:0.8rem; font-weight:600; color:#fff; background:#d97706; border:none; border-radius:0.5rem; cursor:pointer; transition:opacity .15s;">
+                        Registrar compra
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@endsection
+
+@push('head')
+<style>
+    @keyframes gmFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .gm-modal-inner { animation: gmFadeUp 0.35s cubic-bezier(.22,.68,0,1.2) both; }
+</style>
+@endpush
+
+@push('scripts')
+<script>
+const gmProductos = {!! json_encode($productos->map(fn($p) => ['id' => $p->id, 'nombre' => $p->nombre, 'descripcion' => $p->descripcion, 'stock' => $p->stock_actual])->values()) !!};
+
+let gmItems   = [];
+let gmCounter = 0;
+
+document.getElementById('btn-abrir-gasto-menor').addEventListener('click', function() {
+    const modal = document.getElementById('modal-gasto-menor');
+    const inner = modal.querySelector('.gm-modal-inner');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    inner.style.animation = 'none';
+    inner.offsetHeight;
+    inner.style.animation = '';
+});
+function cerrarModalGastoMenor() {
+    document.getElementById('modal-gasto-menor').style.display = 'none';
+    document.body.style.overflow = '';
+}
+document.getElementById('modal-gasto-menor').addEventListener('click', function(e) {
+    if (e.target === this) cerrarModalGastoMenor();
+});
+
+document.getElementById('gm-buscador').addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    const res = document.getElementById('gm-resultados');
+    if (q.length < 1) { res.style.display = 'none'; return; }
+    const matches = gmProductos.filter(p =>
+        p.nombre.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q)
+    ).slice(0, 10);
+    if (!matches.length) { res.style.display = 'none'; return; }
+    res.innerHTML = matches.map(p => `
+        <div onclick="gmAgregar(${p.id}, \`${p.nombre.replace(/`/g,'')}\`)"
+             style="padding:0.5rem 0.75rem; cursor:pointer; border-bottom:1px solid #f3f4f6; transition:background .1s;"
+             onmouseover="this.style.background='#fef3c7'" onmouseout="this.style.background=''">
+            <p style="font-size:0.8rem; font-weight:600; color:#1f2937;">${escHtmlGm(p.nombre)}</p>
+            <p style="font-size:0.72rem; color:#6b7280;">${escHtmlGm(p.descripcion || '')} · Stock: ${p.stock}</p>
+        </div>
+    `).join('');
+    res.style.display = 'block';
+});
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#gm-buscador') && !e.target.closest('#gm-resultados')) {
+        document.getElementById('gm-resultados').style.display = 'none';
+    }
+});
+
+function gmAgregar(id, nombre) {
+    if (gmItems.find(i => i.id === id)) {
+        document.getElementById('gm-buscador').value = '';
+        document.getElementById('gm-resultados').style.display = 'none';
+        return;
+    }
+    const idx = gmCounter++;
+    gmItems.push({ idx, id, nombre });
+    gmRenderFila(idx, id, nombre);
+    document.getElementById('gm-buscador').value = '';
+    document.getElementById('gm-resultados').style.display = 'none';
+    gmActualizarTabla();
+}
+
+function gmRenderFila(idx, id, nombre) {
+    const tbody = document.getElementById('gm-items');
+    const tr = document.createElement('tr');
+    tr.id = `gm-row-${idx}`;
+    tr.style.borderBottom = '1px solid #f3f4f6';
+    tr.innerHTML = `
+        <td style="padding:0.4rem 0.6rem;">
+            <input type="hidden" name="items[${idx}][producto_id]" value="${id}">
+            <span style="font-size:0.8rem; font-weight:500; color:#1f2937;">${escHtmlGm(nombre)}</span>
+        </td>
+        <td style="padding:0.4rem 0.4rem; text-align:center;">
+            <input type="number" name="items[${idx}][cantidad]" value="1" min="1" required
+                   style="width:68px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
+        </td>
+        <td style="padding:0.4rem 0.4rem; text-align:center;">
+            <input type="number" name="items[${idx}][monto]" placeholder="0" min="0" step="1" required
+                   style="width:108px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
+        </td>
+        <td style="padding:0.4rem 0.4rem; text-align:center;">
+            <input type="number" name="items[${idx}][precio_neto]" placeholder="0" min="0" step="1"
+                   style="width:120px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
+        </td>
+        <td style="padding:0.4rem 0.3rem; text-align:center;">
+            <button type="button" onclick="gmQuitar(${idx})"
+                    style="color:#ef4444; background:none; border:none; cursor:pointer; font-size:1rem; line-height:1;">✕</button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function gmQuitar(idx) {
+    gmItems = gmItems.filter(i => i.idx !== idx);
+    const row = document.getElementById(`gm-row-${idx}`);
+    if (row) row.remove();
+    gmActualizarTabla();
+}
+
+function gmActualizarTabla() {
+    const wrap = document.getElementById('gm-tabla-wrap');
+    const sin  = document.getElementById('gm-sin-items');
+    wrap.style.display = gmItems.length ? '' : 'none';
+    sin.style.display  = gmItems.length ? 'none' : '';
+}
+
+function escHtmlGm(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('buscador-gm').addEventListener('input', function () {
+    const q = this.value.trim().toLowerCase();
+    const cards = document.querySelectorAll('.gm-card');
+    let visible = 0;
+    cards.forEach(card => {
+        const match = !q || card.dataset.search.includes(q);
+        card.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+    document.getElementById('gm-sin-resultados').classList.toggle('hidden', visible > 0 || !q);
+});
+</script>
+@endpush

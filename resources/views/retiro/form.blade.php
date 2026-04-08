@@ -3,93 +3,90 @@
 
 @section('content')
 
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-800">Retiro de Piezas</h1>
-    <p class="text-sm text-gray-500 mt-1">
+<div class="mb-3" style="max-width:900px; margin-left:auto; margin-right:auto;">
+    <h1 class="text-xl font-bold text-gray-800">Retiro de Piezas</h1>
+    <p class="text-sm text-gray-500 mt-0.5">
         @if(auth()->user()->esAdmin())
-            Como administrador, el retiro descuenta el stock directamente.
+        Como administrador, el retiro descuenta el stock directamente.
         @else
-            Tu solicitud quedará pendiente de aprobación del administrador.
+        Tu solicitud quedará pendiente de aprobación del administrador.
         @endif
     </p>
 </div>
 
 @if(session('error'))
-    <div class="mb-4 bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm">
-        {{ session('error') }}
-    </div>
+<div class="mb-3 bg-red-50 border border-red-300 text-red-700 rounded-lg px-3 py-2 text-sm" style="max-width:900px; margin-left:auto; margin-right:auto;">
+    {{ session('error') }}
+</div>
 @endif
 
 @if($errors->any())
-    <div class="mb-4 bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm">
-        {{ $errors->first() }}
-    </div>
+<div class="mb-3 bg-red-50 border border-red-300 text-red-700 rounded-lg px-3 py-2 text-sm" style="max-width:900px; margin-left:auto; margin-right:auto;">
+    {{ $errors->first() }}
+</div>
 @endif
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4" style="max-width:900px; margin-left:auto; margin-right:auto;">
 
     {{-- ── BUSCADOR ── --}}
-    <div class="bg-white rounded-xl shadow p-5">
-        <h2 class="text-sm font-bold text-gray-700 mb-3">1. Buscar producto</h2>
+    <div class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-sm font-bold text-gray-700 mb-2">1. Buscar producto</h2>
 
-        <div class="relative">
+        <div>
             <input type="text" id="buscador-retiro"
-                   placeholder="🔍  Buscar por descripción o categoría..."
-                   autocomplete="off"
-                   class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
-                          focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-
-            {{-- Spinner --}}
-            <span id="spinner" class="hidden absolute right-3 top-3 text-gray-400 text-xs">Buscando...</span>
+                placeholder="🔍  Buscar por descripción o categoría..."
+                autocomplete="off"
+                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-sm
+                       focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+            <p id="spinner" class="hidden text-sm text-gray-400 mt-2 text-center">Buscando...</p>
         </div>
 
-        {{-- Resultados --}}
-        <div id="resultados" class="mt-2 space-y-1 max-h-80 overflow-y-auto"></div>
-        <p id="sin-resultados" class="hidden text-xs text-gray-400 mt-2 text-center">Sin resultados.</p>
+        <div id="resultados" class="mt-2 space-y-1 max-h-56 overflow-y-auto"></div>
+        <p id="sin-resultados" class="hidden text-sm text-gray-400 mt-2 text-center">Sin resultados.</p>
     </div>
 
     {{-- ── CARRITO ── --}}
-    <div class="bg-white rounded-xl shadow p-5">
-        <h2 class="text-sm font-bold text-gray-700 mb-3">2. Piezas seleccionadas</h2>
+    <div class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-md font-bold text-gray-700 mb-2">2. Piezas seleccionadas</h2>
 
-        <div id="carrito-vacio" class="text-center py-8 text-gray-400 text-sm">
-            <svg class="w-10 h-10 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/>
+        <div id="carrito-vacio" class="text-center py-6 text-gray-400 text-lg">
+            <svg class="w-8 h-8 mx-auto mb-1.5 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
             </svg>
             Agrega productos desde el buscador
         </div>
 
-        <div id="carrito-lista" class="space-y-2"></div>
+        <div id="carrito-lista" class="space-y-1.5"></div>
     </div>
 </div>
-
+<br>
 {{-- ── FORMULARIO DE ENVÍO ── --}}
-<form method="POST" action="{{ route('retiro.procesar') }}" id="form-retiro" class="mt-6 bg-white rounded-xl shadow p-5">
+<form method="POST" action="{{ route('retiro.procesar') }}" id="form-retiro"
+    class="mt-4 bg-white rounded-xl shadow p-4" style="max-width:900px; margin-left:auto; margin-right:auto;">
     @csrf
 
-    {{-- Inputs ocultos del carrito (se generan por JS) --}}
     <div id="inputs-ocultos"></div>
 
-    <div class="mb-4">
+    <div class="mb-3">
         <label for="motivo_retiro" class="block text-sm font-semibold text-gray-700 mb-1">
             Motivo de retiro <span class="text-red-500">*</span>
         </label>
-        <textarea id="motivo_retiro" name="motivo_retiro" rows="3" required
-                  placeholder="Describe el motivo del retiro de piezas..."
-                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+        <textarea id="motivo_retiro" name="motivo_retiro" rows="2" required
+            placeholder="Describe el motivo del retiro de piezas..."
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                          focus:outline-none focus:ring-2 focus:ring-indigo-400">{{ old('motivo_retiro') }}</textarea>
     </div>
 
     <div class="flex items-center justify-between gap-4">
         <p id="resumen-carrito" class="text-sm text-gray-500">Carrito vacío</p>
         <button type="submit" id="btn-enviar" disabled
-                class="px-6 py-2.5 text-sm font-semibold text-white rounded-lg transition
+            class="px-4 py-2 text-sm font-semibold text-white rounded-lg transition
                        bg-gray-300 cursor-not-allowed"
-                onclick="return confirmarRetiro()">
+            onclick="return confirmarRetiro()">
             @if(auth()->user()->esAdmin())
-                Procesar retiro
+            Procesar retiro
             @else
-                Enviar solicitud
+            Enviar solicitud
             @endif
         </button>
     </div>
@@ -98,11 +95,11 @@
 @push('scripts')
 <script>
     // ── Estado del carrito ────────────────────────────────────────────────────
-    let carrito = {};   // { id: { id, nombre, descripcion, stock_actual, cantidad } }
+    let carrito = {}; // { id: { id, nombre, descripcion, stock_actual, cantidad } }
     let timerBusqueda;
 
     // ── Buscador con debounce ─────────────────────────────────────────────────
-    document.getElementById('buscador-retiro').addEventListener('input', function () {
+    document.getElementById('buscador-retiro').addEventListener('input', function() {
         clearTimeout(timerBusqueda);
         const q = this.value.trim();
 
@@ -116,14 +113,16 @@
 
         timerBusqueda = setTimeout(() => {
             fetch(`{{ route('retiro.buscar') }}?q=` + encodeURIComponent(q), {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(r => r.json())
-            .then(productos => {
-                document.getElementById('spinner').classList.add('hidden');
-                renderResultados(productos);
-            })
-            .catch(() => document.getElementById('spinner').classList.add('hidden'));
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(r => r.json())
+                .then(productos => {
+                    document.getElementById('spinner').classList.add('hidden');
+                    renderResultados(productos);
+                })
+                .catch(() => document.getElementById('spinner').classList.add('hidden'));
         }, 300);
     });
 
@@ -163,7 +162,13 @@
                 alert('Este producto no tiene stock disponible.');
                 return;
             }
-            carrito[id] = { id, nombre, descripcion, stockActual, cantidad: 1 };
+            carrito[id] = {
+                id,
+                nombre,
+                descripcion,
+                stockActual,
+                cantidad: 1
+            };
         }
         renderCarrito();
         document.getElementById('buscador-retiro').value = '';
@@ -188,12 +193,12 @@
     }
 
     function renderCarrito() {
-        const lista     = document.getElementById('carrito-lista');
-        const vacio     = document.getElementById('carrito-vacio');
-        const inputs    = document.getElementById('inputs-ocultos');
-        const resumen   = document.getElementById('resumen-carrito');
+        const lista = document.getElementById('carrito-lista');
+        const vacio = document.getElementById('carrito-vacio');
+        const inputs = document.getElementById('inputs-ocultos');
+        const resumen = document.getElementById('resumen-carrito');
         const btnEnviar = document.getElementById('btn-enviar');
-        const items     = Object.values(carrito);
+        const items = Object.values(carrito);
 
         if (!items.length) {
             lista.innerHTML = '';
@@ -201,7 +206,7 @@
             vacio.classList.remove('hidden');
             resumen.textContent = 'Carrito vacío';
             btnEnviar.disabled = true;
-            btnEnviar.className = 'px-6 py-2.5 text-sm font-semibold text-white rounded-lg transition bg-gray-300 cursor-not-allowed';
+            btnEnviar.className = 'px-4 py-2 text-sm font-semibold text-white rounded-lg transition bg-gray-300 cursor-not-allowed';
             return;
         }
 
@@ -234,7 +239,7 @@
         const totalPiezas = items.reduce((acc, i) => acc + i.cantidad, 0);
         resumen.textContent = `${items.length} producto(s) — ${totalPiezas} pieza(s) en total`;
         btnEnviar.disabled = false;
-        btnEnviar.className = 'px-6 py-2.5 text-sm font-semibold text-white rounded-lg transition bg-indigo-600 hover:bg-indigo-700 cursor-pointer';
+        btnEnviar.className = 'px-4 py-2 text-sm font-semibold text-white rounded-lg transition bg-indigo-600 hover:bg-indigo-700 cursor-pointer';
     }
 
     function confirmarRetiro() {

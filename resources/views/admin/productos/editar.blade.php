@@ -113,12 +113,12 @@
             </div>
 
             {{-- Motivo --}}
-            <div class="mb-6">
+            <div class="mb-5">
                 <label for="motivo" class="block text-sm font-medium text-gray-700 mb-1">
                     Motivo <span class="text-red-500">*</span>
                 </label>
                 <textarea name="motivo" id="motivo"
-                          rows="4" required maxlength="500"
+                          rows="3" required maxlength="500"
                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                                  focus:outline-none focus:ring-2 focus:ring-indigo-500
                                  {{ $errors->has('motivo') ? 'border-red-400 bg-red-50' : '' }}"
@@ -194,5 +194,6 @@
         </div>
     </form>
 </div>
+
 
 @endsection

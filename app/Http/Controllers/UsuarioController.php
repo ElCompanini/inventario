@@ -58,7 +58,6 @@ class UsuarioController extends Controller
             'email'        => 'required|email|unique:users,email,' . $id,
             'rol'          => 'required|in:admin,usuario',
             'centro_costo' => 'nullable|string|max:100',
-            'password'     => 'nullable|string|min:6|confirmed',
         ]);
 
         $usuario->name         = $data['name'];
@@ -74,10 +73,6 @@ class UsuarioController extends Controller
             $usuario->permisos = count($permisos) ? $permisos : null;
         } else {
             $usuario->permisos = null;
-        }
-
-        if (!empty($data['password'])) {
-            $usuario->password = Hash::make($data['password']);
         }
 
         $usuario->save();

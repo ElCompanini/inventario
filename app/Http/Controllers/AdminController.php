@@ -126,6 +126,7 @@ class AdminController extends Controller
     public function modificarStock(int $id, Request $request)
     {
         abort_unless(auth()->user()->tienePermiso('stock'), 403);
+
         $data = $request->validate([
             'cantidad' => ['required', 'integer', 'min:1'],
             'tipo'     => ['required', 'in:entrada,salida'],

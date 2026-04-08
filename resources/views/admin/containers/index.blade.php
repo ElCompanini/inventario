@@ -29,6 +29,7 @@
                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
     </div>
     <div class="bg-white rounded-xl shadow overflow-hidden p-4">
+        <p class="font-medium text-gray-900 text-sm mb-1">Exportar archivo:</p>
         <table id="tabla-containers" class="w-full text-sm">
             <thead class="bg-gray-50 text-left">
                 <tr>
@@ -70,6 +71,7 @@
                                     </svg>
                                     Trasladar
                                 </button>
+                                @if(auth()->user()->esAdmin())
                                 <form method="POST" action="{{ route('admin.containers.destroy', $container->id) }}"
                                       id="form-delete-{{ $container->id }}">
                                     @csrf
@@ -84,6 +86,7 @@
                                         Eliminar
                                     </button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -282,12 +285,15 @@
 
 @push('head')
 <style>
-    .dt-btn-excel { background:#16a34a; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .15s; }
-    .dt-btn-excel:hover { background:#15803d; }
-    .dt-btn { background:#2563eb; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .15s; }
-    .dt-btn:hover { background:#1d4ed8; }
-    .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .15s; }
-    .dt-btn-pdf:hover { background:#b91c1c; }
+@keyframes btn-breathe-green { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.7)} 50%{box-shadow:0 0 0 6px rgba(22,163,74,0)} }
+    @keyframes btn-breathe-blue  { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.7)} 50%{box-shadow:0 0 0 6px rgba(37,99,235,0)} }
+    @keyframes btn-breathe-red   { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.7)} 50%{box-shadow:0 0 0 6px rgba(220,38,38,0)} }
+    .dt-btn-excel { background:#16a34a; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s,transform .15s; }
+    .dt-btn-excel:hover { background:#15803d; transform:translateY(-1px); animation:btn-breathe-green 1.6s ease-in-out infinite; }
+    .dt-btn { background:#2563eb; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s,transform .15s; }
+    .dt-btn:hover { background:#1d4ed8; transform:translateY(-1px); animation:btn-breathe-blue 1.6s ease-in-out infinite; }
+    .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s,transform .15s; }
+    .dt-btn-pdf:hover { background:#b91c1c; transform:translateY(-1px); animation:btn-breathe-red 1.6s ease-in-out infinite; }
     .btn-trasladar { background:#2563eb; transition: background .25s, box-shadow .25s, transform .25s; }
     .btn-trasladar:hover { background:#93c5fd; box-shadow:0 0 14px 4px rgba(147,197,253,0.75); transform:scale(1.05); }
     .btn-eliminar { background:#dc2626; transition: background .25s, box-shadow .25s, transform .25s; }
