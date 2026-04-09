@@ -735,8 +735,10 @@ function escHtmlGm(str) {
 
             <form method="POST" action="" id="form-agregar-inv" enctype="multipart/form-data"
                 data-url-local="{{ route('admin.gastos-menores.store') }}"
-                data-url-externa="{{ route('admin.sicd.recibir.directo') }}">
-                <input type="hidden" name="_modo" id="ai-modo" value="nuevo">
+                data-url-externa="{{ route('admin.sicd.recibir.directo') }}"
+                data-url-masiva="{{ route('admin.productos.carga.masiva') }}"
+                data-url-manual="{{ route('admin.productos.carga.manual') }}">
+                <input type="hidden" name="_modo" value="nuevo">
                 @csrf
                 <div style="padding:1.25rem; display:flex; flex-direction:column; gap:1rem;">
 
@@ -834,104 +836,115 @@ function escHtmlGm(str) {
                     {{-- ══ SECCIÓN EXTERNA ══ --}}
                     <div id="ai-seccion-externa" style="display:none; flex-direction:column; gap:0.75rem;">
 
-                        {{-- Sub-selector Nuevo / Existente --}}
-                        <div style="display:flex; gap:0.5rem;">
-                            <button type="button" id="ai-tab-nuevo"
-                                onclick="aiTabSicd('nuevo')"
-                                style="flex:1; padding:0.45rem; font-size:0.78rem; font-weight:600; border-radius:0.5rem; border:2px solid #2563eb; background:#2563eb; color:#fff; cursor:pointer; transition:all .15s;">
-                                Nuevo SICD
-                            </button>
-                            <button type="button" id="ai-tab-existente"
-                                onclick="aiTabSicd('existente')"
-                                style="flex:1; padding:0.45rem; font-size:0.78rem; font-weight:600; border-radius:0.5rem; border:2px solid #d1d5db; background:#fff; color:#6b7280; cursor:pointer; transition:all .15s;">
-                                SICD Existente
-                            </button>
+                        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:0.5rem; padding:0.5rem 0.75rem;">
+                            <p style="font-size:0.72rem; color:#1e40af; font-weight:600; margin:0;">
+                                📋 El sistema actualizará el stock y marcará el SICD como recibido automáticamente.
+                            </p>
                         </div>
 
-                        {{-- ── Nuevo SICD ── --}}
-                        <div id="ai-panel-nuevo" style="display:flex; flex-direction:column; gap:0.75rem;">
-
-                            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:0.5rem; padding:0.5rem 0.75rem;">
-                                <p style="font-size:0.72rem; color:#1e40af; font-weight:600; margin:0;">
-                                    📋 El sistema procesará el Excel para actualizar el stock automáticamente.
-                                </p>
+                        {{-- Documento SICD + Código (siempre visibles) --}}
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Documento SICD <span style="color:#ef4444;">*</span>
+                                    <span style="font-weight:400; color:#9ca3af;">(PDF, JPG, PNG)</span>
+                                </label>
+                                <input type="file" name="archivo_sicd" id="ai-archivo-sicd" accept=".pdf,.jpg,.jpeg,.png"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
                             </div>
-
-                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
-                                <div>
-                                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                        Documento SICD <span style="color:#ef4444;">*</span>
-                                        <span style="font-weight:400; color:#9ca3af;">(PDF, JPG, PNG)</span>
-                                    </label>
-                                    <input type="file" name="archivo_sicd" id="ai-archivo-sicd" accept=".pdf,.jpg,.jpeg,.png"
-                                        style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
-                                </div>
-                                <div>
-                                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                        Código SICD <span style="color:#ef4444;">*</span>
-                                    </label>
-                                    <input type="text" name="codigo_sicd" id="ai-codigo-sicd" placeholder="Se detecta del PDF automáticamente"
-                                        style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
-                                    <span id="ai-codigo-hint" style="font-size:0.7rem; margin-top:0.2rem; display:block;"></span>
-                                </div>
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Código SICD <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="text" name="codigo_sicd" id="ai-codigo-sicd" placeholder="Se detecta del PDF automáticamente"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                                <span id="ai-codigo-hint" style="font-size:0.7rem; margin-top:0.2rem; display:block;"></span>
                             </div>
+                        </div>
 
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                Descripción <span style="font-weight:400; color:#9ca3af;">(opcional)</span>
+                            </label>
+                            <textarea name="descripcion" id="ai-descripcion" rows="2" maxlength="500"
+                                placeholder="Notas o descripción del documento SICD..."
+                                style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; resize:vertical;"></textarea>
+                        </div>
+
+                        {{-- Separador con selector de método de carga --}}
+                        <div style="border-top:1px solid #e5e7eb; padding-top:0.75rem;">
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.35rem;">
+                                Método de carga de productos <span style="color:#ef4444;">*</span>
+                            </label>
+                            <div style="display:flex; gap:0.5rem;">
+                                <button type="button" id="ai-ext-btn-masiva"
+                                    onclick="aiMetodoCarga('masiva')"
+                                    style="flex:1; padding:0.45rem 0.5rem; font-size:0.78rem; font-weight:600; border:2px solid #2563eb; border-radius:0.5rem; background:#eff6ff; color:#1e40af; cursor:pointer; transition:all .15s;">
+                                    📊 Carga masiva (Excel)
+                                </button>
+                                <button type="button" id="ai-ext-btn-manual"
+                                    onclick="aiMetodoCarga('manual')"
+                                    style="flex:1; padding:0.45rem 0.5rem; font-size:0.78rem; font-weight:600; border:2px solid #e5e7eb; border-radius:0.5rem; background:#fff; color:#6b7280; cursor:pointer; transition:all .15s;">
+                                    ✏️ Carga manual
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Panel Carga masiva --}}
+                        <div id="ai-ext-panel-masiva" style="display:flex; flex-direction:column; gap:0.75rem;">
                             <div>
                                 <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
                                     Excel de productos <span style="color:#ef4444;">*</span>
-                                    <span style="font-weight:400; color:#9ca3af;">(XLSX, XLS, CSV)</span>
+                                    <span style="font-weight:400; color:#9ca3af;">(col A = descripción, col B = unidad, col C = cantidad — fila 1 es encabezado)</span>
                                 </label>
-                                <input type="file" name="archivo_excel" id="ai-archivo-excel" accept=".xlsx,.xls,.csv"
+                                <input type="file" name="excel_masivo" id="ai-excel-masivo" accept=".xlsx,.xls,.csv"
                                     style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
                             </div>
-
                             <div>
                                 <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                    Descripción <span style="font-weight:400; color:#9ca3af;">(opcional)</span>
+                                    Motivo general <span style="font-weight:400; color:#9ca3af;">(opcional)</span>
                                 </label>
-                                <textarea name="descripcion" id="ai-descripcion" rows="2" maxlength="500"
-                                    placeholder="Notas o descripción del documento SICD..."
-                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; resize:vertical;"></textarea>
+                                <input type="text" name="motivo_masivo" id="ai-motivo-masivo" placeholder="Ej: Reabastecimiento mensual"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
                             </div>
+                            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; padding:0.5rem 0.65rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.5rem;">
+                                <input type="checkbox" name="vincular_oc" id="ai-vincular-oc" value="1"
+                                    style="width:1rem; height:1rem; accent-color:#16a34a; cursor:pointer;">
+                                <span style="font-size:0.78rem; font-weight:600; color:#166534;">
+                                    Continuar con asignación a Orden de Compra
+                                </span>
+                                <span style="font-size:0.72rem; color:#4ade80; margin-left:auto;">Opcional</span>
+                            </label>
                         </div>
 
-                        {{-- ── SICD Existente ── --}}
-                        <div id="ai-panel-existente" style="display:none; flex-direction:column; gap:0.75rem;">
-
-                            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.5rem; padding:0.5rem 0.75rem;">
-                                <p style="font-size:0.72rem; color:#166534; font-weight:600; margin:0;">
-                                    🔗 Selecciona un SICD ya registrado para adjuntarle productos adicionales o continuar su proceso.
-                                </p>
+                        {{-- Panel Carga manual --}}
+                        <div id="ai-ext-panel-manual" style="display:none; flex-direction:column; gap:0.75rem;">
+                            <div style="position:relative;">
+                                <input type="text" id="ai-buscador-manual"
+                                    placeholder="🔍 Buscar producto por nombre o descripción..."
+                                    autocomplete="off"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                                <div id="ai-resultados-manual"
+                                    style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #e5e7eb; border-radius:0.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.1); max-height:200px; overflow-y:auto; margin-top:2px;"></div>
                             </div>
-
-                            <div>
-                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                    Seleccionar SICD <span style="color:#ef4444;">*</span>
-                                </label>
-                                <select name="sicd_existente_id" id="ai-sicd-existente-id"
-                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.65rem; font-size:0.8rem; box-sizing:border-box; background:#fff;"
-                                    onchange="aiSicdExistenteChange(this)">
-                                    <option value="">— Selecciona un SICD —</option>
-                                    @foreach($sicds as $sicd)
-                                    <option value="{{ $sicd->id }}"
-                                        data-codigo="{{ $sicd->codigo_sicd }}"
-                                        data-estado="{{ $sicd->estado }}">
-                                        {{ $sicd->codigo_sicd }}
-                                        @if($sicd->descripcion) — {{ Str::limit($sicd->descripcion, 40) }}@endif
-                                        ({{ $sicd->estado }})
-                                    </option>
-                                    @endforeach
-                                </select>
+                            <div id="ai-tabla-manual-wrap" style="display:none;">
+                                <table style="width:100%; font-size:0.78rem; border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="background:#f3e8ff; color:#6b21a8;">
+                                            <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Producto</th>
+                                            <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:90px;">Cantidad</th>
+                                            <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Motivo</th>
+                                            <th style="padding:0.4rem 0.6rem; width:36px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ai-items-manual"></tbody>
+                                </table>
                             </div>
-
-                            <div id="ai-sicd-existente-info" style="display:none; background:#f9fafb; border:1px solid #e5e7eb; border-radius:0.5rem; padding:0.6rem 0.75rem;">
-                                <p style="font-size:0.75rem; color:#374151; margin:0;">
-                                    <span style="font-weight:600;">Código:</span> <span id="ai-info-codigo">—</span>
-                                    &nbsp;·&nbsp;
-                                    <span style="font-weight:600;">Estado:</span> <span id="ai-info-estado">—</span>
-                                </p>
-                            </div>
+                            <p id="ai-sin-items-manual" style="font-size:0.75rem; color:#9ca3af; text-align:center; display:none;">
+                                Agrega al menos un producto para continuar.
+                            </p>
                         </div>
+
                     </div>
 
                 </div>
@@ -1062,8 +1075,13 @@ var aiProductos = JSON.parse(document.getElementById('ai-data').textContent);
 var aiItems = [];
 var aiCounter = 0;
 var aiForm = document.getElementById('form-agregar-inv');
-var aiUrlLocal = aiForm.dataset.urlLocal;
+var aiUrlLocal   = aiForm.dataset.urlLocal;
 var aiUrlExterna = aiForm.dataset.urlExterna;
+var aiUrlMasiva  = aiForm.dataset.urlMasiva;
+var aiUrlManual  = aiForm.dataset.urlManual;
+var aiMetodoCargaActual = 'masiva';
+var aiItemsManual = [];
+var aiCounterManual = 0;
 
 document.getElementById('btn-agregar-inventario').addEventListener('click', function() {
     var modal = document.getElementById('modal-agregar-inv');
@@ -1083,9 +1101,16 @@ function cerrarModalAgregarInv() {
     document.getElementById('ai-seccion-externa').style.display = 'none';
     aiItems = [];
     aiCounter = 0;
+    aiItemsManual = [];
+    aiCounterManual = 0;
     document.getElementById('ai-items').innerHTML = '';
     document.getElementById('ai-tabla-wrap').style.display = 'none';
     document.getElementById('ai-sin-items').style.display = 'none';
+    document.getElementById('ai-items-manual').innerHTML = '';
+    document.getElementById('ai-tabla-manual-wrap').style.display = 'none';
+    document.getElementById('ai-sin-items-manual').style.display = 'none';
+    aiMetodoCargaActual = 'masiva';
+    aiMetodoCarga('masiva');
     var btn = document.getElementById('ai-btn-submit');
     btn.disabled = true;
     btn.style.background = '#9ca3af';
@@ -1097,12 +1122,45 @@ document.getElementById('modal-agregar-inv').addEventListener('click', function(
     if (e.target === this) cerrarModalAgregarInv();
 });
 
+function aiMetodoCarga(metodo) {
+    aiMetodoCargaActual = metodo;
+    var btnM = document.getElementById('ai-ext-btn-masiva');
+    var btnMa = document.getElementById('ai-ext-btn-manual');
+    var panelM  = document.getElementById('ai-ext-panel-masiva');
+    var panelMa = document.getElementById('ai-ext-panel-manual');
+    if (metodo === 'masiva') {
+        btnM.style.borderColor  = '#2563eb'; btnM.style.background  = '#eff6ff'; btnM.style.color  = '#1e40af';
+        btnMa.style.borderColor = '#e5e7eb'; btnMa.style.background = '#fff';    btnMa.style.color = '#6b7280';
+        panelM.style.display  = 'flex';
+        panelMa.style.display = 'none';
+    } else {
+        btnMa.style.borderColor = '#7c3aed'; btnMa.style.background = '#faf5ff'; btnMa.style.color = '#6b21a8';
+        btnM.style.borderColor  = '#e5e7eb'; btnM.style.background  = '#fff';    btnM.style.color  = '#6b7280';
+        panelMa.style.display = 'flex';
+        panelM.style.display  = 'none';
+    }
+    var aiTipo = document.getElementById('ai-tipo').value;
+    if (aiTipo === 'externa') { aiActualizarBtnExterna(metodo); }
+}
+
+function aiActualizarBtnExterna(metodo) {
+    var btn = document.getElementById('ai-btn-submit');
+    btn.disabled = false;
+    btn.style.cursor = 'pointer';
+    if (metodo === 'masiva') {
+        btn.style.background = '#2563eb';
+        btn.textContent = 'Recibir SICD y cargar Excel';
+    } else {
+        btn.style.background = '#7c3aed';
+        btn.textContent = 'Recibir SICD y registrar productos';
+    }
+}
+
 function aiCambiarTipo(tipo) {
     var local = document.getElementById('ai-seccion-local');
     var externa = document.getElementById('ai-seccion-externa');
     local.style.display = (tipo === 'local') ? 'flex' : 'none';
     externa.style.display = (tipo === 'externa') ? 'flex' : 'none';
-    if (tipo === 'externa') aiTabSicd('nuevo');
     var btn = document.getElementById('ai-btn-submit');
     if (tipo === 'local') {
         btn.disabled = false;
@@ -1110,55 +1168,13 @@ function aiCambiarTipo(tipo) {
         btn.style.cursor = 'pointer';
         btn.textContent = 'Registrar compra local';
     } else if (tipo === 'externa') {
-        btn.disabled = false;
-        btn.style.background = '#2563eb';
-        btn.style.cursor = 'pointer';
-        btn.textContent = 'Recibir SICD y actualizar stock';
+        aiActualizarBtnExterna(aiMetodoCargaActual);
     } else {
         btn.disabled = true;
         btn.style.background = '#9ca3af';
         btn.style.cursor = 'not-allowed';
         btn.textContent = 'Registrar';
     }
-}
-
-function aiTabSicd(tab) {
-    var panelNuevo     = document.getElementById('ai-panel-nuevo');
-    var panelExistente = document.getElementById('ai-panel-existente');
-    var btnNuevo       = document.getElementById('ai-tab-nuevo');
-    var btnExistente   = document.getElementById('ai-tab-existente');
-    document.getElementById('ai-modo').value = tab;
-    if (tab === 'nuevo') {
-        panelNuevo.style.display     = 'flex';
-        panelExistente.style.display = 'none';
-        btnNuevo.style.background    = '#2563eb';
-        btnNuevo.style.color         = '#fff';
-        btnNuevo.style.borderColor   = '#2563eb';
-        btnExistente.style.background  = '#fff';
-        btnExistente.style.color       = '#6b7280';
-        btnExistente.style.borderColor = '#d1d5db';
-        document.getElementById('ai-btn-submit').textContent = 'Recibir SICD y actualizar stock';
-    } else {
-        panelNuevo.style.display     = 'none';
-        panelExistente.style.display = 'flex';
-        btnExistente.style.background  = '#2563eb';
-        btnExistente.style.color       = '#fff';
-        btnExistente.style.borderColor = '#2563eb';
-        btnNuevo.style.background    = '#fff';
-        btnNuevo.style.color         = '#6b7280';
-        btnNuevo.style.borderColor   = '#d1d5db';
-        document.getElementById('ai-btn-submit').textContent = 'Recibir SICD y actualizar stock';
-    }
-}
-
-function aiSicdExistenteChange(sel) {
-    var opt  = sel.options[sel.selectedIndex];
-    var id   = sel.value;
-    var info = document.getElementById('ai-sicd-existente-info');
-    if (!id) { info.style.display = 'none'; return; }
-    document.getElementById('ai-info-codigo').textContent = opt.dataset.codigo;
-    document.getElementById('ai-info-estado').textContent = opt.dataset.estado;
-    info.style.display = 'block';
 }
 
 function aiEnviar() {
@@ -1177,19 +1193,15 @@ function aiEnviar() {
         if (aiItems.length === 0) { alert('Agrega al menos un producto.'); document.getElementById('ai-buscador').focus(); return; }
         aiForm.action = aiUrlLocal;
     } else if (tipo === 'externa') {
-        var modo = document.getElementById('ai-modo').value;
-        if (modo === 'existente') {
-            var sicdId = document.getElementById('ai-sicd-existente-id').value;
-            if (!sicdId) { alert('Selecciona un SICD existente.'); return; }
+        if (aiMetodoCargaActual === 'masiva') {
+            if (!document.getElementById('ai-excel-masivo').files.length) {
+                alert('El archivo Excel de productos es obligatorio.'); return;
+            }
+            aiForm.action = aiUrlMasiva;
         } else {
-            var codigo = document.getElementById('ai-codigo-sicd').value.trim();
-            var sicdFile = document.getElementById('ai-archivo-sicd').files.length;
-            var excelFile = document.getElementById('ai-archivo-excel').files.length;
-            if (!codigo)    { alert('El código SICD es obligatorio.'); document.getElementById('ai-codigo-sicd').focus(); return; }
-            if (!sicdFile)  { alert('El documento SICD es obligatorio.'); return; }
-            if (!excelFile) { alert('El archivo Excel es obligatorio.'); return; }
+            if (aiItemsManual.length === 0) { alert('Agrega al menos un producto.'); document.getElementById('ai-buscador-manual').focus(); return; }
+            aiForm.action = aiUrlManual;
         }
-        aiForm.action = aiUrlExterna;
     }
 
     aiForm.submit();
@@ -1263,7 +1275,82 @@ document.addEventListener('click', function(e) {
     if (res && !e.target.closest('#ai-buscador') && !e.target.closest('#ai-resultados')) {
         res.style.display = 'none';
     }
+    var resM = document.getElementById('ai-resultados-manual');
+    if (resM && !e.target.closest('#ai-buscador-manual') && !e.target.closest('#ai-resultados-manual')) {
+        resM.style.display = 'none';
+    }
 });
+
+document.getElementById('ai-buscador-manual').addEventListener('input', function() {
+    var q = this.value.trim().toLowerCase();
+    var res = document.getElementById('ai-resultados-manual');
+    if (q.length < 1) { res.style.display = 'none'; return; }
+    var matches = aiProductos.filter(function(p) {
+        return p.nombre.toLowerCase().indexOf(q) >= 0 || (p.descripcion || '').toLowerCase().indexOf(q) >= 0;
+    }).slice(0, 10);
+    if (!matches.length) { res.style.display = 'none'; return; }
+    res.innerHTML = matches.map(function(p) {
+        return '<div onclick="aiAgregarManual(' + p.id + ',\'' + p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')"'
+            + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;"'
+            + ' onmouseover="this.style.background=\'#f3e8ff\'" onmouseout="this.style.background=\'\'">'
+            + '<p style="font-size:0.8rem;font-weight:600;color:#1f2937;">' + escHtmlAi(p.nombre) + '</p>'
+            + '<p style="font-size:0.72rem;color:#6b7280;">' + escHtmlAi(p.descripcion || '') + ' &middot; Stock: ' + p.stock + '</p>'
+            + '</div>';
+    }).join('');
+    res.style.display = 'block';
+});
+
+function aiAgregarManual(id, nombre) {
+    if (aiItemsManual.find(function(i) { return i.id === id; })) {
+        document.getElementById('ai-buscador-manual').value = '';
+        document.getElementById('ai-resultados-manual').style.display = 'none';
+        return;
+    }
+    var idx = aiCounterManual++;
+    aiItemsManual.push({ idx: idx, id: id, nombre: nombre });
+    aiRenderFilaManual(idx, id, nombre);
+    document.getElementById('ai-buscador-manual').value = '';
+    document.getElementById('ai-resultados-manual').style.display = 'none';
+    aiActualizarTablaManual();
+}
+
+function aiRenderFilaManual(idx, id, nombre) {
+    var tbody = document.getElementById('ai-items-manual');
+    var tr = document.createElement('tr');
+    tr.id = 'ai-row-manual-' + idx;
+    tr.style.borderBottom = '1px solid #f3f4f6';
+    tr.innerHTML =
+        '<td style="padding:0.4rem 0.6rem;">'
+        + '<input type="hidden" name="items_manual[' + idx + '][producto_id]" value="' + id + '">'
+        + '<span style="font-size:0.8rem;font-weight:500;color:#1f2937;">' + escHtmlAi(nombre) + '</span>'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
+        + '<input type="number" name="items_manual[' + idx + '][cantidad]" value="1" min="1"'
+        + ' style="width:68px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;">'
+        + '<input type="text" name="items_manual[' + idx + '][motivo]" placeholder="Motivo (opcional)"'
+        + ' style="width:100%;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.78rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.3rem;text-align:center;">'
+        + '<button type="button" onclick="aiQuitarManual(' + idx + ')" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;">&#x2715;</button>'
+        + '</td>';
+    tbody.appendChild(tr);
+}
+
+function aiQuitarManual(idx) {
+    aiItemsManual = aiItemsManual.filter(function(i) { return i.idx !== idx; });
+    var row = document.getElementById('ai-row-manual-' + idx);
+    if (row) row.remove();
+    aiActualizarTablaManual();
+}
+
+function aiActualizarTablaManual() {
+    var wrap = document.getElementById('ai-tabla-manual-wrap');
+    var sin  = document.getElementById('ai-sin-items-manual');
+    wrap.style.display = aiItemsManual.length ? '' : 'none';
+    sin.style.display  = aiItemsManual.length ? 'none' : '';
+}
 
 function aiAgregar(id, nombre) {
     if (aiItems.find(function(i) { return i.id === id; })) {

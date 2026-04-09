@@ -143,7 +143,7 @@
         <h2 class="text-lg font-bold text-gray-800 mb-1">Rechazar solicitud</h2>
         <p class="text-sm text-gray-500 mb-4">Ingresa el motivo del rechazo para informar al solicitante.</p>
 
-        <form id="formRechazo" method="POST" action="">
+        <form id="formRechazo" method="POST" action="" onsubmit="return validarRechazo()">
             @csrf
             <div class="mb-4">
                 <label for="motivo_rechazo" class="block text-sm font-medium text-gray-700 mb-1">
@@ -151,7 +151,14 @@
                 </label>
                 <textarea id="motivo_rechazo" name="motivo_rechazo" rows="3"
                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                          placeholder="Ej: Stock insuficiente, solicitud duplicada, error en la cantidad..."></textarea>
+                          placeholder="Ej: Stock insuficiente, solicitud duplicada, error en la cantidad..."
+                          oninput="limpiarErrorRechazo()"></textarea>
+                <p id="error-motivo-rechazo" class="hidden mt-1.5 text-sm font-medium text-red-600 flex items-center gap-1">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    Debes ingresar el motivo del rechazo antes de continuar.
+                </p>
             </div>
 
             <div class="flex justify-end gap-3">
@@ -200,19 +207,44 @@
         });
     }
 
-    function abrirModalRechazo(id) {
+    function abrirModalRechazo(id, url) {
         const modal = document.getElementById('modalRechazo');
         const form  = document.getElementById('formRechazo');
-        form.action = `/admin/solicitudes/${id}/rechazar`;
+        form.action = url || `/admin/solicitudes/${id}/rechazar`;
         document.getElementById('motivo_rechazo').value = '';
+        limpiarErrorRechazo();
         modal.classList.remove('hidden');
         modal.classList.add('flex');
+        setTimeout(function() { document.getElementById('motivo_rechazo').focus(); }, 50);
     }
 
     function cerrarModalRechazo() {
         const modal = document.getElementById('modalRechazo');
         modal.classList.add('hidden');
         modal.classList.remove('flex');
+        limpiarErrorRechazo();
+    }
+
+    function validarRechazo() {
+        const motivo = document.getElementById('motivo_rechazo').value.trim();
+        if (!motivo) {
+            const textarea = document.getElementById('motivo_rechazo');
+            const error    = document.getElementById('error-motivo-rechazo');
+            textarea.classList.add('border-red-500', 'ring-1', 'ring-red-400');
+            error.classList.remove('hidden');
+            error.classList.add('flex');
+            textarea.focus();
+            return false;
+        }
+        return true;
+    }
+
+    function limpiarErrorRechazo() {
+        const textarea = document.getElementById('motivo_rechazo');
+        const error    = document.getElementById('error-motivo-rechazo');
+        textarea.classList.remove('border-red-500', 'ring-1', 'ring-red-400');
+        error.classList.add('hidden');
+        error.classList.remove('flex');
     }
 
     // Cerrar al hacer clic fuera del modal

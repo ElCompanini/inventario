@@ -4,18 +4,9 @@
 
 @section('content')
 
-<div class="mb-6 flex items-center justify-between">
-    <div>
-        <h1 class="text-2xl font-bold text-gray-800">SICD</h1>
-        <p class="text-sm text-gray-500 mt-1">Gestión documental de SICDs</p>
-    </div>
-    <a href="{{ route('admin.sicd.create') }}"
-       class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-        </svg>
-        Nuevo SICD
-    </a>
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">SICD</h1>
+    <p class="text-sm text-gray-500 mt-1">Gestión documental de SICDs</p>
 </div>
 
 <div class="mb-4">

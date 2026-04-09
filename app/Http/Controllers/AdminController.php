@@ -6,9 +6,13 @@ use App\Models\Solicitud;
 use App\Models\Producto;
 use App\Models\Container;
 use App\Models\HistorialCambio;
+use App\Models\Sicd;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\SicdDetallesImport;
 
 class AdminController extends Controller
 {
@@ -210,5 +214,157 @@ class AdminController extends Controller
 
         return redirect()->route('dashboard')
             ->with('success', "Producto '{$producto->nombre}' trasladado a {$containerDestino->nombre} correctamente.");
+    }
+
+    public function cargaMasiva(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $request->validate([
+            'excel_masivo'  => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
+            'motivo_masivo' => ['nullable', 'string', 'max:500'],
+            'codigo_sicd'   => ['nullable', 'string', 'max:100'],
+            'archivo_sicd'  => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'descripcion'   => ['nullable', 'string', 'max:500'],
+        ], [
+            'excel_masivo.required' => 'El archivo Excel es obligatorio.',
+            'excel_masivo.mimes'    => 'El archivo debe ser XLSX, XLS o CSV.',
+        ]);
+
+        $vincularOc = $request->boolean('vincular_oc');
+        $rows   = Excel::toCollection(new SicdDetallesImport, $request->file('excel_masivo'))->first();
+        $motivo = trim($request->input('motivo_masivo', '')) ?: 'Carga masiva de inventario';
+
+        $actualizados = 0;
+        $errores      = [];
+        $sicd         = null;
+
+        // Crear registro SICD si se adjuntó el documento
+        $codigoSicd = strtoupper(trim($request->input('codigo_sicd', '')));
+        if ($codigoSicd && $request->hasFile('archivo_sicd')) {
+            $archivoSicd = $request->file('archivo_sicd');
+            $rutaFinal   = 'documentos/sicd/' . $archivoSicd->hashName();
+            Storage::disk('local')->put($rutaFinal, file_get_contents($archivoSicd->getRealPath()));
+
+            $sicd = Sicd::create([
+                'codigo_sicd'    => $codigoSicd,
+                'archivo_nombre' => $archivoSicd->getClientOriginalName(),
+                'archivo_ruta'   => $rutaFinal,
+                'descripcion'    => $request->input('descripcion'),
+                'estado'         => $vincularOc ? 'pendiente' : 'recibido',
+                'usuario_id'     => Auth::id(),
+            ]);
+        }
+
+        // Procesar Excel en formato SICD: col A = descripción, col B = unidad, col C = cantidad
+        DB::transaction(function () use ($rows, $motivo, $sicd, &$actualizados, &$errores) {
+            foreach ($rows as $i => $row) {
+                $descripcion = trim((string) ($row[0] ?? ''));
+                $unidad      = trim((string) ($row[1] ?? ''));
+                $cantidad    = (int) ($row[2] ?? 0);
+                $precioNeto  = is_numeric($row[3] ?? '') ? (float) $row[3] : null;
+                $totalNeto   = is_numeric($row[4] ?? '') ? (float) $row[4] : null;
+
+                if ($descripcion === '' || $cantidad <= 0) continue;
+
+                // Buscar producto por descripción exacta, luego por nombre, luego fuzzy
+                $producto = Producto::where('descripcion', $descripcion)
+                    ->orWhere('nombre', $descripcion)
+                    ->first();
+
+                if (!$producto) {
+                    $errores[] = "Fila " . ($i + 2) . ": no se encontró '{$descripcion}'.";
+                    if ($sicd) {
+                        $sicd->detalles()->create([
+                            'nombre_producto_excel' => $descripcion,
+                            'unidad'                => $unidad ?: null,
+                            'cantidad_solicitada'   => $cantidad,
+                            'cantidad_recibida'     => 0,
+                            'precio_neto'           => $precioNeto,
+                            'total_neto'            => $totalNeto,
+                        ]);
+                    }
+                    continue;
+                }
+
+                $producto->stock_actual += $cantidad;
+                $producto->actualizarFechasStock();
+                $producto->save();
+
+                HistorialCambio::create([
+                    'producto_id'  => $producto->id,
+                    'cantidad'     => $cantidad,
+                    'tipo'         => 'entrada',
+                    'motivo'       => $sicd ? "Carga masiva – SICD {$sicd->codigo_sicd}" : $motivo,
+                    'aprobado_por' => Auth::user()->name,
+                    'usuario_id'   => Auth::id(),
+                ]);
+
+                if ($sicd) {
+                    $sicd->detalles()->create([
+                        'producto_id'           => $producto->id,
+                        'nombre_producto_excel' => $descripcion,
+                        'unidad'                => $unidad ?: null,
+                        'cantidad_solicitada'   => $cantidad,
+                        'cantidad_recibida'     => $cantidad,
+                        'precio_neto'           => $precioNeto,
+                        'total_neto'            => $totalNeto,
+                    ]);
+                }
+
+                $actualizados++;
+            }
+        });
+
+        $msg = "Carga masiva completada: {$actualizados} producto(s) actualizado(s).";
+        if (!empty($errores)) {
+            $msg .= ' Advertencias: ' . implode(' | ', $errores);
+        }
+
+        if ($vincularOc && $sicd) {
+            return redirect()->route('admin.sicd.show', $sicd->id)->with('success', $msg);
+        }
+
+        return redirect()->route('dashboard')->with('success', $msg);
+    }
+
+    public function cargaManual(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $request->validate([
+            'items_manual'                => ['required', 'array', 'min:1'],
+            'items_manual.*.producto_id'  => ['required', 'integer', 'exists:productos,id'],
+            'items_manual.*.cantidad'     => ['required', 'integer', 'min:1'],
+            'items_manual.*.motivo'       => ['nullable', 'string', 'max:500'],
+        ], [
+            'items_manual.required'              => 'Agrega al menos un producto.',
+            'items_manual.*.producto_id.required' => 'Cada fila debe tener un producto.',
+            'items_manual.*.cantidad.min'         => 'La cantidad debe ser al menos 1.',
+        ]);
+
+        DB::transaction(function () use ($request) {
+            foreach ($request->items_manual as $item) {
+                $producto = Producto::findOrFail($item['producto_id']);
+                $cantidad = (int) $item['cantidad'];
+                $motivo   = trim($item['motivo'] ?? '') ?: 'Carga manual de inventario';
+
+                $producto->stock_actual += $cantidad;
+                $producto->actualizarFechasStock();
+                $producto->save();
+
+                HistorialCambio::create([
+                    'producto_id'  => $producto->id,
+                    'cantidad'     => $cantidad,
+                    'tipo'         => 'entrada',
+                    'motivo'       => $motivo,
+                    'aprobado_por' => Auth::user()->name,
+                    'usuario_id'   => Auth::id(),
+                ]);
+            }
+        });
+
+        return redirect()->route('dashboard')
+            ->with('success', 'Stock actualizado correctamente.');
     }
 }
