@@ -57,6 +57,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/sicd', [SicdController::class, 'index'])->name('sicd.index');
     Route::get('/sicd/crear', [SicdController::class, 'create'])->name('sicd.create');
     Route::post('/sicd', [SicdController::class, 'store'])->name('sicd.store');
+    Route::post('/sicd/recibir-directo', [SicdController::class, 'recibirDirecto'])->name('sicd.recibir.directo');
     Route::get('/sicd/resolver-conflictos', [SicdController::class, 'resolver'])->name('sicd.resolver');
     Route::post('/sicd/confirmar', [SicdController::class, 'confirmar'])->name('sicd.confirmar');
     Route::get('/sicd/{id}', [SicdController::class, 'show'])->name('sicd.show');

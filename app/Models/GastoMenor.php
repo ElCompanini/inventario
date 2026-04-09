@@ -19,13 +19,11 @@ class GastoMenor extends Model
         'cantidad',
         'precio_neto',
         'fecha_emision',
-        'fecha_ingreso',
         'documento_path',
     ];
 
     protected $casts = [
         'fecha_emision'  => 'datetime',
-        'fecha_ingreso'  => 'datetime',
         'monto'         => 'integer',
         'precio_neto'   => 'integer',
 

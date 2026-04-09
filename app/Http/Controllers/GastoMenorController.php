@@ -160,7 +160,6 @@ class GastoMenorController extends Controller
                     'cantidad'           => $item['cantidad'],
                     'precio_neto'        => $item['precio_neto'] ?? null,
                     'fecha_emision'      => $request->fecha_emision,
-                    'fecha_ingreso'      => now(),
                     'documento_path'     => $rutaDoc,
                 ]);
             }

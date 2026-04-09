@@ -109,7 +109,7 @@ if (strlen($limpio) < 2) return $rut;
                     <div>
                         <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Fecha Ingreso</p>
                         <p class="text-sm font-semibold text-amber-900">
-                            {{ $primero->fecha_ingreso ? $primero->fecha_ingreso->format('d/m/Y H:i') : '—' }}
+                            {{ $primero->created_at ? $primero->created_at->format('d/m/Y H:i') : '—' }}
                         </p>
                     </div>
                     <div>

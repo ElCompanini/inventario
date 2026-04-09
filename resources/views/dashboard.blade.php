@@ -4,7 +4,7 @@
 
 @section('content')
 
-<div class="mb-6 flex items-center justify-between">
+<div class="mb-6 flex items-center justify-between gap-4 flex-wrap">
     <div>
         <h1 class="text-2xl font-bold text-gray-800">Inventario de Productos</h1>
         <p class="text-sm text-gray-500 mt-1">
@@ -12,20 +12,33 @@
         </p>
     </div>
 
-    {{-- Leyenda de colores --}}
-    <div class="flex items-center gap-4 text-xs text-gray-600">
-        <span class="flex items-center gap-1.5">
-            <span class="inline-block w-4 h-4 rounded bg-red-200 border border-red-300"></span>
-            Stock crítico
-        </span>
-        <span class="flex items-center gap-1.5">
-            <span class="inline-block w-4 h-4 rounded bg-yellow-100 border border-yellow-300"></span>
-            Stock mínimo
-        </span>
-        <span class="flex items-center gap-1.5">
-            <span class="inline-block w-4 h-4 rounded bg-white border border-gray-200"></span>
-            Normal
-        </span>
+    <div class="flex items-center gap-4 flex-wrap">
+        @if(auth()->user()->esAdmin())
+        <button type="button" id="btn-agregar-inventario"
+            style="background:#2563eb; color:#fff; font-size:0.82rem; font-weight:600; padding:0.5rem 1.1rem; border-radius:0.5rem; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:0.4rem; transition:background .15s; white-space:nowrap;"
+            onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            Agregar Inventario
+        </button>
+        @endif
+
+        {{-- Leyenda de colores --}}
+        <div class="flex items-center gap-4 text-xs text-gray-600">
+            <span class="flex items-center gap-1.5">
+                <span class="inline-block w-4 h-4 rounded bg-red-200 border border-red-300"></span>
+                Stock crítico
+            </span>
+            <span class="flex items-center gap-1.5">
+                <span class="inline-block w-4 h-4 rounded bg-yellow-100 border border-yellow-300"></span>
+                Stock mínimo
+            </span>
+            <span class="flex items-center gap-1.5">
+                <span class="inline-block w-4 h-4 rounded bg-white border border-gray-200"></span>
+                Normal
+            </span>
+        </div>
     </div>
 </div>
 
@@ -703,6 +716,243 @@ function escHtmlGm(str) {
 @endpush
 @endif
 
+@if(auth()->user()->esAdmin())
+{{-- ══ MODAL AGREGAR INVENTARIO ══ --}}
+<div id="modal-agregar-inv"
+    style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.5); overflow-y:auto;">
+    <div style="min-height:100%; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1rem;">
+        <div class="ai-modal-inner" style="background:#fff; border-radius:1rem; width:100%; max-width:820px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+
+            {{-- Header --}}
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #e5e7eb;">
+                <div>
+                    <p style="font-size:1rem; font-weight:700; color:#1e40af;">Agregar Inventario</p>
+                    <p style="font-size:0.75rem; color:#6b7280; margin-top:0.1rem;">Registra una entrada por boleta local o documento SICD externo</p>
+                </div>
+                <button type="button" onclick="cerrarModalAgregarInv()"
+                    style="color:#9ca3af; font-size:1.25rem; line-height:1; background:none; border:none; cursor:pointer;">✕</button>
+            </div>
+
+            <form method="POST" action="" id="form-agregar-inv" enctype="multipart/form-data"
+                data-url-local="{{ route('admin.gastos-menores.store') }}"
+                data-url-externa="{{ route('admin.sicd.recibir.directo') }}">
+                <input type="hidden" name="_modo" id="ai-modo" value="nuevo">
+                @csrf
+                <div style="padding:1.25rem; display:flex; flex-direction:column; gap:1rem;">
+
+                    {{-- Selector de tipo --}}
+                    <div>
+                        <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                            Tipo de ingreso <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="ai-tipo" name="_tipo"
+                            style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.65rem; font-size:0.8rem; box-sizing:border-box; background:#fff;"
+                            onchange="aiCambiarTipo(this.value)">
+                            <option value="">— Selecciona el tipo de ingreso —</option>
+                            <option value="local">Local (Boleta de compra)</option>
+                            <option value="externa">Externa (Documento SICD)</option>
+                        </select>
+                    </div>
+
+                    {{-- ══ SECCIÓN LOCAL ══ --}}
+                    <div id="ai-seccion-local" style="display:none; flex-direction:column; gap:1rem;">
+
+                        <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:0.5rem; padding:0.5rem 0.75rem;">
+                            <p style="font-size:0.72rem; color:#92400e; font-weight:600; margin:0;">
+                                📄 Los productos se sumarán al stock del inventario al registrar la boleta.
+                            </p>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    RUT Proveedor <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="text" name="rut_proveedor" id="ai-rut" placeholder="Ej: 12.345.678-9"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Folio <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="text" name="folio" id="ai-folio" placeholder="Ej: 001234"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Fecha y hora de emisión <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="datetime-local" name="fecha_emision" id="ai-fecha"
+                                    max="{{ date('Y-m-d\TH:i') }}"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Boleta PDF <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="file" name="documento" id="ai-doc" accept=".pdf"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
+                            </div>
+                        </div>
+
+                        <div style="border-top:1px solid #e5e7eb; padding-top:0.75rem;">
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.4rem;">
+                                Productos <span style="color:#ef4444;">*</span>
+                            </label>
+                            <div style="position:relative;">
+                                <input type="text" id="ai-buscador"
+                                    placeholder="🔍 Buscar producto por nombre o descripción..."
+                                    autocomplete="off"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                                <div id="ai-resultados"
+                                    style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #e5e7eb; border-radius:0.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.1); max-height:200px; overflow-y:auto; margin-top:2px;"></div>
+                            </div>
+                        </div>
+
+                        <div id="ai-tabla-wrap" style="display:none;">
+                            <table style="width:100%; font-size:0.78rem; border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:#fef3c7; color:#92400e;">
+                                        <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Producto</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:80px;">Cant.</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">Monto ($)</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:140px;">P. Neto s/IVA</th>
+                                        <th style="padding:0.4rem 0.6rem; width:36px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ai-items"></tbody>
+                            </table>
+                        </div>
+                        <p id="ai-sin-items" style="font-size:0.75rem; color:#9ca3af; text-align:center; display:none;">
+                            Agrega al menos un producto para continuar.
+                        </p>
+                    </div>
+
+                    {{-- ══ SECCIÓN EXTERNA ══ --}}
+                    <div id="ai-seccion-externa" style="display:none; flex-direction:column; gap:0.75rem;">
+
+                        {{-- Sub-selector Nuevo / Existente --}}
+                        <div style="display:flex; gap:0.5rem;">
+                            <button type="button" id="ai-tab-nuevo"
+                                onclick="aiTabSicd('nuevo')"
+                                style="flex:1; padding:0.45rem; font-size:0.78rem; font-weight:600; border-radius:0.5rem; border:2px solid #2563eb; background:#2563eb; color:#fff; cursor:pointer; transition:all .15s;">
+                                Nuevo SICD
+                            </button>
+                            <button type="button" id="ai-tab-existente"
+                                onclick="aiTabSicd('existente')"
+                                style="flex:1; padding:0.45rem; font-size:0.78rem; font-weight:600; border-radius:0.5rem; border:2px solid #d1d5db; background:#fff; color:#6b7280; cursor:pointer; transition:all .15s;">
+                                SICD Existente
+                            </button>
+                        </div>
+
+                        {{-- ── Nuevo SICD ── --}}
+                        <div id="ai-panel-nuevo" style="display:flex; flex-direction:column; gap:0.75rem;">
+
+                            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:0.5rem; padding:0.5rem 0.75rem;">
+                                <p style="font-size:0.72rem; color:#1e40af; font-weight:600; margin:0;">
+                                    📋 El sistema procesará el Excel para actualizar el stock automáticamente.
+                                </p>
+                            </div>
+
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                                <div>
+                                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                        Documento SICD <span style="color:#ef4444;">*</span>
+                                        <span style="font-weight:400; color:#9ca3af;">(PDF, JPG, PNG)</span>
+                                    </label>
+                                    <input type="file" name="archivo_sicd" id="ai-archivo-sicd" accept=".pdf,.jpg,.jpeg,.png"
+                                        style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                        Código SICD <span style="color:#ef4444;">*</span>
+                                    </label>
+                                    <input type="text" name="codigo_sicd" id="ai-codigo-sicd" placeholder="Se detecta del PDF automáticamente"
+                                        style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                                    <span id="ai-codigo-hint" style="font-size:0.7rem; margin-top:0.2rem; display:block;"></span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Excel de productos <span style="color:#ef4444;">*</span>
+                                    <span style="font-weight:400; color:#9ca3af;">(XLSX, XLS, CSV)</span>
+                                </label>
+                                <input type="file" name="archivo_excel" id="ai-archivo-excel" accept=".xlsx,.xls,.csv"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
+                            </div>
+
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Descripción <span style="font-weight:400; color:#9ca3af;">(opcional)</span>
+                                </label>
+                                <textarea name="descripcion" id="ai-descripcion" rows="2" maxlength="500"
+                                    placeholder="Notas o descripción del documento SICD..."
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; resize:vertical;"></textarea>
+                            </div>
+                        </div>
+
+                        {{-- ── SICD Existente ── --}}
+                        <div id="ai-panel-existente" style="display:none; flex-direction:column; gap:0.75rem;">
+
+                            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.5rem; padding:0.5rem 0.75rem;">
+                                <p style="font-size:0.72rem; color:#166534; font-weight:600; margin:0;">
+                                    🔗 Selecciona un SICD ya registrado para adjuntarle productos adicionales o continuar su proceso.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Seleccionar SICD <span style="color:#ef4444;">*</span>
+                                </label>
+                                <select name="sicd_existente_id" id="ai-sicd-existente-id"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.65rem; font-size:0.8rem; box-sizing:border-box; background:#fff;"
+                                    onchange="aiSicdExistenteChange(this)">
+                                    <option value="">— Selecciona un SICD —</option>
+                                    @foreach($sicds as $sicd)
+                                    <option value="{{ $sicd->id }}"
+                                        data-codigo="{{ $sicd->codigo_sicd }}"
+                                        data-estado="{{ $sicd->estado }}">
+                                        {{ $sicd->codigo_sicd }}
+                                        @if($sicd->descripcion) — {{ Str::limit($sicd->descripcion, 40) }}@endif
+                                        ({{ $sicd->estado }})
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div id="ai-sicd-existente-info" style="display:none; background:#f9fafb; border:1px solid #e5e7eb; border-radius:0.5rem; padding:0.6rem 0.75rem;">
+                                <p style="font-size:0.75rem; color:#374151; margin:0;">
+                                    <span style="font-weight:600;">Código:</span> <span id="ai-info-codigo">—</span>
+                                    &nbsp;·&nbsp;
+                                    <span style="font-weight:600;">Estado:</span> <span id="ai-info-estado">—</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                {{-- Footer --}}
+                <div style="display:flex; align-items:center; justify-content:flex-end; gap:0.5rem; padding:0.75rem 1.25rem; border-top:1px solid #e5e7eb; background:#fafafa; border-radius:0 0 1rem 1rem;">
+                    <button type="button" onclick="cerrarModalAgregarInv()"
+                        style="padding:0.4rem 1rem; font-size:0.8rem; font-weight:600; color:#374151; background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">
+                        Cancelar
+                    </button>
+                    <button type="button" onclick="aiEnviar()" id="ai-btn-submit" disabled
+                        style="padding:0.4rem 1.1rem; font-size:0.8rem; font-weight:600; color:#fff; background:#9ca3af; border:none; border-radius:0.5rem; cursor:not-allowed; transition:background .15s;">
+                        Registrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+
 @push('head')
 <style>
     @keyframes btn-breathe-green { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.7)} 50%{box-shadow:0 0 0 6px rgba(22,163,74,0)} }
@@ -719,6 +969,7 @@ function escHtmlGm(str) {
     .dt-btn-pdf:hover { background:#b91c1c; transform:translateY(-1px); animation:btn-breathe-red 1.6s ease-in-out infinite; }
     @keyframes gmFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     .gm-modal-inner { animation: gmFadeUp 0.35s cubic-bezier(.22,.68,0,1.2) both; }
+    .ai-modal-inner { animation: gmFadeUp 0.35s cubic-bezier(.22,.68,0,1.2) both; }
 </style>
 @endpush
 
@@ -796,3 +1047,283 @@ function escHtmlGm(str) {
 @endpush
 
 @endsection
+
+@push('scripts')
+@php
+$aiProductosJson = json_encode(
+    $productos->map(fn($p) => ['id'=>$p->id,'nombre'=>$p->nombre,'descripcion'=>$p->descripcion,'stock'=>$p->stock_actual])->values(),
+    JSON_HEX_TAG | JSON_HEX_AMP
+);
+@endphp
+<script type="application/json" id="ai-data">{!! $aiProductosJson !!}</script>
+<script>
+if (document.getElementById('btn-agregar-inventario')) {
+var aiProductos = JSON.parse(document.getElementById('ai-data').textContent);
+var aiItems = [];
+var aiCounter = 0;
+var aiForm = document.getElementById('form-agregar-inv');
+var aiUrlLocal = aiForm.dataset.urlLocal;
+var aiUrlExterna = aiForm.dataset.urlExterna;
+
+document.getElementById('btn-agregar-inventario').addEventListener('click', function() {
+    var modal = document.getElementById('modal-agregar-inv');
+    var inner = modal.querySelector('.ai-modal-inner');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    inner.style.animation = 'none';
+    inner.offsetHeight;
+    inner.style.animation = '';
+});
+
+function cerrarModalAgregarInv() {
+    document.getElementById('modal-agregar-inv').style.display = 'none';
+    document.body.style.overflow = '';
+    aiForm.reset();
+    document.getElementById('ai-seccion-local').style.display = 'none';
+    document.getElementById('ai-seccion-externa').style.display = 'none';
+    aiItems = [];
+    aiCounter = 0;
+    document.getElementById('ai-items').innerHTML = '';
+    document.getElementById('ai-tabla-wrap').style.display = 'none';
+    document.getElementById('ai-sin-items').style.display = 'none';
+    var btn = document.getElementById('ai-btn-submit');
+    btn.disabled = true;
+    btn.style.background = '#9ca3af';
+    btn.style.cursor = 'not-allowed';
+    btn.textContent = 'Registrar';
+}
+
+document.getElementById('modal-agregar-inv').addEventListener('click', function(e) {
+    if (e.target === this) cerrarModalAgregarInv();
+});
+
+function aiCambiarTipo(tipo) {
+    var local = document.getElementById('ai-seccion-local');
+    var externa = document.getElementById('ai-seccion-externa');
+    local.style.display = (tipo === 'local') ? 'flex' : 'none';
+    externa.style.display = (tipo === 'externa') ? 'flex' : 'none';
+    if (tipo === 'externa') aiTabSicd('nuevo');
+    var btn = document.getElementById('ai-btn-submit');
+    if (tipo === 'local') {
+        btn.disabled = false;
+        btn.style.background = '#d97706';
+        btn.style.cursor = 'pointer';
+        btn.textContent = 'Registrar compra local';
+    } else if (tipo === 'externa') {
+        btn.disabled = false;
+        btn.style.background = '#2563eb';
+        btn.style.cursor = 'pointer';
+        btn.textContent = 'Recibir SICD y actualizar stock';
+    } else {
+        btn.disabled = true;
+        btn.style.background = '#9ca3af';
+        btn.style.cursor = 'not-allowed';
+        btn.textContent = 'Registrar';
+    }
+}
+
+function aiTabSicd(tab) {
+    var panelNuevo     = document.getElementById('ai-panel-nuevo');
+    var panelExistente = document.getElementById('ai-panel-existente');
+    var btnNuevo       = document.getElementById('ai-tab-nuevo');
+    var btnExistente   = document.getElementById('ai-tab-existente');
+    document.getElementById('ai-modo').value = tab;
+    if (tab === 'nuevo') {
+        panelNuevo.style.display     = 'flex';
+        panelExistente.style.display = 'none';
+        btnNuevo.style.background    = '#2563eb';
+        btnNuevo.style.color         = '#fff';
+        btnNuevo.style.borderColor   = '#2563eb';
+        btnExistente.style.background  = '#fff';
+        btnExistente.style.color       = '#6b7280';
+        btnExistente.style.borderColor = '#d1d5db';
+        document.getElementById('ai-btn-submit').textContent = 'Recibir SICD y actualizar stock';
+    } else {
+        panelNuevo.style.display     = 'none';
+        panelExistente.style.display = 'flex';
+        btnExistente.style.background  = '#2563eb';
+        btnExistente.style.color       = '#fff';
+        btnExistente.style.borderColor = '#2563eb';
+        btnNuevo.style.background    = '#fff';
+        btnNuevo.style.color         = '#6b7280';
+        btnNuevo.style.borderColor   = '#d1d5db';
+        document.getElementById('ai-btn-submit').textContent = 'Recibir SICD y actualizar stock';
+    }
+}
+
+function aiSicdExistenteChange(sel) {
+    var opt  = sel.options[sel.selectedIndex];
+    var id   = sel.value;
+    var info = document.getElementById('ai-sicd-existente-info');
+    if (!id) { info.style.display = 'none'; return; }
+    document.getElementById('ai-info-codigo').textContent = opt.dataset.codigo;
+    document.getElementById('ai-info-estado').textContent = opt.dataset.estado;
+    info.style.display = 'block';
+}
+
+function aiEnviar() {
+    var tipo = document.getElementById('ai-tipo').value;
+    if (!tipo) { alert('Selecciona el tipo de ingreso.'); return; }
+
+    if (tipo === 'local') {
+        var rut = document.getElementById('ai-rut').value.trim();
+        var folio = document.getElementById('ai-folio').value.trim();
+        var fecha = document.getElementById('ai-fecha').value;
+        var doc = document.getElementById('ai-doc').files.length;
+        if (!rut)   { alert('El RUT del proveedor es obligatorio.'); document.getElementById('ai-rut').focus(); return; }
+        if (!folio) { alert('El folio es obligatorio.'); document.getElementById('ai-folio').focus(); return; }
+        if (!fecha) { alert('La fecha de emisión es obligatoria.'); document.getElementById('ai-fecha').focus(); return; }
+        if (!doc)   { alert('La boleta PDF es obligatoria.'); return; }
+        if (aiItems.length === 0) { alert('Agrega al menos un producto.'); document.getElementById('ai-buscador').focus(); return; }
+        aiForm.action = aiUrlLocal;
+    } else if (tipo === 'externa') {
+        var modo = document.getElementById('ai-modo').value;
+        if (modo === 'existente') {
+            var sicdId = document.getElementById('ai-sicd-existente-id').value;
+            if (!sicdId) { alert('Selecciona un SICD existente.'); return; }
+        } else {
+            var codigo = document.getElementById('ai-codigo-sicd').value.trim();
+            var sicdFile = document.getElementById('ai-archivo-sicd').files.length;
+            var excelFile = document.getElementById('ai-archivo-excel').files.length;
+            if (!codigo)    { alert('El código SICD es obligatorio.'); document.getElementById('ai-codigo-sicd').focus(); return; }
+            if (!sicdFile)  { alert('El documento SICD es obligatorio.'); return; }
+            if (!excelFile) { alert('El archivo Excel es obligatorio.'); return; }
+        }
+        aiForm.action = aiUrlExterna;
+    }
+
+    aiForm.submit();
+}
+
+document.getElementById('ai-archivo-sicd').addEventListener('change', function() {
+    var file = this.files[0];
+    var input = document.getElementById('ai-codigo-sicd');
+    var hint  = document.getElementById('ai-codigo-hint');
+    if (!file || file.type !== 'application/pdf') return;
+    if (typeof pdfjsLib === 'undefined') return;
+
+    hint.textContent = '⏳ Leyendo PDF...';
+    hint.style.color = '#6b7280';
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        pdfjsLib.getDocument({ data: e.target.result }).promise.then(function(pdf) {
+            var pages = [];
+            for (var i = 1; i <= pdf.numPages; i++) { pages.push(i); }
+            return Promise.all(pages.map(function(n) {
+                return pdf.getPage(n).then(function(p) {
+                    return p.getTextContent().then(function(tc) {
+                        return tc.items.map(function(it) { return it.str; }).join(' ');
+                    });
+                });
+            }));
+        }).then(function(textos) {
+            var fullText = textos.join(' ');
+            // Busca TIC(RAMO)/12345 o TIC(RAMO)12345
+            var match = fullText.match(/TIC\([^)]+\)\/?(\d+)/i);
+            if (match) {
+                // Normaliza con barra: TIC(RAMO)/12345
+                var codigo = match[0].replace(/\/?(\d+)$/, '/$1').toUpperCase();
+                input.value = codigo;
+                hint.textContent = '✅ Código detectado automáticamente';
+                hint.style.color = '#16a34a';
+            } else {
+                hint.textContent = '⚠️ No se detectó código TIC en el PDF. Ingrésalo manualmente.';
+                hint.style.color = '#d97706';
+            }
+        }).catch(function() {
+            hint.textContent = '⚠️ No se pudo leer el PDF. Ingresa el código manualmente.';
+            hint.style.color = '#d97706';
+        });
+    };
+    reader.readAsArrayBuffer(file);
+});
+
+document.getElementById('ai-buscador').addEventListener('input', function() {
+    var q = this.value.trim().toLowerCase();
+    var res = document.getElementById('ai-resultados');
+    if (q.length < 1) { res.style.display = 'none'; return; }
+    var matches = aiProductos.filter(function(p) {
+        return p.nombre.toLowerCase().indexOf(q) >= 0 || (p.descripcion || '').toLowerCase().indexOf(q) >= 0;
+    }).slice(0, 10);
+    if (!matches.length) { res.style.display = 'none'; return; }
+    res.innerHTML = matches.map(function(p) {
+        return '<div onclick="aiAgregar(' + p.id + ',\'' + p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')"'
+            + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;"'
+            + ' onmouseover="this.style.background=\'#fef3c7\'" onmouseout="this.style.background=\'\'">'
+            + '<p style="font-size:0.8rem;font-weight:600;color:#1f2937;">' + escHtmlAi(p.nombre) + '</p>'
+            + '<p style="font-size:0.72rem;color:#6b7280;">' + escHtmlAi(p.descripcion || '') + ' &middot; Stock: ' + p.stock + '</p>'
+            + '</div>';
+    }).join('');
+    res.style.display = 'block';
+});
+
+document.addEventListener('click', function(e) {
+    var res = document.getElementById('ai-resultados');
+    if (res && !e.target.closest('#ai-buscador') && !e.target.closest('#ai-resultados')) {
+        res.style.display = 'none';
+    }
+});
+
+function aiAgregar(id, nombre) {
+    if (aiItems.find(function(i) { return i.id === id; })) {
+        document.getElementById('ai-buscador').value = '';
+        document.getElementById('ai-resultados').style.display = 'none';
+        return;
+    }
+    var idx = aiCounter++;
+    aiItems.push({ idx: idx, id: id, nombre: nombre });
+    aiRenderFila(idx, id, nombre);
+    document.getElementById('ai-buscador').value = '';
+    document.getElementById('ai-resultados').style.display = 'none';
+    aiActualizarTabla();
+}
+
+function aiRenderFila(idx, id, nombre) {
+    var tbody = document.getElementById('ai-items');
+    var tr = document.createElement('tr');
+    tr.id = 'ai-row-' + idx;
+    tr.style.borderBottom = '1px solid #f3f4f6';
+    tr.innerHTML =
+        '<td style="padding:0.4rem 0.6rem;">'
+        + '<input type="hidden" name="items[' + idx + '][producto_id]" value="' + id + '">'
+        + '<span style="font-size:0.8rem;font-weight:500;color:#1f2937;">' + escHtmlAi(nombre) + '</span>'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
+        + '<input type="number" name="items[' + idx + '][cantidad]" value="1" min="1"'
+        + ' style="width:68px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
+        + '<input type="number" name="items[' + idx + '][monto]" placeholder="0" min="0" step="1"'
+        + ' style="width:108px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
+        + '<input type="number" name="items[' + idx + '][precio_neto]" placeholder="0" min="0" step="1"'
+        + ' style="width:120px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.3rem;text-align:center;">'
+        + '<button type="button" onclick="aiQuitar(' + idx + ')" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;">&#x2715;</button>'
+        + '</td>';
+    tbody.appendChild(tr);
+}
+
+function aiQuitar(idx) {
+    aiItems = aiItems.filter(function(i) { return i.idx !== idx; });
+    var row = document.getElementById('ai-row-' + idx);
+    if (row) row.remove();
+    aiActualizarTabla();
+}
+
+function aiActualizarTabla() {
+    var wrap = document.getElementById('ai-tabla-wrap');
+    var sin  = document.getElementById('ai-sin-items');
+    wrap.style.display = aiItems.length ? '' : 'none';
+    sin.style.display  = aiItems.length ? 'none' : '';
+}
+
+function escHtmlAi(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+} // end if btn-agregar-inventario
+</script>
+@endpush

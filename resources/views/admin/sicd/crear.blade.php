@@ -9,8 +9,8 @@
     <h1 class="text-2xl font-bold text-gray-800 mt-1">Nuevo SICD</h1>
     <p class="text-sm text-gray-500 mt-1">
         Sube el documento SICD y el Excel con el detalle de productos.<br>
-        El código se detectará del nombre del archivo (ej: <span class="font-mono">TIC(ROMA)-12345_descripcion.pdf</span>).
-        Ingrésalo sin barra: <span class="font-mono">TIC(ROMA)12345</span> — el sistema la agrega automáticamente.
+        El código se detectará del nombre del archivo (ej: <span class="font-mono">TIC(RAMO)-12345_descripcion.pdf</span>).
+        Ingrésalo sin barra: <span class="font-mono">TIC(RAMO)12345</span> — el sistema la agrega automáticamente.
     </p>
 </div>
 
@@ -36,7 +36,7 @@
                            feedback.className = 'text-xs mt-1 text-green-600';
                        } else if (filename) {
                            input.value = '';
-                           feedback.textContent = '⚠ No se detectó código TIC. Ingrésalo manualmente (ej: TIC(ROMA)12345).';
+                           feedback.textContent = '⚠ No se detectó código TIC. Ingrésalo manualmente (ej: TIC(RAMO)12345).';
                            feedback.className = 'text-xs mt-1 text-amber-600';
                        }
                    ">
