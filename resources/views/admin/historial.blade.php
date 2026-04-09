@@ -83,6 +83,14 @@
                     <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">
                         Solicitud #{{ $registro->origen_id }}
                     </span>
+                    @elseif($registro->origen === 'gasto_menor')
+                    <a href="{{ route('admin.gastos-menores.index') }}{{ $registro->origen_id ? '?gm=' . $registro->origen_id : '' }}"
+                       class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full font-mono transition"
+                       style="background:#fef3c7; color:#b45309;"
+                       onmouseover="this.style.background='#fde68a'"
+                       onmouseout="this.style.background='#fef3c7'">
+                        {{ $registro->origen_id ? 'GM-' . str_pad($registro->origen_id, 4, '0', STR_PAD_LEFT) : 'Gasto Menor' }}
+                    </a>
                     @else
                     <span class="text-gray-400 text-xs">—</span>
                     @endif

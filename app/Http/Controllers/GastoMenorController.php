@@ -101,7 +101,7 @@ class GastoMenorController extends Controller
             'rut_proveedor'     => ['required', 'string', 'max:20'],
             'folio'             => ['required', 'string', 'max:50'],
             'fecha_emision'     => ['required', 'date', 'before_or_equal:now'],
-            'documento'         => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'documento'         => ['required', 'file', 'mimes:pdf', 'max:10240'],
             'items'             => ['required', 'array', 'min:1'],
             'items.*.producto_id' => ['required', 'integer', 'exists:productos,id'],
             'items.*.cantidad'    => ['required', 'integer', 'min:1'],
@@ -145,6 +145,8 @@ class GastoMenorController extends Controller
                     'motivo'       => "Compra de gasto menor — Folio {$request->folio}",
                     'aprobado_por' => Auth::user()->name,
                     'usuario_id'   => Auth::id(),
+                    'origen'       => 'gasto_menor',
+                    'origen_id'    => $nextNumero,
                 ]);
 
                 GastoMenor::create([
@@ -164,7 +166,7 @@ class GastoMenorController extends Controller
             }
         });
 
-        return redirect()->route('dashboard')
+        return redirect()->route('admin.gastos-menores.index')
             ->with('success', 'Compra de gasto menor registrada y stock actualizado correctamente.');
     }
 }
