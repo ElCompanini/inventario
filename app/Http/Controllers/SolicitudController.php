@@ -24,7 +24,7 @@ class SolicitudController extends Controller
         $data = $request->validate([
             'producto_id' => ['required', 'exists:productos,id'],
             'cantidad'    => ['required', 'integer', 'min:1'],
-            'tipo'        => ['required', 'in:entrada,salida'],
+            'tipo'        => ['required', 'in:salida'],
             'motivo'      => ['required', 'string', 'max:500'],
         ], [
             'producto_id.required' => 'El producto es obligatorio.',
@@ -37,11 +37,6 @@ class SolicitudController extends Controller
             'motivo.required'      => 'El motivo es obligatorio.',
             'motivo.max'           => 'El motivo no puede superar los 500 caracteres.',
         ]);
-
-        // Bloquear entrada si el usuario no tiene permiso
-        if ($data['tipo'] === 'entrada' && !auth()->user()->tienePermiso('entrada')) {
-            return back()->with('error', 'No tienes permiso para solicitar entradas de productos.');
-        }
 
         // Verificar que si es salida haya stock suficiente para la solicitud
         if ($data['tipo'] === 'salida') {

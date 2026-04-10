@@ -19,25 +19,20 @@
 
     @if($solicitudes->isNotEmpty())
     <div class="ml-auto flex items-center gap-2">
-        {{-- Buscador --}}
-        <div class="relative">
-            <input type="text" id="buscador-solicitudes" placeholder="Buscar..."
-                   class="border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 w-56">
-            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
-                 fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
-            </svg>
-        </div>
-
         {{-- Botón filtros --}}
         <button type="button" id="btn-filtros-sol"
-            class="relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium border rounded-lg transition bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600">
+            class="relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border rounded-lg shadow-sm transition bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h18M7 10h10M11 16h2"/>
             </svg>
             Filtros
             <span id="badge-sol" class="hidden absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white"></span>
         </button>
+
+        {{-- Buscador --}}
+        <input type="text" id="buscador-solicitudes" placeholder="🔍  Buscar..."
+               class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm bg-white
+                      focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-56">
     </div>
     @endif
 </div>

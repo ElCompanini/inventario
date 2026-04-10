@@ -15,12 +15,8 @@
 </div>
 
 <div class="mb-3 flex items-center gap-2">
-    <input id="buscador-rechazadas" type="text" placeholder="🔍  Buscar solicitud rechazada..."
-        class="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg shadow-sm
-               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
-
     <button type="button" id="btn-filtros-rech" title="Filtrar"
-        class="relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium border rounded-lg transition bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600"
+        class="relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border rounded-lg shadow-sm transition bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600"
         style="white-space:nowrap;">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h18M7 10h10M11 16h2"/>
@@ -28,6 +24,10 @@
         Filtros
         <span id="badge-rech" class="hidden absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white"></span>
     </button>
+
+    <input id="buscador-rechazadas" type="text" placeholder="🔍  Buscar solicitud rechazada..."
+        class="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
+               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
 </div>
 
 {{-- Panel de filtros (flujo normal, todos los acordeones cerrados por defecto) --}}

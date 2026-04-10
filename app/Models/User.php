@@ -26,7 +26,6 @@ class User extends Authenticatable
         'sicd'                => 'Ver y gestionar SICD',
         'ordenes'             => 'Ver y gestionar órdenes de compra',
         'containers'          => 'Ver contenedores',
-        'entrada'             => 'Solicitar entrada de productos',
     ];
 
     protected $fillable = [

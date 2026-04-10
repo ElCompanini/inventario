@@ -50,17 +50,13 @@
 @endif
 
 @php
-    $fFamilias = $productos->pluck('nombre')->unique()->sort()->values();
+    $fFamilias = $productos->groupBy('nombre')->sortKeys();
 @endphp
 
 {{-- Buscador + botón filtros --}}
 <div class="mb-3 flex items-center gap-2">
-    <input id="buscador-productos" type="text" placeholder="🔍  Buscar por categoría, descripción, contenedor, stock o estado..."
-           class="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
-
     <button type="button" id="btn-filtros-prod"
-        class="relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium border rounded-lg transition bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600"
+        class="relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border rounded-lg shadow-sm transition bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600"
         style="white-space:nowrap;">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h18M7 10h10M11 16h2"/>
@@ -68,6 +64,10 @@
         Filtros
         <span id="badge-prod" class="hidden absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white"></span>
     </button>
+
+    <input id="buscador-productos" type="text" placeholder="🔍  Buscar por categoría, descripción, contenedor, stock o estado..."
+           class="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
+                  focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
 </div>
 
 {{-- Panel de filtros (flujo normal) --}}
@@ -133,7 +133,7 @@
                 </div>
             </div>
 
-            {{-- Familia --}}
+            {{-- Familia + descripciones --}}
             <div class="px-4 py-3">
                 <button type="button" class="acc-prod w-full flex items-center justify-between text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1"
                         data-target="acc-prod-familia">
@@ -142,12 +142,27 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
-                <div id="acc-prod-familia" class="hidden space-y-1 max-h-48 overflow-y-auto pr-1 mt-1">
-                    @foreach($fFamilias as $f)
-                    <label class="flex items-center gap-2 cursor-pointer hover:bg-indigo-50 px-1.5 py-1 rounded-md transition">
-                        <input type="checkbox" class="fil-prod-familia w-3.5 h-3.5 accent-indigo-600 shrink-0" value="{{ strtolower($f) }}">
-                        <span class="text-xs text-gray-700 leading-tight">{{ $f }}</span>
-                    </label>
+                <div id="acc-prod-familia" class="hidden space-y-2 max-h-56 overflow-y-auto pr-1 mt-1">
+                    @foreach($fFamilias as $familia => $prods)
+                    @php $ids = $prods->pluck('id')->join(','); @endphp
+                    <div>
+                        {{-- Padre: toda la familia --}}
+                        <label class="flex items-center gap-2 cursor-pointer hover:bg-indigo-50 px-1.5 py-1 rounded-md transition">
+                            <input type="checkbox" class="fil-prod-familia-padre w-3.5 h-3.5 accent-indigo-600 shrink-0"
+                                   data-ids="{{ $ids }}">
+                            <span class="text-xs font-bold text-gray-700 leading-tight">{{ $familia }}</span>
+                        </label>
+                        {{-- Hijos: cada descripción --}}
+                        <div class="pl-4 mt-0.5 space-y-0.5">
+                            @foreach($prods as $p)
+                            <label class="flex items-center gap-2 cursor-pointer hover:bg-indigo-50 px-1.5 py-0.5 rounded-md transition">
+                                <input type="checkbox" class="fil-prod-desc w-3.5 h-3.5 accent-indigo-600 shrink-0"
+                                       value="{{ $p->id }}">
+                                <span class="text-xs text-gray-500 leading-tight">{{ $p->descripcion }}</span>
+                            </label>
+                            @endforeach
+                        </div>
+                    </div>
                     @endforeach
                 </div>
             </div>
@@ -189,7 +204,7 @@
             <tr class="{{ $rowClass }} hover:brightness-95 transition"
                 data-contenedor="{{ $producto->contenedor }}"
                 data-estado="{{ $estado }}"
-                data-familia="{{ strtolower($producto->nombre) }}">
+                data-producto-id="{{ $producto->id }}">
                 <td class="px-4 py-3 font-medium text-gray-900">
                     <div class="flex items-center gap-2">
                         @if($pendienteSalida > 0)
@@ -321,17 +336,6 @@
                             Trasladar
                         </button>
                         @else
-                        {{-- Usuario: solicitar entrada (solo si tiene permiso) --}}
-                        @if(auth()->user()->tienePermiso('entrada'))
-                        <button type="button"
-                            onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'entrada', {{ $producto->stock_actual }})"
-                            class="btn-accion-green inline-flex items-center gap-1 text-white text-xs font-medium px-3 py-1.5 rounded-lg">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                            </svg>
-                            Entrada
-                        </button>
-                        @endif
                         {{-- Usuario: solicitar salida --}}
                         <button type="button"
                             onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'salida', {{ $producto->stock_actual }})"
@@ -427,18 +431,10 @@
         document.getElementById('modal-motivo').value = '';
         document.getElementById('modal-stock').textContent = stockActual;
 
-        const esEntrada = tipo === 'entrada';
-        document.getElementById('modal-titulo').textContent =
-            (esEntrada ? 'Solicitar Entrada' : 'Solicitar Salida') + ' — ' + nombre;
-        document.getElementById('modal-subtitulo').textContent =
-            esEntrada ? 'Añadir unidades al inventario' : 'Retirar unidades del inventario';
-
-        const btn = document.getElementById('modal-btn-submit');
-        if (esEntrada) {
-            btn.className = 'px-4 py-2 text-sm font-medium text-white rounded-lg transition bg-green-600 hover:bg-green-700';
-        } else {
-            btn.className = 'px-4 py-2 text-sm font-medium text-white rounded-lg transition bg-orange-500 hover:bg-orange-600';
-        }
+        document.getElementById('modal-titulo').textContent = 'Solicitar Salida — ' + nombre;
+        document.getElementById('modal-subtitulo').textContent = 'Retirar unidades del inventario';
+        document.getElementById('modal-btn-submit').className =
+            'px-4 py-2 text-sm font-medium text-white rounded-lg transition bg-orange-500 hover:bg-orange-600';
 
         document.getElementById('modal-solicitud').classList.remove('hidden');
         document.getElementById('modal-cantidad').focus();
@@ -1117,13 +1113,15 @@ function escHtmlGm(str) {
 
     /* Labels activos */
     label:has(.fil-prod-contenedor:checked),
-    label:has(.fil-prod-familia:checked) {
+    label:has(.fil-prod-familia-padre:checked),
+    label:has(.fil-prod-desc:checked) {
         background: #eef2ff !important;
         outline: 1px solid #c7d2fe;
         border-radius: 0.375rem;
     }
     label:has(.fil-prod-contenedor:checked) span,
-    label:has(.fil-prod-familia:checked) span {
+    label:has(.fil-prod-familia-padre:checked) span,
+    label:has(.fil-prod-desc:checked) span {
         color: #4338ca !important;
         font-weight: 600;
     }
@@ -1157,17 +1155,28 @@ function escHtmlGm(str) {
         });
 
         // ── Sets de filtros activos ─────────────────────────────────────
-        var filContenedores = new Set();
-        var filEstados      = new Set();
-        var filFamilias     = new Set();
+        var filContenedores  = new Set();
+        var filEstados       = new Set();
+        var filProductoIds   = new Set();  // IDs seleccionados (familia completa o desc individual)
 
         function redibujarProd() {
             table.draw();
-            var hay = filContenedores.size || filEstados.size || filFamilias.size;
+            var hay = filContenedores.size || filEstados.size || filProductoIds.size;
             $('#badge-prod').toggleClass('hidden', !hay);
             $('[data-target="acc-prod-contenedor"]').toggleClass('has-active', filContenedores.size > 0);
             $('[data-target="acc-prod-estado"]').toggleClass('has-active', filEstados.size > 0);
-            $('[data-target="acc-prod-familia"]').toggleClass('has-active', filFamilias.size > 0);
+            $('[data-target="acc-prod-familia"]').toggleClass('has-active', filProductoIds.size > 0);
+        }
+
+        // Sincroniza el estado indeterminado del padre de un grupo
+        function actualizarPadre($padre) {
+            var ids    = ($padre.data('ids') || '').split(',').map(Number).filter(Boolean);
+            var total  = ids.length;
+            var marcados = ids.filter(function(id) { return filProductoIds.has(id); }).length;
+            var el = $padre[0];
+            if (marcados === 0)       { el.checked = false; el.indeterminate = false; }
+            else if (marcados < total) { el.checked = false; el.indeterminate = true;  }
+            else                       { el.checked = true;  el.indeterminate = false; }
         }
 
         // ── Filtro personalizado ────────────────────────────────────────
@@ -1195,10 +1204,10 @@ function escHtmlGm(str) {
                 if (!est || !filEstados.has(est)) return false;
             }
 
-            // Familia
-            if (filFamilias.size) {
-                var fam = tr ? tr.getAttribute('data-familia') : null;
-                if (!fam || !filFamilias.has(fam)) return false;
+            // Producto (familia completa o descripción individual)
+            if (filProductoIds.size) {
+                var pid = tr ? parseInt(tr.getAttribute('data-producto-id'), 10) : null;
+                if (!pid || !filProductoIds.has(pid)) return false;
             }
 
             return true;
@@ -1206,7 +1215,7 @@ function escHtmlGm(str) {
 
         $('#buscador-productos').on('input', function () { table.draw(); });
 
-        // ── Checkboxes ──────────────────────────────────────────────────
+        // ── Checkboxes contenedor y estado ──────────────────────────────
         $(document).on('change', '.fil-prod-contenedor', function() {
             var id = parseInt(this.value, 10);
             this.checked ? filContenedores.add(id) : filContenedores.delete(id);
@@ -1216,8 +1225,28 @@ function escHtmlGm(str) {
             this.checked ? filEstados.add(this.value) : filEstados.delete(this.value);
             redibujarProd();
         });
-        $(document).on('change', '.fil-prod-familia', function() {
-            this.checked ? filFamilias.add(this.value) : filFamilias.delete(this.value);
+
+        // ── Checkbox padre (familia completa) ───────────────────────────
+        $(document).on('change', '.fil-prod-familia-padre', function() {
+            var $padre = $(this);
+            var ids = ($padre.data('ids') || '').split(',').map(Number).filter(Boolean);
+            // Marcar/desmarcar todos los hijos del mismo grupo
+            $padre.closest('div').find('.fil-prod-desc').each(function() {
+                this.checked = $padre[0].checked;
+            });
+            ids.forEach(function(id) {
+                $padre[0].checked ? filProductoIds.add(id) : filProductoIds.delete(id);
+            });
+            redibujarProd();
+        });
+
+        // ── Checkbox hijo (descripción individual) ──────────────────────
+        $(document).on('change', '.fil-prod-desc', function() {
+            var id = parseInt(this.value, 10);
+            this.checked ? filProductoIds.add(id) : filProductoIds.delete(id);
+            // Actualizar estado del padre
+            var $padre = $(this).closest('div').prev('label').find('.fil-prod-familia-padre');
+            actualizarPadre($padre);
             redibujarProd();
         });
 
@@ -1244,8 +1273,9 @@ function escHtmlGm(str) {
 
         // ── Limpiar todo ───────────────────────────────────────────────
         $('#btn-limpiar-prod').on('click', function() {
-            filContenedores.clear(); filEstados.clear(); filFamilias.clear();
-            $('.fil-prod-contenedor, .fil-prod-estado, .fil-prod-familia').prop('checked', false);
+            filContenedores.clear(); filEstados.clear(); filProductoIds.clear();
+            $('.fil-prod-contenedor, .fil-prod-estado, .fil-prod-familia-padre, .fil-prod-desc').prop('checked', false);
+            $('.fil-prod-familia-padre').each(function() { this.indeterminate = false; });
             $('#buscador-productos').val('');
             redibujarProd();
         });
