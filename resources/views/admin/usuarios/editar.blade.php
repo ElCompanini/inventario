@@ -84,6 +84,34 @@
         document.getElementById('bloque-permisos').style.display =
             this.value === 'usuario' ? '' : 'none';
     });
+
+    var chkAprobar     = document.querySelector('input[name="aprobar_solicitudes"]');
+    var chkSolicitudes = document.querySelector('input[name="solicitudes"]');
+
+    if (chkAprobar && chkSolicitudes) {
+        // Al marcar aprobar_solicitudes → forzar solicitudes
+        chkAprobar.addEventListener('change', function () {
+            if (this.checked) {
+                chkSolicitudes.checked  = true;
+                chkSolicitudes.disabled = true;
+            } else {
+                chkSolicitudes.disabled = false;
+            }
+        });
+
+        // Al cargar la página, si aprobar_solicitudes ya está marcado → deshabilitar solicitudes
+        if (chkAprobar.checked) {
+            chkSolicitudes.checked  = true;
+            chkSolicitudes.disabled = true;
+        }
+
+        // Asegurar que el valor de solicitudes se envíe aunque esté disabled
+        document.querySelector('form').addEventListener('submit', function () {
+            if (chkSolicitudes.disabled) {
+                chkSolicitudes.disabled = false;
+            }
+        });
+    }
 </script>
 @endpush
 

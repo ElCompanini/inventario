@@ -49,11 +49,111 @@
 </div>
 @endif
 
-{{-- Buscador de productos --}}
-<div class="mb-4">
+@php
+    $fFamilias = $productos->pluck('nombre')->unique()->sort()->values();
+@endphp
+
+{{-- Buscador + botón filtros --}}
+<div class="mb-3 flex items-center gap-2">
     <input id="buscador-productos" type="text" placeholder="🔍  Buscar por categoría, descripción, contenedor, stock o estado..."
-           class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
+           class="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
                   focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+
+    <button type="button" id="btn-filtros-prod"
+        class="relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium border rounded-lg transition bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600"
+        style="white-space:nowrap;">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h18M7 10h10M11 16h2"/>
+        </svg>
+        Filtros
+        <span id="badge-prod" class="hidden absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white"></span>
+    </button>
+</div>
+
+{{-- Panel de filtros (flujo normal) --}}
+<div id="panel-filtros-prod" class="hidden mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+
+        <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+            <span class="text-xs font-bold text-gray-700 uppercase tracking-wide">Filtros</span>
+            <button type="button" id="btn-limpiar-prod" class="text-xs text-indigo-600 hover:underline font-medium">
+                Limpiar todo
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 gap-0 divide-y divide-gray-100 md:grid-cols-3 md:divide-x md:divide-y-0">
+
+            {{-- Contenedor --}}
+            <div class="px-4 py-3">
+                <button type="button" class="acc-prod w-full flex items-center justify-between text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1"
+                        data-target="acc-prod-contenedor">
+                    <span>Contenedor</span>
+                    <svg class="acc-prod-chevron w-3.5 h-3.5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div id="acc-prod-contenedor" class="hidden space-y-1 max-h-48 overflow-y-auto pr-1 mt-1">
+                    @foreach($containers as $c)
+                    <label class="flex items-center gap-2 cursor-pointer hover:bg-indigo-50 px-1.5 py-1 rounded-md transition">
+                        <input type="checkbox" class="fil-prod-contenedor w-3.5 h-3.5 accent-indigo-600 shrink-0" value="{{ $c->id }}">
+                        <span class="text-xs text-gray-700 leading-tight">{{ $c->nombre }}</span>
+                    </label>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Estado --}}
+            <div class="px-4 py-3">
+                <button type="button" class="acc-prod w-full flex items-center justify-between text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1"
+                        data-target="acc-prod-estado">
+                    <span>Estado</span>
+                    <svg class="acc-prod-chevron w-3.5 h-3.5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div id="acc-prod-estado" class="hidden space-y-1 mt-1">
+                    <label class="flex items-center gap-2 cursor-pointer hover:bg-indigo-50 px-1.5 py-1 rounded-md transition">
+                        <input type="checkbox" class="fil-prod-estado w-3.5 h-3.5 accent-indigo-600 shrink-0" value="normal">
+                        <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Normal
+                        </span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer hover:bg-indigo-50 px-1.5 py-1 rounded-md transition">
+                        <input type="checkbox" class="fil-prod-estado w-3.5 h-3.5 accent-indigo-600 shrink-0" value="minimo">
+                        <span class="inline-flex items-center gap-1 bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                            <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> Mínimo
+                        </span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer hover:bg-indigo-50 px-1.5 py-1 rounded-md transition">
+                        <input type="checkbox" class="fil-prod-estado w-3.5 h-3.5 accent-indigo-600 shrink-0" value="critico">
+                        <span class="inline-flex items-center gap-1 bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                            <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span> Crítico
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            {{-- Familia --}}
+            <div class="px-4 py-3">
+                <button type="button" class="acc-prod w-full flex items-center justify-between text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1"
+                        data-target="acc-prod-familia">
+                    <span>Familia</span>
+                    <svg class="acc-prod-chevron w-3.5 h-3.5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div id="acc-prod-familia" class="hidden space-y-1 max-h-48 overflow-y-auto pr-1 mt-1">
+                    @foreach($fFamilias as $f)
+                    <label class="flex items-center gap-2 cursor-pointer hover:bg-indigo-50 px-1.5 py-1 rounded-md transition">
+                        <input type="checkbox" class="fil-prod-familia w-3.5 h-3.5 accent-indigo-600 shrink-0" value="{{ strtolower($f) }}">
+                        <span class="text-xs text-gray-700 leading-tight">{{ $f }}</span>
+                    </label>
+                    @endforeach
+                </div>
+            </div>
+
+        </div>
+    </div>
 </div>
 
 {{-- Tabla de productos --}}
@@ -86,7 +186,10 @@
             @php
                 $pendienteSalida = $producto->solicitudes->sum('cantidad');
             @endphp
-            <tr class="{{ $rowClass }} hover:brightness-95 transition">
+            <tr class="{{ $rowClass }} hover:brightness-95 transition"
+                data-contenedor="{{ $producto->contenedor }}"
+                data-estado="{{ $estado }}"
+                data-familia="{{ strtolower($producto->nombre) }}">
                 <td class="px-4 py-3 font-medium text-gray-900">
                     <div class="flex items-center gap-2">
                         @if($pendienteSalida > 0)
@@ -983,6 +1086,50 @@ function escHtmlGm(str) {
     @keyframes gmFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     .gm-modal-inner { animation: gmFadeUp 0.35s cubic-bezier(.22,.68,0,1.2) both; }
     .ai-modal-inner { animation: gmFadeUp 0.35s cubic-bezier(.22,.68,0,1.2) both; }
+
+    @keyframes panel-drop-prod {
+        from { opacity:0; transform:translateY(-8px) scale(.97); }
+        to   { opacity:1; transform:translateY(0) scale(1); }
+    }
+    #panel-filtros-prod:not(.hidden) { animation: panel-drop-prod .2s cubic-bezier(.22,.68,0,1.2) both; }
+
+    @keyframes badge-pulse-prod {
+        0%,100% { box-shadow:0 0 0 0 rgba(79,70,229,.6); }
+        50%      { box-shadow:0 0 0 5px rgba(79,70,229,0); }
+    }
+    #badge-prod:not(.hidden) { animation: badge-pulse-prod 1.8s ease-in-out infinite; }
+
+    @keyframes acc-prod-open {
+        from { opacity:0; transform:translateY(-4px); }
+        to   { opacity:1; transform:translateY(0); }
+    }
+    .acc-prod-body-open { animation: acc-prod-open .18s ease both; }
+
+    /* Botón acordeón: abierto o con filtros activos */
+    .acc-prod {
+        transition: background .15s, color .15s;
+        border-radius: 0.375rem;
+        padding: 0.25rem 0.375rem;
+        margin: -0.25rem -0.375rem;
+    }
+    .acc-prod.is-open, .acc-prod.has-active { background:#eef2ff; color:#4338ca; }
+    .acc-prod.is-open .acc-prod-chevron, .acc-prod.has-active .acc-prod-chevron { color:#4338ca; }
+
+    /* Labels activos */
+    label:has(.fil-prod-contenedor:checked),
+    label:has(.fil-prod-familia:checked) {
+        background: #eef2ff !important;
+        outline: 1px solid #c7d2fe;
+        border-radius: 0.375rem;
+    }
+    label:has(.fil-prod-contenedor:checked) span,
+    label:has(.fil-prod-familia:checked) span {
+        color: #4338ca !important;
+        font-weight: 600;
+    }
+    label:has(.fil-prod-estado[value="normal"]:checked)  { background:#f0fdf4 !important; outline:1px solid #bbf7d0; }
+    label:has(.fil-prod-estado[value="minimo"]:checked)  { background:#fefce8 !important; outline:1px solid #fde047; }
+    label:has(.fil-prod-estado[value="critico"]:checked) { background:#fef2f2 !important; outline:1px solid #fca5a5; }
 </style>
 @endpush
 
@@ -1006,29 +1153,101 @@ function escHtmlGm(str) {
                 { extend: 'csvHtml5',   text: 'CSV',   className: 'dt-btn',       exportOptions: { columns: ':not(:last-child)' } },
                 { extend: 'pdfHtml5',   text: 'PDF',   className: 'dt-btn-pdf',   exportOptions: { columns: ':not(:last-child)' }, orientation: 'landscape', pageSize: 'A4' },
             ],
-            columnDefs: [{
-                orderable: false,
-                searchable: false,
-                targets: -1
-            }],
+            columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
         });
 
+        // ── Sets de filtros activos ─────────────────────────────────────
+        var filContenedores = new Set();
+        var filEstados      = new Set();
+        var filFamilias     = new Set();
 
+        function redibujarProd() {
+            table.draw();
+            var hay = filContenedores.size || filEstados.size || filFamilias.size;
+            $('#badge-prod').toggleClass('hidden', !hay);
+            $('[data-target="acc-prod-contenedor"]').toggleClass('has-active', filContenedores.size > 0);
+            $('[data-target="acc-prod-estado"]').toggleClass('has-active', filEstados.size > 0);
+            $('[data-target="acc-prod-familia"]').toggleClass('has-active', filFamilias.size > 0);
+        }
 
-        // Filtro personalizado: busca en texto visible de cada celda
+        // ── Filtro personalizado ────────────────────────────────────────
         $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
             if (settings.nTable.id !== 'tabla-inventario') return true;
-            const q = ($('#buscador-productos').val() || '').toLowerCase().trim();
-            if (!q) return true;
-            // Leer texto real de las celdas (elimina HTML de badges/spans)
-            const fila = table.row(dataIndex).node();
-            const celdas = fila ? Array.from(fila.querySelectorAll('td')).map(td => td.innerText.toLowerCase()) : [];
-            // Busca en: Producto(0), Descripción(1), Contenedor(2), Stock Actual(3), Estado(6)
-            return [0, 1, 2, 3, 6].some(i => (celdas[i] || '').includes(q));
+
+            var tr = settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
+
+            // Texto libre
+            var q = ($('#buscador-productos').val() || '').toLowerCase().trim();
+            if (q) {
+                var celdas = tr ? Array.from(tr.querySelectorAll('td')).map(function(td){ return td.innerText.toLowerCase(); }) : [];
+                if (![0,1,2,3,6].some(function(i){ return (celdas[i]||'').includes(q); })) return false;
+            }
+
+            // Contenedor
+            if (filContenedores.size) {
+                var cont = tr ? parseInt(tr.getAttribute('data-contenedor'), 10) : null;
+                if (!cont || !filContenedores.has(cont)) return false;
+            }
+
+            // Estado
+            if (filEstados.size) {
+                var est = tr ? tr.getAttribute('data-estado') : null;
+                if (!est || !filEstados.has(est)) return false;
+            }
+
+            // Familia
+            if (filFamilias.size) {
+                var fam = tr ? tr.getAttribute('data-familia') : null;
+                if (!fam || !filFamilias.has(fam)) return false;
+            }
+
+            return true;
         });
 
-        $('#buscador-productos').on('input', function () {
-            table.draw();
+        $('#buscador-productos').on('input', function () { table.draw(); });
+
+        // ── Checkboxes ──────────────────────────────────────────────────
+        $(document).on('change', '.fil-prod-contenedor', function() {
+            var id = parseInt(this.value, 10);
+            this.checked ? filContenedores.add(id) : filContenedores.delete(id);
+            redibujarProd();
+        });
+        $(document).on('change', '.fil-prod-estado', function() {
+            this.checked ? filEstados.add(this.value) : filEstados.delete(this.value);
+            redibujarProd();
+        });
+        $(document).on('change', '.fil-prod-familia', function() {
+            this.checked ? filFamilias.add(this.value) : filFamilias.delete(this.value);
+            redibujarProd();
+        });
+
+        // ── Acordeón ───────────────────────────────────────────────────
+        $('.acc-prod').on('click', function() {
+            var $body   = $('#' + $(this).data('target'));
+            var opening = $body.hasClass('hidden');
+            $body.toggleClass('hidden', !opening);
+            if (opening) $body.addClass('acc-prod-body-open');
+            $(this).find('.acc-prod-chevron').css('transform', opening ? 'rotate(180deg)' : '');
+            $(this).toggleClass('is-open', opening);
+        });
+
+        // ── Toggle panel ───────────────────────────────────────────────
+        $('#btn-filtros-prod').on('click', function(e) {
+            e.stopPropagation();
+            $('#panel-filtros-prod').toggleClass('hidden');
+        });
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#panel-filtros-prod, #btn-filtros-prod').length) {
+                $('#panel-filtros-prod').addClass('hidden');
+            }
+        });
+
+        // ── Limpiar todo ───────────────────────────────────────────────
+        $('#btn-limpiar-prod').on('click', function() {
+            filContenedores.clear(); filEstados.clear(); filFamilias.clear();
+            $('.fil-prod-contenedor, .fil-prod-estado, .fil-prod-familia').prop('checked', false);
+            $('#buscador-productos').val('');
+            redibujarProd();
         });
     });
 

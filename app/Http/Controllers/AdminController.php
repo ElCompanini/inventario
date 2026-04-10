@@ -18,18 +18,20 @@ class AdminController extends Controller
 {
     public function solicitudes()
     {
-        abort_unless(auth()->user()->tienePermiso('solicitudes'), 403);
-        $solicitudes = Solicitud::with(['producto', 'usuario'])
+        abort_unless(auth()->user()->tienePermiso('solicitudes') || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
+        $solicitudes = Solicitud::with(['producto.container', 'usuario'])
             ->where('estado', 'pendiente')
-            ->orderBy('created_at')
+            ->orderByDesc('created_at')
             ->get();
 
-        return view('admin.solicitudes', compact('solicitudes'));
+        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+
+        return view('admin.solicitudes', compact('solicitudes', 'containers'));
     }
 
     public function aprobar(int $id)
     {
-        abort_unless(auth()->user()->tienePermiso('solicitudes'), 403);
+        abort_unless(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
         $solicitud = Solicitud::with('producto')->findOrFail($id);
 
         if ($solicitud->estado !== 'pendiente') {
@@ -76,7 +78,7 @@ class AdminController extends Controller
 
     public function rechazar(int $id, Request $request)
     {
-        abort_unless(auth()->user()->tienePermiso('solicitudes'), 403);
+        abort_unless(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
         $data = $request->validate([
             'motivo_rechazo' => ['required', 'string', 'max:500'],
         ], [
@@ -106,7 +108,13 @@ class AdminController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return view('admin.solicitudes.rechazadas', compact('solicitudes'));
+        $productosAgrupados = Producto::orderBy('nombre')->orderBy('descripcion')
+            ->get(['id', 'nombre', 'descripcion'])
+            ->groupBy('nombre');
+
+        $fSolicitantes = $solicitudes->pluck('usuario.name')->filter()->unique()->sort()->values();
+
+        return view('admin.solicitudes.rechazadas', compact('solicitudes', 'productosAgrupados', 'fSolicitantes'));
     }
 
     public function historial()

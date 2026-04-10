@@ -246,13 +246,13 @@
         </div>
 
         {{-- ── Flujo de Solicitudes ── --}}
-        @if($u->tienePermiso('solicitudes') || $u->tienePermiso('rechazadas') || $u->tienePermiso('historial') || (!$u->esAdmin() && !$u->tieneAlgunPermiso()))
+        @if($u->tienePermiso('solicitudes') || $u->tienePermiso('aprobar_solicitudes') || $u->tienePermiso('rechazadas') || $u->tienePermiso('historial') || (!$u->esAdmin() && !$u->tieneAlgunPermiso()))
         <div class="px-3">
             <p class="sb-section-title text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-2 mb-1">
                 Flujo de Solicitudes
             </p>
 
-            @if($u->tienePermiso('solicitudes'))
+            @if($u->tienePermiso('solicitudes') || $u->tienePermiso('aprobar_solicitudes'))
                 @php $pendientes = \App\Models\Solicitud::where('estado','pendiente')->count(); @endphp
                 <a href="{{ route('admin.solicitudes') }}" data-tip="Solicitudes de Retiro"
                    class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150

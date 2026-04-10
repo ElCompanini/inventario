@@ -3,7 +3,6 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use App\Models\Solicitud;
@@ -11,8 +10,7 @@ use App\Models\HistorialCambio;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -21,13 +19,14 @@ class User extends Authenticatable
      */
     // Permisos disponibles para usuarios no-admin
     public const PERMISOS_DISPONIBLES = [
-        'historial'   => 'Ver historial de cambios',
-        'solicitudes' => 'Ver y gestionar solicitudes pendientes',
-        'rechazadas'  => 'Ver solicitudes rechazadas',
-        'sicd'        => 'Ver y gestionar SICD',
-        'ordenes'     => 'Ver y gestionar órdenes de compra',
-        'containers'  => 'Ver contenedores',
-        'entrada'     => 'Solicitar entrada de productos',
+        'historial'           => 'Ver historial de cambios',
+        'solicitudes'         => 'Ver solicitudes pendientes',
+        'aprobar_solicitudes' => 'Aprobar y rechazar solicitudes',
+        'rechazadas'          => 'Ver solicitudes rechazadas',
+        'sicd'                => 'Ver y gestionar SICD',
+        'ordenes'             => 'Ver y gestionar órdenes de compra',
+        'containers'          => 'Ver contenedores',
+        'entrada'             => 'Solicitar entrada de productos',
     ];
 
     protected $fillable = [
