@@ -53,9 +53,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/productos/{id}/stock', [AdminController::class, 'modificarStock'])->name('productos.stock');
     Route::post('/productos/{id}/trasladar', [AdminController::class, 'trasladarContainer'])->name('productos.trasladar');
     Route::post('/productos/carga-masiva', [AdminController::class, 'cargaMasiva'])->name('productos.carga.masiva');
+    Route::get('/productos/carga-masiva/resolver', [AdminController::class, 'resolverCargaMasiva'])->name('productos.carga.masiva.resolver');
+    Route::post('/productos/carga-masiva/confirmar', [AdminController::class, 'confirmarCargaMasiva'])->name('productos.carga.masiva.confirmar');
     Route::post('/productos/carga-manual', [AdminController::class, 'cargaManual'])->name('productos.carga.manual');
 
     // SICD
+    Route::get('/sicd/validar', [SicdController::class, 'validarCodigo'])->name('sicd.validar');
     Route::get('/sicd', [SicdController::class, 'index'])->name('sicd.index');
     Route::get('/sicd/crear', [SicdController::class, 'create'])->name('sicd.create');
     Route::post('/sicd', [SicdController::class, 'store'])->name('sicd.store');

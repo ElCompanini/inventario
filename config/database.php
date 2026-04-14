@@ -62,6 +62,22 @@ return [
             ]) : [],
         ],
 
+        'sicd_externa' => [
+            'driver'    => 'mysql',
+            'host'      => env('DB_SICD_HOST', '10.5.212.137'),
+            'port'      => env('DB_SICD_PORT', '3306'),
+            'database'  => env('DB_SICD_DATABASE', 'solicitudes'),
+            'username'  => env('DB_SICD_USERNAME', 'testing'),
+            'password'  => env('DB_SICD_PASSWORD', '123456'),
+            'charset'   => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix'    => '',
+            'strict'    => false,
+            'options'   => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

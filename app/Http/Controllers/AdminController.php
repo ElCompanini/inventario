@@ -232,105 +232,208 @@ class AdminController extends Controller
             'excel_masivo'  => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
             'motivo_masivo' => ['nullable', 'string', 'max:500'],
             'codigo_sicd'   => ['nullable', 'string', 'max:100'],
-            'archivo_sicd'  => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'descripcion'   => ['nullable', 'string', 'max:500'],
         ], [
             'excel_masivo.required' => 'El archivo Excel es obligatorio.',
             'excel_masivo.mimes'    => 'El archivo debe ser XLSX, XLS o CSV.',
         ]);
 
-        $vincularOc = $request->boolean('vincular_oc');
-        $rows   = Excel::toCollection(new SicdDetallesImport, $request->file('excel_masivo'))->first();
-        $motivo = trim($request->input('motivo_masivo', '')) ?: 'Carga masiva de inventario';
+        $vincularOc  = $request->boolean('vincular_oc');
+        $rows        = Excel::toCollection(new SicdDetallesImport, $request->file('excel_masivo'))->first();
+        $motivo      = trim($request->input('motivo_masivo', '')) ?: 'Carga masiva de inventario';
+        $codigoSicd  = strtoupper(trim($request->input('codigo_sicd', '')));
+        $descripcion = $request->input('descripcion');
 
-        $actualizados = 0;
-        $errores      = [];
+        $productosDB = Producto::whereNotNull('descripcion')->get(['id', 'nombre', 'descripcion']);
+        $exactos     = [];
+        $conflictos  = [];
+
+        foreach ($rows as $row) {
+            $desc       = trim((string) ($row[0] ?? ''));
+            $unidad     = trim((string) ($row[1] ?? ''));
+            $cantidad   = (int) ($row[2] ?? 0);
+            $precioNeto = is_numeric($row[3] ?? '') ? (float) $row[3] : null;
+            $totalNeto  = is_numeric($row[4] ?? '') ? (float) $row[4] : null;
+
+            if ($desc === '' || $cantidad <= 0) continue;
+
+            $item = [
+                'descripcion' => $desc,
+                'unidad'      => $unidad,
+                'cantidad'    => $cantidad,
+                'precioNeto'  => $precioNeto,
+                'totalNeto'   => $totalNeto,
+            ];
+
+            // Coincidencia exacta por descripcion o nombre
+            $producto = Producto::where('descripcion', $desc)->orWhere('nombre', $desc)->first();
+            if ($producto) {
+                $item['producto_id'] = $producto->id;
+                $exactos[] = $item;
+                continue;
+            }
+
+            // Fuzzy matching
+            $descNorm  = strtolower($desc);
+            $mejorPct  = 0;
+            $mejorProd = null;
+            foreach ($productosDB as $p) {
+                $dist   = levenshtein($descNorm, strtolower($p->descripcion));
+                $maxLen = max(strlen($descNorm), strlen($p->descripcion));
+                $pct    = $maxLen > 0 ? (1 - $dist / $maxLen) * 100 : 0;
+                if ($pct > $mejorPct) { $mejorPct = $pct; $mejorProd = $p; }
+            }
+
+            $item['similitud']          = round($mejorPct, 1);
+            $item['sugerencia_id']      = $mejorProd?->id;
+            $item['sugerencia_nombre']  = $mejorProd?->descripcion;
+            $conflictos[] = $item;
+        }
+
+        // Si hay conflictos → guardar en sesión y resolver
+        if (!empty($conflictos)) {
+            session([
+                'carga_masiva_pendiente' => [
+                    'codigo_sicd' => $codigoSicd,
+                    'descripcion' => $descripcion,
+                    'motivo'      => $motivo,
+                    'vincular_oc' => $vincularOc,
+                    'exactos'     => $exactos,
+                    'conflictos'  => $conflictos,
+                ],
+            ]);
+            return redirect()->route('admin.productos.carga.masiva.resolver');
+        }
+
+        // Sin conflictos → procesar directamente
+        return $this->procesarCargaMasiva($exactos, $codigoSicd, $descripcion, $motivo, $vincularOc);
+    }
+
+    public function resolverCargaMasiva()
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+        $pendiente = session('carga_masiva_pendiente');
+        if (!$pendiente) {
+            return redirect()->route('dashboard')->with('error', 'Sesión expirada. Vuelve a cargar el Excel.');
+        }
+        $productos  = Producto::whereNotNull('descripcion')->orderBy('descripcion')->get(['id', 'nombre', 'descripcion']);
+        $familias   = Producto::select('nombre')->distinct()->orderBy('nombre')->pluck('nombre');
+        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+        return view('admin.productos.resolver-carga-masiva', compact('pendiente', 'productos', 'familias', 'containers'));
+    }
+
+    public function confirmarCargaMasiva(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+        $pendiente = session('carga_masiva_pendiente');
+        if (!$pendiente) {
+            return redirect()->route('dashboard')->with('error', 'Sesión expirada. Vuelve a cargar el Excel.');
+        }
+
+        $resoluciones = $request->input('resoluciones', []);
+        $items = $pendiente['exactos'];
+
+        foreach ($pendiente['conflictos'] as $idx => $conflicto) {
+            $res    = $resoluciones[$idx] ?? [];
+            $accion = $res['accion'] ?? 'omitir';
+
+            if ($accion === 'enlazar' && !empty($res['producto_id'])) {
+                $conflicto['producto_id'] = (int) $res['producto_id'];
+            } elseif ($accion === 'nuevo') {
+                $conflicto['producto_id']       = null;
+                $conflicto['accion']            = 'nuevo';
+                $conflicto['nuevo_nombre']      = trim($res['nuevo_nombre'] ?? '');
+                $conflicto['nuevo_descripcion'] = trim($res['nuevo_descripcion'] ?? $conflicto['descripcion']);
+                $conflicto['nuevo_contenedor']  = (int) ($res['nuevo_contenedor'] ?? 1);
+            } else {
+                $conflicto['producto_id'] = null;
+            }
+
+            $items[] = $conflicto;
+        }
+
+        session()->forget('carga_masiva_pendiente');
+
+        return $this->procesarCargaMasiva(
+            $items,
+            $pendiente['codigo_sicd'],
+            $pendiente['descripcion'],
+            $pendiente['motivo'],
+            $pendiente['vincular_oc']
+        );
+    }
+
+    private function procesarCargaMasiva(array $items, string $codigoSicd, ?string $descripcion, string $motivo, bool $vincularOc)
+    {
         $sicd         = null;
+        $actualizados = 0;
 
-        // Crear registro SICD si se adjuntó el documento
-        $codigoSicd = strtoupper(trim($request->input('codigo_sicd', '')));
-        if ($codigoSicd && $request->hasFile('archivo_sicd')) {
-            $archivoSicd = $request->file('archivo_sicd');
-            $rutaFinal   = 'documentos/sicd/' . $archivoSicd->hashName();
-            Storage::disk('local')->put($rutaFinal, file_get_contents($archivoSicd->getRealPath()));
-
+        if ($codigoSicd) {
             $sicd = Sicd::create([
                 'codigo_sicd'    => $codigoSicd,
-                'archivo_nombre' => $archivoSicd->getClientOriginalName(),
-                'archivo_ruta'   => $rutaFinal,
-                'descripcion'    => $request->input('descripcion'),
+                'archivo_nombre' => '',
+                'archivo_ruta'   => '',
+                'descripcion'    => $descripcion,
                 'estado'         => $vincularOc ? 'pendiente' : 'recibido',
                 'usuario_id'     => Auth::id(),
             ]);
         }
 
-        // Procesar Excel en formato SICD: col A = descripción, col B = unidad, col C = cantidad
-        DB::transaction(function () use ($rows, $motivo, $sicd, &$actualizados, &$errores) {
-            foreach ($rows as $i => $row) {
-                $descripcion = trim((string) ($row[0] ?? ''));
-                $unidad      = trim((string) ($row[1] ?? ''));
-                $cantidad    = (int) ($row[2] ?? 0);
-                $precioNeto  = is_numeric($row[3] ?? '') ? (float) $row[3] : null;
-                $totalNeto   = is_numeric($row[4] ?? '') ? (float) $row[4] : null;
+        DB::transaction(function () use ($items, $motivo, $sicd, &$actualizados) {
+            foreach ($items as $item) {
+                $productoId = $item['producto_id'] ?? null;
 
-                if ($descripcion === '' || $cantidad <= 0) continue;
-
-                // Buscar producto por descripción exacta, luego por nombre, luego fuzzy
-                $producto = Producto::where('descripcion', $descripcion)
-                    ->orWhere('nombre', $descripcion)
-                    ->first();
-
-                if (!$producto) {
-                    $errores[] = "Fila " . ($i + 2) . ": no se encontró '{$descripcion}'.";
-                    if ($sicd) {
-                        $sicd->detalles()->create([
-                            'nombre_producto_excel' => $descripcion,
-                            'unidad'                => $unidad ?: null,
-                            'cantidad_solicitada'   => $cantidad,
-                            'cantidad_recibida'     => 0,
-                            'precio_neto'           => $precioNeto,
-                            'total_neto'            => $totalNeto,
-                        ]);
-                    }
-                    continue;
+                // Crear producto nuevo si el usuario eligió esa opción
+                if (!$productoId && ($item['accion'] ?? '') === 'nuevo' && !empty($item['nuevo_nombre'])) {
+                    $nuevo = Producto::create([
+                        'nombre'       => $item['nuevo_nombre'],
+                        'descripcion'  => $item['nuevo_descripcion'],
+                        'stock_actual' => 0,
+                        'stock_minimo' => 0,
+                        'stock_critico'=> 0,
+                        'contenedor'   => $item['nuevo_contenedor'],
+                    ]);
+                    $productoId = $nuevo->id;
                 }
 
-                $producto->stock_actual += $cantidad;
+                if ($sicd) {
+                    $sicd->detalles()->create([
+                        'producto_id'           => $productoId,
+                        'nombre_producto_excel' => $item['descripcion'],
+                        'unidad'                => $item['unidad'] ?: null,
+                        'cantidad_solicitada'   => $item['cantidad'],
+                        'cantidad_recibida'     => $productoId ? $item['cantidad'] : 0,
+                        'precio_neto'           => $item['precioNeto'] ?? null,
+                        'total_neto'            => $item['totalNeto'] ?? null,
+                    ]);
+                }
+
+                if (!$productoId) continue;
+
+                $producto = Producto::find($productoId);
+                if (!$producto) continue;
+
+                $producto->stock_actual += $item['cantidad'];
                 $producto->actualizarFechasStock();
                 $producto->save();
 
                 HistorialCambio::create([
                     'producto_id'  => $producto->id,
-                    'cantidad'     => $cantidad,
+                    'cantidad'     => $item['cantidad'],
                     'tipo'         => 'entrada',
                     'motivo'       => $sicd ? "Carga masiva – SICD {$sicd->codigo_sicd}" : $motivo,
                     'aprobado_por' => Auth::user()->name,
                     'usuario_id'   => Auth::id(),
                 ]);
 
-                if ($sicd) {
-                    $sicd->detalles()->create([
-                        'producto_id'           => $producto->id,
-                        'nombre_producto_excel' => $descripcion,
-                        'unidad'                => $unidad ?: null,
-                        'cantidad_solicitada'   => $cantidad,
-                        'cantidad_recibida'     => $cantidad,
-                        'precio_neto'           => $precioNeto,
-                        'total_neto'            => $totalNeto,
-                    ]);
-                }
-
                 $actualizados++;
             }
         });
 
         $msg = "Carga masiva completada: {$actualizados} producto(s) actualizado(s).";
-        if (!empty($errores)) {
-            $msg .= ' Advertencias: ' . implode(' | ', $errores);
-        }
 
         if ($vincularOc && $sicd) {
-            return redirect()->route('admin.sicd.show', $sicd->id)->with('success', $msg);
+            return redirect()->route('admin.ordenes.create')->with('success', $msg);
         }
 
         return redirect()->route('dashboard')->with('success', $msg);

@@ -6,6 +6,7 @@ use App\Imports\SicdDetallesImport;
 use App\Models\HistorialCambio;
 use App\Models\Producto;
 use App\Models\Sicd;
+use App\Models\SicdExterno;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,40 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class SicdController extends Controller
 {
+    public function validarCodigo(Request $request)
+    {
+        $codigo = trim($request->query('codigo', ''));
+
+        if ($codigo === '') {
+            return response()->json(['valido' => false, 'mensaje' => 'Ingresa un código.']);
+        }
+
+        try {
+            $solicitud = SicdExterno::buscar($codigo);
+        } catch (\Exception $e) {
+            return response()->json(['valido' => false, 'mensaje' => 'No se pudo conectar al sistema externo.']);
+        }
+
+        if (!$solicitud) {
+            return response()->json(['valido' => false, 'mensaje' => 'Código SICD no encontrado en el sistema.']);
+        }
+
+        $detalles = DB::connection('sicd_externa')
+            ->table('detalle_solicitud')
+            ->where('num_int_sol_comp', $codigo)
+            ->select('item_presup', 'cantidad', 'unidad', 'detalle', 'valor_unitario', 'total_neto', 'estado')
+            ->get();
+
+        return response()->json([
+            'valido'        => true,
+            'mensaje'       => 'Código válido.',
+            'centro_costo'  => $solicitud->centro_costo,
+            'estado'        => $solicitud->estado,
+            'fecha'         => $solicitud->fecha_creacion,
+            'detalles'      => $detalles,
+        ]);
+    }
+
     public function index()
     {
         abort_unless(auth()->user()->tienePermiso('sicd'), 403);

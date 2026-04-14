@@ -941,24 +941,15 @@ function escHtmlGm(str) {
                             </p>
                         </div>
 
-                        {{-- Documento SICD + Código (siempre visibles) --}}
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
-                            <div>
-                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                    Documento SICD <span style="color:#ef4444;">*</span>
-                                    <span style="font-weight:400; color:#9ca3af;">(PDF, JPG, PNG)</span>
-                                </label>
-                                <input type="file" name="archivo_sicd" id="ai-archivo-sicd" accept=".pdf,.jpg,.jpeg,.png"
-                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
-                            </div>
-                            <div>
-                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                    Código SICD <span style="color:#ef4444;">*</span>
-                                </label>
-                                <input type="text" name="codigo_sicd" id="ai-codigo-sicd" placeholder="Se detecta del PDF automáticamente"
-                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
-                                <span id="ai-codigo-hint" style="font-size:0.7rem; margin-top:0.2rem; display:block;"></span>
-                            </div>
+                        {{-- Código SICD --}}
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                Código SICD <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="text" name="codigo_sicd" id="ai-codigo-sicd" placeholder="Ej: TIC(S)/81"
+                                style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                            <span id="ai-codigo-hint" style="font-size:0.7rem; margin-top:0.35rem; display:flex; align-items:center; gap:0.3rem;"></span>
+                            <div id="ai-sicd-info" style="display:none; margin-top:0.4rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.4rem; padding:0.35rem 0.6rem; font-size:0.72rem; color:#166534;"></div>
                         </div>
 
                         <div>
@@ -1442,6 +1433,18 @@ function aiEnviar() {
         if (aiItems.length === 0) { alert('Agrega al menos un producto.'); document.getElementById('ai-buscador').focus(); return; }
         aiForm.action = aiUrlLocal;
     } else if (tipo === 'externa') {
+        // Validar que el código SICD esté verificado contra el sistema externo
+        var codigoSicd = document.getElementById('ai-codigo-sicd').value.trim();
+        if (!codigoSicd) {
+            alert('El código SICD es obligatorio.');
+            document.getElementById('ai-codigo-sicd').focus();
+            return;
+        }
+        if (!aiSicdValido) {
+            alert('El código SICD "' + codigoSicd + '" no está validado en el sistema externo. Verifica el código antes de continuar.');
+            document.getElementById('ai-codigo-sicd').focus();
+            return;
+        }
         if (aiMetodoCargaActual === 'masiva') {
             if (!document.getElementById('ai-excel-masivo').files.length) {
                 alert('El archivo Excel de productos es obligatorio.'); return;
@@ -1456,48 +1459,87 @@ function aiEnviar() {
     aiForm.submit();
 }
 
-document.getElementById('ai-archivo-sicd').addEventListener('change', function() {
-    var file = this.files[0];
-    var input = document.getElementById('ai-codigo-sicd');
-    var hint  = document.getElementById('ai-codigo-hint');
-    if (!file || file.type !== 'application/pdf') return;
-    if (typeof pdfjsLib === 'undefined') return;
 
-    hint.textContent = '⏳ Leyendo PDF...';
-    hint.style.color = '#6b7280';
+// ── Validación en tiempo real del código SICD contra sistema externo ──────
+var aiSicdValidTimer = null;
+var aiSicdValido = false;
+var aiUrlValidar = '{{ route('admin.sicd.validar') }}';
 
-    var reader = new FileReader();
-    reader.onload = function(e) {
-        pdfjsLib.getDocument({ data: e.target.result }).promise.then(function(pdf) {
-            var pages = [];
-            for (var i = 1; i <= pdf.numPages; i++) { pages.push(i); }
-            return Promise.all(pages.map(function(n) {
-                return pdf.getPage(n).then(function(p) {
-                    return p.getTextContent().then(function(tc) {
-                        return tc.items.map(function(it) { return it.str; }).join(' ');
+function aiValidarCodigo(codigo) {
+    var hint = document.getElementById('ai-codigo-hint');
+    var info = document.getElementById('ai-sicd-info');
+    info.style.display = 'none';
+    info.textContent = '';
+
+    if (!codigo) {
+        hint.innerHTML = '';
+        aiSicdValido = false;
+        return;
+    }
+
+    hint.innerHTML = '<span style="color:#6b7280;">⏳ Verificando...</span>';
+
+    fetch(aiUrlValidar + '?codigo=' + encodeURIComponent(codigo))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.valido) {
+                aiSicdValido = true;
+                hint.innerHTML = '<svg style="width:13px;height:13px;flex-shrink:0" fill="none" stroke="#16a34a" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg><span style="color:#16a34a;font-weight:600;">Código válido en el sistema</span>';
+                document.getElementById('ai-codigo-sicd').style.borderColor = '#16a34a';
+                info.style.display = 'block';
+                var html = '<strong>Centro de costo:</strong> ' + (data.centro_costo || '—') + ' &nbsp;·&nbsp; <strong>Fecha:</strong> ' + (data.fecha || '—').trim();
+                if (data.detalles && data.detalles.length > 0) {
+                    html += '<div style="margin-top:0.45rem;overflow-x:auto;">';
+                    html += '<table style="width:100%;border-collapse:collapse;font-size:0.7rem;">';
+                    html += '<thead><tr style="background:#dcfce7;color:#14532d;">'
+                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid #bbf7d0;">Ítem</th>'
+                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid #bbf7d0;">Detalle</th>'
+                          + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid #bbf7d0;">Cant.</th>'
+                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid #bbf7d0;">Unidad</th>'
+                          + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid #bbf7d0;">V. Unit.</th>'
+                          + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid #bbf7d0;">Total Neto</th>'
+                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid #bbf7d0;">Estado</th>'
+                          + '</tr></thead><tbody>';
+                    data.detalles.forEach(function(d, i) {
+                        var bg = i % 2 === 0 ? '#f0fdf4' : '#ffffff';
+                        html += '<tr style="background:' + bg + ';">'
+                              + '<td style="padding:3px 6px;">' + (d.item_presup || '—') + '</td>'
+                              + '<td style="padding:3px 6px;">' + (d.detalle || '—') + '</td>'
+                              + '<td style="padding:3px 6px;text-align:right;">' + (d.cantidad ?? '—') + '</td>'
+                              + '<td style="padding:3px 6px;">' + (d.unidad || '—') + '</td>'
+                              + '<td style="padding:3px 6px;text-align:right;">' + (d.valor_unitario != null ? '$' + Number(d.valor_unitario).toLocaleString('es-CL') : '—') + '</td>'
+                              + '<td style="padding:3px 6px;text-align:right;">' + (d.total_neto != null ? '$' + Number(d.total_neto).toLocaleString('es-CL') : '—') + '</td>'
+                              + '<td style="padding:3px 6px;">' + (d.estado || '—') + '</td>'
+                              + '</tr>';
                     });
-                });
-            }));
-        }).then(function(textos) {
-            var fullText = textos.join(' ');
-            // Busca TIC(RAMO)/12345 o TIC(RAMO)12345
-            var match = fullText.match(/TIC\([^)]+\)\/?(\d+)/i);
-            if (match) {
-                // Normaliza con barra: TIC(RAMO)/12345
-                var codigo = match[0].replace(/\/?(\d+)$/, '/$1').toUpperCase();
-                input.value = codigo;
-                hint.textContent = '✅ Código detectado automáticamente';
-                hint.style.color = '#16a34a';
+                    html += '</tbody></table></div>';
+                } else {
+                    html += '<br><em style="color:#6b7280;">Sin detalles de compra registrados.</em>';
+                }
+                info.innerHTML = html;
             } else {
-                hint.textContent = '⚠️ No se detectó código TIC en el PDF. Ingrésalo manualmente.';
-                hint.style.color = '#d97706';
+                aiSicdValido = false;
+                hint.innerHTML = '<svg style="width:13px;height:13px;flex-shrink:0" fill="none" stroke="#dc2626" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg><span style="color:#dc2626;font-weight:600;">' + data.mensaje + '</span>';
+                document.getElementById('ai-codigo-sicd').style.borderColor = '#dc2626';
             }
-        }).catch(function() {
-            hint.textContent = '⚠️ No se pudo leer el PDF. Ingresa el código manualmente.';
-            hint.style.color = '#d97706';
+        })
+        .catch(function() {
+            aiSicdValido = false;
+            hint.innerHTML = '<span style="color:#d97706;">⚠️ Sin conexión al sistema externo.</span>';
+            document.getElementById('ai-codigo-sicd').style.borderColor = '#d1d5db';
         });
-    };
-    reader.readAsArrayBuffer(file);
+}
+
+document.getElementById('ai-codigo-sicd').addEventListener('input', function() {
+    var codigo = this.value.trim();
+    this.style.borderColor = '#d1d5db';
+    document.getElementById('ai-codigo-hint').innerHTML = '';
+    document.getElementById('ai-sicd-info').style.display = 'none';
+    aiSicdValido = false;
+    clearTimeout(aiSicdValidTimer);
+    if (codigo.length >= 3) {
+        aiSicdValidTimer = setTimeout(function() { aiValidarCodigo(codigo); }, 600);
+    }
 });
 
 document.getElementById('ai-buscador').addEventListener('input', function() {
