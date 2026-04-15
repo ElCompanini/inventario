@@ -13,6 +13,7 @@ class HistorialCambio extends Model
 
     protected $fillable = [
         'producto_id',
+        'contenedor_id',
         'cantidad',
         'tipo',
         'motivo',
@@ -25,6 +26,11 @@ class HistorialCambio extends Model
     public function producto()
     {
         return $this->belongsTo(Producto::class);
+    }
+
+    public function container()
+    {
+        return $this->belongsTo(\App\Models\Container::class, 'contenedor_id');
     }
 
     public function usuario()

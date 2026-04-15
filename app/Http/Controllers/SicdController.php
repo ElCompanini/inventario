@@ -294,6 +294,7 @@ class SicdController extends Controller
 
                     HistorialCambio::create([
                         'producto_id'  => $detalle->producto_id,
+                        'contenedor_id'=> $detalle->producto->contenedor,
                         'cantidad'     => $cantidad,
                         'tipo'         => 'entrada',
                         'motivo'       => "Recepción directa – SICD {$sicd->codigo_sicd}",
@@ -402,6 +403,7 @@ class SicdController extends Controller
 
                         HistorialCambio::create([
                             'producto_id'  => $producto->id,
+                            'contenedor_id'=> $producto->contenedor,
                             'cantidad'     => $cantidad,
                             'tipo'         => 'entrada',
                             'motivo'       => "Recepción directa – SICD {$codigo}",

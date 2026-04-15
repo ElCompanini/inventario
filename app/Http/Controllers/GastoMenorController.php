@@ -140,6 +140,7 @@ class GastoMenorController extends Controller
 
                 $historial = HistorialCambio::create([
                     'producto_id'  => $producto->id,
+                    'contenedor_id'=> $producto->contenedor,
                     'cantidad'     => $item['cantidad'],
                     'tipo'         => 'entrada',
                     'motivo'       => "Compra de gasto menor — Folio {$request->folio}",

@@ -91,13 +91,14 @@ class RetiroController extends Controller
 
                         // Registrar en historial
                         HistorialCambio::create([
-                            'producto_id' => $producto->id,
-                            'usuario_id'  => $user->id,
-                            'tipo'        => 'salida',
-                            'cantidad'    => (int) $item['cantidad'],
-                            'motivo'      => $motivo,
+                            'producto_id'  => $producto->id,
+                            'contenedor_id'=> $producto->contenedor,
+                            'usuario_id'   => $user->id,
+                            'tipo'         => 'salida',
+                            'cantidad'     => (int) $item['cantidad'],
+                            'motivo'       => $motivo,
                             'aprobado_por' => $user->name,
-                            'origen'      => 'solicitud',
+                            'origen'       => 'solicitud',
                         ]);
                     } else {
                         // — USUARIO NORMAL: crea solicitud pendiente (activa círculo naranja) —

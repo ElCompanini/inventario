@@ -55,6 +55,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/productos/carga-masiva', [AdminController::class, 'cargaMasiva'])->name('productos.carga.masiva');
     Route::get('/productos/carga-masiva/resolver', [AdminController::class, 'resolverCargaMasiva'])->name('productos.carga.masiva.resolver');
     Route::post('/productos/carga-masiva/confirmar', [AdminController::class, 'confirmarCargaMasiva'])->name('productos.carga.masiva.confirmar');
+    Route::get('/productos/carga-masiva/contenedores', [AdminController::class, 'asignarContenedoresMasiva'])->name('productos.carga.masiva.contenedores');
+    Route::post('/productos/carga-masiva/contenedores/confirmar', [AdminController::class, 'confirmarContenedoresMasiva'])->name('productos.carga.masiva.contenedores.confirmar');
     Route::post('/productos/carga-manual', [AdminController::class, 'cargaManual'])->name('productos.carga.manual');
 
     // SICD

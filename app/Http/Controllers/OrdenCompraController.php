@@ -230,6 +230,7 @@ class OrdenCompraController extends Controller
 
                         HistorialCambio::create([
                             'producto_id'  => $detalle->producto_id,
+                            'contenedor_id'=> $detalle->producto->contenedor,
                             'cantidad'     => $recibido,
                             'tipo'         => 'entrada',
                             'motivo'       => $motivoBase,

@@ -1023,6 +1023,7 @@ function escHtmlGm(str) {
                                         <tr style="background:#f3e8ff; color:#6b21a8;">
                                             <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Producto</th>
                                             <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:90px;">Cantidad</th>
+                                            <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; width:160px;">Contenedor</th>
                                             <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Motivo</th>
                                             <th style="padding:0.4rem 0.6rem; width:36px;"></th>
                                         </tr>
@@ -1304,14 +1305,27 @@ function escHtmlGm(str) {
 @push('scripts')
 @php
 $aiProductosJson = json_encode(
-    $productos->map(fn($p) => ['id'=>$p->id,'nombre'=>$p->nombre,'descripcion'=>$p->descripcion,'stock'=>$p->stock_actual])->values(),
+    $productos->map(fn($p) => [
+        'id'             => $p->id,
+        'nombre'         => $p->nombre,
+        'descripcion'    => $p->descripcion,
+        'stock'          => $p->stock_actual,
+        'contenedor_id'  => $p->contenedor,
+        'contenedor_nombre' => $p->container?->nombre ?? '—',
+    ])->values(),
+    JSON_HEX_TAG | JSON_HEX_AMP
+);
+$aiContainersJson = json_encode(
+    $containers->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values(),
     JSON_HEX_TAG | JSON_HEX_AMP
 );
 @endphp
 <script type="application/json" id="ai-data">{!! $aiProductosJson !!}</script>
+<script type="application/json" id="ai-containers-data">{!! $aiContainersJson !!}</script>
 <script>
 if (document.getElementById('btn-agregar-inventario')) {
-var aiProductos = JSON.parse(document.getElementById('ai-data').textContent);
+var aiProductos  = JSON.parse(document.getElementById('ai-data').textContent);
+var aiContainers = JSON.parse(document.getElementById('ai-containers-data').textContent);
 var aiItems = [];
 var aiCounter = 0;
 var aiForm = document.getElementById('form-agregar-inv');
@@ -1581,35 +1595,41 @@ document.getElementById('ai-buscador-manual').addEventListener('input', function
     }).slice(0, 10);
     if (!matches.length) { res.style.display = 'none'; return; }
     res.innerHTML = matches.map(function(p) {
-        return '<div onclick="aiAgregarManual(' + p.id + ',\'' + p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')"'
+        return '<div onclick="aiAgregarManual(' + p.id + ',\'' + p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\',' + p.contenedor_id + ')"'
             + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;"'
             + ' onmouseover="this.style.background=\'#f3e8ff\'" onmouseout="this.style.background=\'\'">'
             + '<p style="font-size:0.8rem;font-weight:600;color:#1f2937;">' + escHtmlAi(p.nombre) + '</p>'
-            + '<p style="font-size:0.72rem;color:#6b7280;">' + escHtmlAi(p.descripcion || '') + ' &middot; Stock: ' + p.stock + '</p>'
+            + '<p style="font-size:0.72rem;color:#6b7280;">' + escHtmlAi(p.descripcion || '') + ' &middot; ' + escHtmlAi(p.contenedor_nombre || '') + ' &middot; Stock: ' + p.stock + '</p>'
             + '</div>';
     }).join('');
     res.style.display = 'block';
 });
 
-function aiAgregarManual(id, nombre) {
+function aiAgregarManual(id, nombre, contenedorId) {
     if (aiItemsManual.find(function(i) { return i.id === id; })) {
         document.getElementById('ai-buscador-manual').value = '';
         document.getElementById('ai-resultados-manual').style.display = 'none';
         return;
     }
     var idx = aiCounterManual++;
-    aiItemsManual.push({ idx: idx, id: id, nombre: nombre });
-    aiRenderFilaManual(idx, id, nombre);
+    aiItemsManual.push({ idx: idx, id: id, nombre: nombre, contenedorId: contenedorId });
+    aiRenderFilaManual(idx, id, nombre, contenedorId || null);
     document.getElementById('ai-buscador-manual').value = '';
     document.getElementById('ai-resultados-manual').style.display = 'none';
     aiActualizarTablaManual();
 }
 
-function aiRenderFilaManual(idx, id, nombre) {
+function aiRenderFilaManual(idx, id, nombre, contenedorId) {
     var tbody = document.getElementById('ai-items-manual');
     var tr = document.createElement('tr');
     tr.id = 'ai-row-manual-' + idx;
     tr.style.borderBottom = '1px solid #f3f4f6';
+
+    var contOptions = aiContainers.map(function(c) {
+        var sel = (c.id == contenedorId) ? ' selected' : '';
+        return '<option value="' + c.id + '"' + sel + '>' + escHtmlAi(c.nombre) + '</option>';
+    }).join('');
+
     tr.innerHTML =
         '<td style="padding:0.4rem 0.6rem;">'
         + '<input type="hidden" name="items_manual[' + idx + '][producto_id]" value="' + id + '">'
@@ -1618,6 +1638,12 @@ function aiRenderFilaManual(idx, id, nombre) {
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
         + '<input type="number" name="items_manual[' + idx + '][cantidad]" value="1" min="1"'
         + ' style="width:68px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;">'
+        + '<select name="items_manual[' + idx + '][contenedor_id]"'
+        + ' style="width:100%;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.78rem;background:#fff;">'
+        + contOptions
+        + '</select>'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;">'
         + '<input type="text" name="items_manual[' + idx + '][motivo]" placeholder="Motivo (opcional)"'

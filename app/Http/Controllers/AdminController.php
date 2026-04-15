@@ -65,6 +65,7 @@ class AdminController extends Controller
             // Registrar en historial
             HistorialCambio::create([
                 'producto_id'  => $solicitud->producto_id,
+                'contenedor_id'=> $producto->contenedor,
                 'cantidad'     => $solicitud->cantidad,
                 'tipo'         => $solicitud->tipo,
                 'motivo'       => $solicitud->motivo,
@@ -120,11 +121,42 @@ class AdminController extends Controller
     public function historial()
     {
         abort_unless(auth()->user()->tienePermiso('historial'), 403);
-        $historial = HistorialCambio::with(['producto', 'usuario', 'sicd'])
+        $historial = HistorialCambio::with(['producto', 'usuario', 'sicd', 'container'])
             ->orderByDesc('created_at')
             ->get();
 
-        return view('admin.historial', compact('historial'));
+        // Clave de agrupación: origen+id cuando existe, sino motivo+usuario+minuto exacto
+        $lotes = $historial
+            ->groupBy(function ($r) {
+                if ($r->origen && $r->origen_id) {
+                    return "origen:{$r->origen}-{$r->origen_id}";
+                }
+                // Agrupar registros sin origen por motivo + usuario + minuto
+                return "sinOrigen:{$r->usuario_id}:{$r->motivo}:{$r->created_at->format('Y-m-d H:i')}";
+            })
+            ->filter(fn($g) => $g->count() > 1);
+
+        // Lista ordenada de filas: grupos colapsados + individuales
+        $filas = collect();
+        $vistos = [];
+        foreach ($historial as $r) {
+            if ($r->origen && $r->origen_id) {
+                $key = "origen:{$r->origen}-{$r->origen_id}";
+            } else {
+                $key = "sinOrigen:{$r->usuario_id}:{$r->motivo}:{$r->created_at->format('Y-m-d H:i')}";
+            }
+
+            if ($lotes->has($key)) {
+                if (!in_array($key, $vistos)) {
+                    $vistos[] = $key;
+                    $filas->push(['tipo' => 'grupo', 'registros' => $lotes[$key]]);
+                }
+            } else {
+                $filas->push(['tipo' => 'individual', 'registro' => $r]);
+            }
+        }
+
+        return view('admin.historial', compact('historial', 'filas'));
     }
 
     public function editarStock(int $id)
@@ -172,6 +204,7 @@ class AdminController extends Controller
 
             HistorialCambio::create([
                 'producto_id'  => $producto->id,
+                'contenedor_id'=> $producto->contenedor,
                 'cantidad'     => $data['cantidad'],
                 'tipo'         => $data['tipo'],
                 'motivo'       => $data['motivo'],
@@ -212,6 +245,7 @@ class AdminController extends Controller
 
             HistorialCambio::create([
                 'producto_id'  => $producto->id,
+                'contenedor_id'=> $containerDestino->id,
                 'cantidad'     => $producto->stock_actual,
                 'tipo'         => 'traslado',
                 'motivo'       => "Traslado de {$containerOrigen->nombre} a {$containerDestino->nombre}: {$data['motivo']}",
@@ -244,7 +278,7 @@ class AdminController extends Controller
         $codigoSicd  = strtoupper(trim($request->input('codigo_sicd', '')));
         $descripcion = $request->input('descripcion');
 
-        $productosDB = Producto::whereNotNull('descripcion')->get(['id', 'nombre', 'descripcion']);
+        $productosDB = Producto::whereNotNull('descripcion')->get(['id', 'nombre', 'descripcion', 'contenedor']);
         $exactos     = [];
         $conflictos  = [];
 
@@ -265,10 +299,12 @@ class AdminController extends Controller
                 'totalNeto'   => $totalNeto,
             ];
 
-            // Coincidencia exacta por descripcion o nombre
-            $producto = Producto::where('descripcion', $desc)->orWhere('nombre', $desc)->first();
+            // Coincidencia exacta: solo por descripcion
+            $producto = Producto::where('descripcion', $desc)->first();
             if ($producto) {
-                $item['producto_id'] = $producto->id;
+                $item['producto_id']    = $producto->id;
+                $item['producto_nombre']= $producto->nombre;
+                $item['contenedor_id']  = $producto->contenedor;
                 $exactos[] = $item;
                 continue;
             }
@@ -284,13 +320,13 @@ class AdminController extends Controller
                 if ($pct > $mejorPct) { $mejorPct = $pct; $mejorProd = $p; }
             }
 
-            $item['similitud']          = round($mejorPct, 1);
-            $item['sugerencia_id']      = $mejorProd?->id;
-            $item['sugerencia_nombre']  = $mejorProd?->descripcion;
+            $item['similitud']         = round(min($mejorPct, 100), 1);
+            $item['sugerencia_id']     = $mejorProd?->id;
+            $item['sugerencia_nombre'] = $mejorProd?->descripcion;
             $conflictos[] = $item;
         }
 
-        // Si hay conflictos → guardar en sesión y resolver
+        // Si hay conflictos → guardar en sesión y resolver primero
         if (!empty($conflictos)) {
             session([
                 'carga_masiva_pendiente' => [
@@ -305,8 +341,17 @@ class AdminController extends Controller
             return redirect()->route('admin.productos.carga.masiva.resolver');
         }
 
-        // Sin conflictos → procesar directamente
-        return $this->procesarCargaMasiva($exactos, $codigoSicd, $descripcion, $motivo, $vincularOc);
+        // Sin conflictos → ir a asignar contenedores
+        session([
+            'carga_masiva_items' => [
+                'codigo_sicd' => $codigoSicd,
+                'descripcion' => $descripcion,
+                'motivo'      => $motivo,
+                'vincular_oc' => $vincularOc,
+                'items'       => $exactos,
+            ],
+        ]);
+        return redirect()->route('admin.productos.carga.masiva.contenedores');
     }
 
     public function resolverCargaMasiva()
@@ -338,13 +383,16 @@ class AdminController extends Controller
             $accion = $res['accion'] ?? 'omitir';
 
             if ($accion === 'enlazar' && !empty($res['producto_id'])) {
-                $conflicto['producto_id'] = (int) $res['producto_id'];
+                $linked = Producto::find((int) $res['producto_id']);
+                $conflicto['producto_id']    = (int) $res['producto_id'];
+                $conflicto['producto_nombre']= $linked?->nombre;
+                $conflicto['contenedor_id']  = $linked?->contenedor;
             } elseif ($accion === 'nuevo') {
                 $conflicto['producto_id']       = null;
                 $conflicto['accion']            = 'nuevo';
                 $conflicto['nuevo_nombre']      = trim($res['nuevo_nombre'] ?? '');
                 $conflicto['nuevo_descripcion'] = trim($res['nuevo_descripcion'] ?? $conflicto['descripcion']);
-                $conflicto['nuevo_contenedor']  = (int) ($res['nuevo_contenedor'] ?? 1);
+                $conflicto['contenedor_id']     = null; // se elige en el paso siguiente
             } else {
                 $conflicto['producto_id'] = null;
             }
@@ -353,6 +401,46 @@ class AdminController extends Controller
         }
 
         session()->forget('carga_masiva_pendiente');
+        session([
+            'carga_masiva_items' => [
+                'codigo_sicd' => $pendiente['codigo_sicd'],
+                'descripcion' => $pendiente['descripcion'],
+                'motivo'      => $pendiente['motivo'],
+                'vincular_oc' => $pendiente['vincular_oc'],
+                'items'       => $items,
+            ],
+        ]);
+        return redirect()->route('admin.productos.carga.masiva.contenedores');
+    }
+
+    public function asignarContenedoresMasiva()
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+        $pendiente = session('carga_masiva_items');
+        if (!$pendiente) {
+            return redirect()->route('dashboard')->with('error', 'Sesión expirada. Vuelve a cargar el Excel.');
+        }
+        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+        return view('admin.productos.asignar-contenedores-masiva', compact('pendiente', 'containers'));
+    }
+
+    public function confirmarContenedoresMasiva(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+        $pendiente = session('carga_masiva_items');
+        if (!$pendiente) {
+            return redirect()->route('dashboard')->with('error', 'Sesión expirada. Vuelve a cargar el Excel.');
+        }
+
+        $contenedores = $request->input('contenedores', []);
+        $items = $pendiente['items'];
+
+        foreach ($items as $i => &$item) {
+            $item['contenedor_id'] = (int) ($contenedores[$i] ?? ($item['contenedor_id'] ?? 1));
+        }
+        unset($item);
+
+        session()->forget('carga_masiva_items');
 
         return $this->procesarCargaMasiva(
             $items,
@@ -379,21 +467,45 @@ class AdminController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($items, $motivo, $sicd, &$actualizados) {
+        DB::transaction(function () use ($items, $motivo, $sicd, $vincularOc, &$actualizados) {
             foreach ($items as $item) {
                 $productoId = $item['producto_id'] ?? null;
 
                 // Crear producto nuevo si el usuario eligió esa opción
                 if (!$productoId && ($item['accion'] ?? '') === 'nuevo' && !empty($item['nuevo_nombre'])) {
                     $nuevo = Producto::create([
-                        'nombre'       => $item['nuevo_nombre'],
-                        'descripcion'  => $item['nuevo_descripcion'],
-                        'stock_actual' => 0,
-                        'stock_minimo' => 0,
-                        'stock_critico'=> 0,
-                        'contenedor'   => $item['nuevo_contenedor'],
+                        'nombre'        => $item['nuevo_nombre'],
+                        'descripcion'   => $item['nuevo_descripcion'] ?? $item['descripcion'],
+                        'stock_actual'  => 0,
+                        'stock_minimo'  => 0,
+                        'stock_critico' => 0,
+                        'contenedor'    => $item['contenedor_id'] ?? 1,
                     ]);
                     $productoId = $nuevo->id;
+                }
+
+                // Si el usuario cambió el contenedor para un producto existente,
+                // buscar o crear el producto en el nuevo contenedor
+                if ($productoId && !empty($item['contenedor_id'])) {
+                    $prod = Producto::find($productoId);
+                    if ($prod && $prod->contenedor != $item['contenedor_id']) {
+                        $enDestino = Producto::where('descripcion', $prod->descripcion)
+                            ->where('contenedor', $item['contenedor_id'])
+                            ->first();
+                        if ($enDestino) {
+                            $productoId = $enDestino->id;
+                        } else {
+                            $copia = Producto::create([
+                                'nombre'        => $prod->nombre,
+                                'descripcion'   => $prod->descripcion,
+                                'stock_actual'  => 0,
+                                'stock_minimo'  => $prod->stock_minimo,
+                                'stock_critico' => $prod->stock_critico,
+                                'contenedor'    => $item['contenedor_id'],
+                            ]);
+                            $productoId = $copia->id;
+                        }
+                    }
                 }
 
                 if ($sicd) {
@@ -402,13 +514,15 @@ class AdminController extends Controller
                         'nombre_producto_excel' => $item['descripcion'],
                         'unidad'                => $item['unidad'] ?: null,
                         'cantidad_solicitada'   => $item['cantidad'],
-                        'cantidad_recibida'     => $productoId ? $item['cantidad'] : 0,
+                        // Si va a OC, la recepción real ocurre después → cantidad_recibida = 0
+                        'cantidad_recibida'     => (!$vincularOc && $productoId) ? $item['cantidad'] : 0,
                         'precio_neto'           => $item['precioNeto'] ?? null,
                         'total_neto'            => $item['totalNeto'] ?? null,
                     ]);
                 }
 
-                if (!$productoId) continue;
+                // Si va a OC no tocar el stock ahora; se actualizará al procesar la recepción
+                if ($vincularOc || !$productoId) continue;
 
                 $producto = Producto::find($productoId);
                 if (!$producto) continue;
@@ -419,22 +533,26 @@ class AdminController extends Controller
 
                 HistorialCambio::create([
                     'producto_id'  => $producto->id,
+                    'contenedor_id'=> $producto->contenedor,
                     'cantidad'     => $item['cantidad'],
                     'tipo'         => 'entrada',
                     'motivo'       => $sicd ? "Carga masiva – SICD {$sicd->codigo_sicd}" : $motivo,
                     'aprobado_por' => Auth::user()->name,
                     'usuario_id'   => Auth::id(),
+                    'origen'       => $sicd ? 'sicd' : null,
+                    'origen_id'    => $sicd ? $sicd->id : null,
                 ]);
 
                 $actualizados++;
             }
         });
 
-        $msg = "Carga masiva completada: {$actualizados} producto(s) actualizado(s).";
-
         if ($vincularOc && $sicd) {
+            $msg = "SICD {$sicd->codigo_sicd} creado con {$sicd->detalles()->count()} producto(s). Stock pendiente — asígnalo a una Orden de Compra para recibirlo.";
             return redirect()->route('admin.ordenes.create')->with('success', $msg);
         }
+
+        $msg = "Carga masiva completada: {$actualizados} producto(s) actualizado(s).";
 
         return redirect()->route('dashboard')->with('success', $msg);
     }
@@ -444,10 +562,11 @@ class AdminController extends Controller
         abort_unless(auth()->user()->esAdmin(), 403);
 
         $request->validate([
-            'items_manual'                => ['required', 'array', 'min:1'],
-            'items_manual.*.producto_id'  => ['required', 'integer', 'exists:productos,id'],
-            'items_manual.*.cantidad'     => ['required', 'integer', 'min:1'],
-            'items_manual.*.motivo'       => ['nullable', 'string', 'max:500'],
+            'items_manual'                  => ['required', 'array', 'min:1'],
+            'items_manual.*.producto_id'    => ['required', 'integer', 'exists:productos,id'],
+            'items_manual.*.cantidad'       => ['required', 'integer', 'min:1'],
+            'items_manual.*.contenedor_id'  => ['nullable', 'integer', 'exists:containers,id'],
+            'items_manual.*.motivo'         => ['nullable', 'string', 'max:500'],
         ], [
             'items_manual.required'              => 'Agrega al menos un producto.',
             'items_manual.*.producto_id.required' => 'Cada fila debe tener un producto.',
@@ -456,9 +575,29 @@ class AdminController extends Controller
 
         DB::transaction(function () use ($request) {
             foreach ($request->items_manual as $item) {
-                $producto = Producto::findOrFail($item['producto_id']);
-                $cantidad = (int) $item['cantidad'];
-                $motivo   = trim($item['motivo'] ?? '') ?: 'Carga manual de inventario';
+                $producto       = Producto::findOrFail($item['producto_id']);
+                $cantidad       = (int) $item['cantidad'];
+                $motivo         = trim($item['motivo'] ?? '') ?: 'Carga manual de inventario';
+                $contenedorId   = isset($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
+
+                // Si el usuario eligió un contenedor distinto, buscar o crear el producto allí
+                if ($contenedorId && $contenedorId !== $producto->contenedor) {
+                    $enDestino = Producto::where('descripcion', $producto->descripcion)
+                        ->where('contenedor', $contenedorId)
+                        ->first();
+                    if ($enDestino) {
+                        $producto = $enDestino;
+                    } else {
+                        $producto = Producto::create([
+                            'nombre'        => $producto->nombre,
+                            'descripcion'   => $producto->descripcion,
+                            'stock_actual'  => 0,
+                            'stock_minimo'  => $producto->stock_minimo,
+                            'stock_critico' => $producto->stock_critico,
+                            'contenedor'    => $contenedorId,
+                        ]);
+                    }
+                }
 
                 $producto->stock_actual += $cantidad;
                 $producto->actualizarFechasStock();
@@ -466,6 +605,7 @@ class AdminController extends Controller
 
                 HistorialCambio::create([
                     'producto_id'  => $producto->id,
+                    'contenedor_id'=> $producto->contenedor,
                     'cantidad'     => $cantidad,
                     'tipo'         => 'entrada',
                     'motivo'       => $motivo,

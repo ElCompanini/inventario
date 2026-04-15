@@ -112,31 +112,19 @@
                 <div id="panel-nuevo-{{ $i }}"
                      class="{{ $c['similitud'] < 60 && empty($c['sugerencia_id']) ? '' : 'hidden' }} border-t border-gray-100 bg-emerald-50 p-3 space-y-2">
 
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">
-                                Categoría (familia) <span class="text-red-500">*</span>
-                            </label>
-                            <select name="resoluciones[{{ $i }}][nuevo_nombre]"
-                                    class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                                <option value="">— Selecciona —</option>
-                                @foreach($familias as $f)
-                                    <option value="{{ $f }}">{{ $f }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">
-                                Contenedor <span class="text-red-500">*</span>
-                            </label>
-                            <select name="resoluciones[{{ $i }}][nuevo_contenedor]"
-                                    class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                                @foreach($containers as $cont)
-                                    <option value="{{ $cont->id }}">{{ $cont->nombre }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">
+                            Categoría (familia) <span class="text-red-500">*</span>
+                        </label>
+                        <select name="resoluciones[{{ $i }}][nuevo_nombre]"
+                                class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                            <option value="">— Selecciona —</option>
+                            @foreach($familias as $f)
+                                <option value="{{ $f }}">{{ $f }}</option>
+                            @endforeach
+                        </select>
                     </div>
+                    <p class="text-xs text-gray-400">El contenedor se elige en el paso siguiente.</p>
 
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 mb-1">

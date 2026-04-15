@@ -85,6 +85,7 @@ class ContainerController extends Controller
 
                 HistorialCambio::create([
                     'producto_id'  => $producto->id,
+                    'contenedor_id'=> $destino->id,
                     'cantidad'     => $producto->stock_actual,
                     'tipo'         => 'traslado',
                     'motivo'       => "Traslado de {$origen->nombre} a {$destino->nombre}: {$data['motivo']}",
