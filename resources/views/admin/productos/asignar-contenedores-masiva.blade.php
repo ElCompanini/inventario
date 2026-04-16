@@ -24,16 +24,25 @@
                     <th class="px-5 py-3 text-left">Producto</th>
                     <th class="px-5 py-3 text-center w-24">Cantidad</th>
                     <th class="px-5 py-3 text-left w-56">Contenedor</th>
+                    <th class="px-5 py-3 text-left w-32">Resultado</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 @foreach($pendiente['items'] as $i => $item)
                 @php
-                    $esNuevo = ($item['accion'] ?? '') === 'nuevo';
-                    $nombre  = $esNuevo
+                    $esNuevo   = ($item['accion'] ?? '') === 'nuevo';
+                    // Para el nombre mostrado usar la descripcion del producto en BDD (más específica)
+                    $nombre    = $esNuevo
                         ? ($item['nuevo_descripcion'] ?? $item['descripcion'])
-                        : ($item['producto_nombre'] ?? $item['descripcion']);
-                    $preselect = $item['contenedor_id'] ?? null;
+                        : ($item['producto_descripcion'] ?? $item['producto_nombre'] ?? $item['descripcion']);
+                    // Categoría (familia)
+                    $categoria = $esNuevo
+                        ? ($item['nuevo_nombre'] ?? '')
+                        : ($item['producto_nombre'] ?? '');
+                    // Hay error de tipeo cuando la descripcion del Excel difiere de la BDD
+                    $tieneError = !$esNuevo && ($item['descripcion'] ?? '') !== $nombre;
+                    // Si no hay contenedor pre-asignado, usar el primero de la lista como default
+                    $preselect = $item['contenedor_id'] ?? $containers->first()?->id;
                 @endphp
                 <tr class="hover:bg-gray-50 transition">
                     <td class="px-5 py-3">
@@ -42,9 +51,18 @@
                                 <span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">NUEVO</span>
                             @endif
                             <div>
-                                <p class="font-medium text-gray-800">{{ $nombre }}</p>
-                                @if(!$esNuevo && ($item['descripcion'] ?? '') !== $nombre)
-                                    <p class="text-xs text-gray-400">Excel: {{ $item['descripcion'] }}</p>
+                                @if($categoria)
+                                    <p class="text-xs text-gray-500 mb-0.5">{{ $categoria }}</p>
+                                @endif
+                                @if($tieneError)
+                                    <p class="font-medium text-gray-800">
+                                        <span class="text-xs font-bold text-gray-500">Bdd:</span> {{ $nombre }}
+                                    </p>
+                                    <p class="text-xs mt-0.5" style="color:#f87171;">
+                                        <span class="text-gray-500 font-bold">Excel:</span> {{ $item['descripcion'] }} (Error en el  nombre)
+                                    </p>
+                                @else
+                                    <p class="font-medium text-gray-800">{{ $nombre }}</p>
                                 @endif
                             </div>
                         </div>
@@ -64,7 +82,12 @@
                             @endforeach
                         </select>
                     </td>
+                    <td>
+    
+                    </td>
                 </tr>
+
+
                 @endforeach
             </tbody>
         </table>
@@ -91,5 +114,6 @@
         </button>
     </div>
 </form>
+
 
 @endsection

@@ -9,6 +9,7 @@ use App\Models\Sicd;
 use App\Models\SicdExterno;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
@@ -25,7 +26,7 @@ class SicdController extends Controller
 
         try {
             $solicitud = SicdExterno::buscar($codigo);
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             return response()->json(['valido' => false, 'mensaje' => 'No se pudo conectar al sistema externo.']);
         }
 
@@ -49,13 +50,58 @@ class SicdController extends Controller
         ]);
     }
 
+    public function verificarPdf(Request $request)
+    {
+        abort_unless(auth()->check(), 403);
+        $codigo = strtoupper(trim($request->query('codigo', '')));
+        if ($codigo === '') return response()->json(['tiene_pdf' => false]);
+
+        $cacheKey = 'sicd_tiene_pdf_' . md5($codigo);
+        $tienePdf = Cache::remember($cacheKey, now()->addHours(6), function () use ($codigo) {
+            try {
+                // MAX_EXECUTION_TIME hint: aborta la query en 4 segundos si la BD externa es lenta
+                $row = DB::connection('sicd_externa')
+                    ->selectOne('SELECT /*+ MAX_EXECUTION_TIME(4000) */ 1 AS tiene FROM solicitud_full WHERE num_int_sol = ? AND pdf IS NOT NULL LIMIT 1', [$codigo]);
+                return $row !== null;
+            } catch (\Exception) {
+                return false;
+            }
+        });
+
+        return response()->json(['tiene_pdf' => $tienePdf]);
+    }
+
+    public function verPdfExterno(Request $request)
+    {
+        abort_unless(auth()->check(), 403);
+        $codigo = strtoupper(trim($request->query('codigo', '')));
+        abort_if($codigo === '', 400);
+
+        $row = DB::connection('sicd_externa')
+            ->table('solicitud_full')
+            ->where('num_int_sol', $codigo)
+            ->select('pdf')
+            ->first();
+
+        abort_if(!$row || empty($row->pdf), 404);
+
+        return response($row->pdf, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="SICD_' . preg_replace('/[^A-Z0-9_\-]/i', '_', $codigo) . '.pdf"');
+    }
+
     public function index()
     {
         abort_unless(auth()->user()->tienePermiso('sicd'), 403);
-        $sicds = Sicd::with(['usuario', 'detalles', 'ordenesCompra'])
-            ->orderByDesc('created_at')
-            ->paginate(20);
+        $user  = auth()->user();
+        $query = Sicd::with(['usuario', 'detalles', 'ordenesCompra'])->orderByDesc('created_at');
 
+        if ($user->tieneFiltroCC()) {
+            $prefix = $user->centroCostoPrefix();
+            $query->where('codigo_sicd', 'LIKE', $prefix . '(%');
+        }
+
+        $sicds = $query->paginate(20);
         return view('admin.sicd.index', compact('sicds'));
     }
 
@@ -153,11 +199,10 @@ class SicdController extends Controller
 
         // Sin conflictos → crear SICD directamente
         Storage::disk('local')->delete($rutaExcelTemp);
-        $rutaFinal = Storage::disk('local')->move($rutaSicdTemp, 'documentos/sicd/' . basename($rutaSicdTemp))
-            ? 'documentos/sicd/' . basename($rutaSicdTemp)
-            : $rutaSicdTemp;
+        Storage::disk('local')->move($rutaSicdTemp, 'documentos/sicd/' . basename($rutaSicdTemp));
+        $rutaFinal = 'documentos/sicd/' . basename($rutaSicdTemp);
 
-        return $this->crearSicd($codigo, $nombreOriginal, $rutaSicdTemp, $data['descripcion'] ?? null, $exactos);
+        return $this->crearSicd($codigo, $nombreOriginal, $rutaFinal, $data['descripcion'] ?? null, $exactos);
     }
 
     /**

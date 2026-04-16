@@ -121,9 +121,23 @@ class AdminController extends Controller
     public function historial()
     {
         abort_unless(auth()->user()->tienePermiso('historial'), 403);
-        $historial = HistorialCambio::with(['producto', 'usuario', 'sicd', 'container'])
-            ->orderByDesc('created_at')
-            ->get();
+        $user  = auth()->user();
+        $query = HistorialCambio::with(['producto', 'usuario', 'sicd', 'container'])
+            ->orderByDesc('created_at');
+
+        if ($user->tieneFiltroCC()) {
+            $prefix = $user->centroCostoPrefix();
+            // Entradas sin SICD son visibles; las ligadas a SICD solo si coincide el prefijo
+            $query->where(function ($q) use ($prefix) {
+                $q->where(function ($q2) {
+                    $q2->where('origen', '!=', 'sicd')->orWhereNull('origen');
+                })->orWhereHas('sicd', function ($q2) use ($prefix) {
+                    $q2->where('codigo_sicd', 'LIKE', $prefix . '(%');
+                });
+            });
+        }
+
+        $historial = $query->get();
 
         // Clave de agrupación: origen+id cuando existe, sino motivo+usuario+minuto exacto
         $lotes = $historial
@@ -265,17 +279,28 @@ class AdminController extends Controller
         $request->validate([
             'excel_masivo'  => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
             'motivo_masivo' => ['nullable', 'string', 'max:500'],
-            'codigo_sicd'   => ['nullable', 'string', 'max:100'],
+            'codigo_sicd'   => ['required', 'string', 'max:100'],
             'descripcion'   => ['nullable', 'string', 'max:500'],
         ], [
             'excel_masivo.required' => 'El archivo Excel es obligatorio.',
             'excel_masivo.mimes'    => 'El archivo debe ser XLSX, XLS o CSV.',
+            'codigo_sicd.required'  => 'El código SICD es obligatorio.',
         ]);
 
         $vincularOc  = $request->boolean('vincular_oc');
         $rows        = Excel::toCollection(new SicdDetallesImport, $request->file('excel_masivo'))->first();
         $motivo      = trim($request->input('motivo_masivo', '')) ?: 'Carga masiva de inventario';
         $codigoSicd  = strtoupper(trim($request->input('codigo_sicd', '')));
+
+        // Verificar que el código SICD exista en la BD externa
+        try {
+            $sicdExterno = \App\Models\SicdExterno::buscar($codigoSicd);
+        } catch (\Exception) {
+            return back()->with('error', 'No se pudo conectar al sistema externo para validar el código SICD.');
+        }
+        if (!$sicdExterno) {
+            return back()->with('error', "El código SICD \"{$codigoSicd}\" no existe en el sistema externo. Verifica el número e inténtalo de nuevo.");
+        }
         $descripcion = $request->input('descripcion');
 
         $productosDB = Producto::whereNotNull('descripcion')->get(['id', 'nombre', 'descripcion', 'contenedor']);
@@ -302,9 +327,10 @@ class AdminController extends Controller
             // Coincidencia exacta: solo por descripcion
             $producto = Producto::where('descripcion', $desc)->first();
             if ($producto) {
-                $item['producto_id']    = $producto->id;
-                $item['producto_nombre']= $producto->nombre;
-                $item['contenedor_id']  = $producto->contenedor;
+                $item['producto_id']          = $producto->id;
+                $item['producto_nombre']      = $producto->nombre;
+                $item['producto_descripcion'] = $producto->descripcion;
+                $item['contenedor_id']        = $producto->contenedor;
                 $exactos[] = $item;
                 continue;
             }
@@ -384,9 +410,10 @@ class AdminController extends Controller
 
             if ($accion === 'enlazar' && !empty($res['producto_id'])) {
                 $linked = Producto::find((int) $res['producto_id']);
-                $conflicto['producto_id']    = (int) $res['producto_id'];
-                $conflicto['producto_nombre']= $linked?->nombre;
-                $conflicto['contenedor_id']  = $linked?->contenedor;
+                $conflicto['producto_id']          = (int) $res['producto_id'];
+                $conflicto['producto_nombre']      = $linked?->nombre;
+                $conflicto['producto_descripcion'] = $linked?->descripcion;
+                $conflicto['contenedor_id']        = $linked?->contenedor;
             } elseif ($accion === 'nuevo') {
                 $conflicto['producto_id']       = null;
                 $conflicto['accion']            = 'nuevo';

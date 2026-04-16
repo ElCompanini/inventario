@@ -20,11 +20,18 @@
         $h .= '<th style="padding:5px 10px;text-align:left;font-weight:600;color:#374151;">Aprobado por</th>';
         $h .= '</tr></thead><tbody>';
         foreach ($regs as $r) {
-            $color = $r->tipo === 'entrada' ? '#16a34a' : '#ea580c';
-            $signo = $r->tipo === 'entrada' ? '+' : '−';
+            if ($r->tipo === 'entrada') {
+                $color = '#16a34a'; $signo = '+';
+            } elseif ($r->tipo === 'salida') {
+                $color = '#ea580c'; $signo = '−';
+            } else {
+                $color = '#2563eb'; $signo = '';
+            }
             $contNombre = $r->container?->nombre ?? ($r->contenedor_id ? 'C'.$r->contenedor_id : '—');
             $h .= '<tr style="border-top:1px solid #f1f5f9;">';
-            $h .= '<td style="padding:5px 10px;">' . e($r->producto?->nombre ?? '—') . '</td>';
+            $prodDesc = $r->producto?->descripcion ?? $r->producto?->nombre ?? '—';
+            $prodNom  = ($r->producto?->descripcion && $r->producto?->nombre) ? '<br><span style="font-size:0.7rem;color:#9ca3af;">' . e($r->producto->nombre) . '</span>' : '';
+            $h .= '<td style="padding:5px 10px;">' . e($prodDesc) . $prodNom . '</td>';
             $h .= '<td style="padding:5px 10px;"><span style="font-size:0.72rem;background:#f3f4f6;color:#374151;padding:1px 7px;border-radius:999px;">' . e($contNombre) . '</span></td>';
             $h .= '<td style="padding:5px 10px;text-align:center;font-weight:700;color:' . $color . ';">' . $signo . $r->cantidad . '</td>';
             $h .= '<td style="padding:5px 10px;color:#4b5563;">' . e($r->motivo) . '</td>';
@@ -145,8 +152,11 @@
                 <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
                     {{ $registro->created_at->format('d/m/Y H:i') }}
                 </td>
-                <td class="px-4 py-3 font-medium text-gray-900">
-                    {{ $registro->producto->nombre }}
+                <td class="px-4 py-3">
+                    <p class="font-medium text-gray-900">{{ $registro->producto->descripcion ?? $registro->producto->nombre }}</p>
+                    @if($registro->producto->descripcion)
+                        <p class="text-xs text-gray-400 mt-0.5">{{ $registro->producto->nombre }}</p>
+                    @endif
                 </td>
                 <td class="px-4 py-3">
                     @php

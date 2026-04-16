@@ -34,7 +34,17 @@
 
     <div class="space-y-4 mb-6">
         @foreach($pendiente['conflictos'] as $i => $c)
+        @php
+            $autoEnlazar = $c['similitud'] >= 60 && !empty($c['sugerencia_id']);
+            $autoNuevo   = $c['similitud'] < 60 && empty($c['sugerencia_id']);
+            // Valor inicial del producto_id único
+            $initPid     = $autoEnlazar ? $c['sugerencia_id'] : '';
+        @endphp
         <div class="bg-white rounded-xl shadow border-l-4 border-orange-400 p-5">
+
+            {{-- ── Hidden único para producto_id ── --}}
+            <input type="hidden" name="resoluciones[{{ $i }}][producto_id]"
+                   value="{{ $initPid }}" id="input-pid-{{ $i }}">
 
             {{-- Cabecera --}}
             <div class="flex items-start justify-between gap-4 mb-4">
@@ -58,14 +68,13 @@
             <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-indigo-50
                           hover:border-indigo-300 cursor-pointer transition mb-2">
                 <input type="radio" name="resoluciones[{{ $i }}][accion]" value="enlazar"
-                       class="mt-0.5 radio-accion" data-idx="{{ $i }}"
-                       {{ $c['similitud'] >= 60 ? 'checked' : '' }}
-                       onchange="toggleNuevo({{ $i }}, false)">
+                       class="mt-0.5" data-idx="{{ $i }}" data-tipo="sugerencia"
+                       data-pid="{{ $c['sugerencia_id'] }}"
+                       {{ $autoEnlazar ? 'checked' : '' }}
+                       onchange="onRadioChange({{ $i }}, 'sugerencia', {{ $c['sugerencia_id'] }})">
                 <div class="flex-1">
                     <p class="text-sm font-semibold text-indigo-700">Enlazar al producto más parecido</p>
                     <p class="text-xs text-gray-600 mt-0.5">{{ $c['sugerencia_nombre'] }}</p>
-                    <input type="hidden" name="resoluciones[{{ $i }}][producto_id]"
-                           value="{{ $c['sugerencia_id'] }}" class="input-sugerencia-{{ $i }}">
                 </div>
                 <span class="text-xs text-indigo-500 font-medium shrink-0">{{ $c['similitud'] }}% similitud</span>
             </label>
@@ -75,24 +84,21 @@
             <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-blue-50
                           hover:border-blue-300 cursor-pointer transition mb-2">
                 <input type="radio" name="resoluciones[{{ $i }}][accion]" value="enlazar"
-                       class="mt-0.5 radio-otro" data-idx="{{ $i }}"
-                       onchange="toggleNuevo({{ $i }}, false)">
+                       class="mt-0.5" data-idx="{{ $i }}" data-tipo="otro"
+                       onchange="onRadioChange({{ $i }}, 'otro', 0)">
                 <div class="flex-1">
                     <p class="text-sm font-semibold text-blue-700">Enlazar a otro producto</p>
-                    <select class="mt-1.5 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs
-                                   focus:outline-none focus:ring-2 focus:ring-blue-400 select-otro-{{ $i }}"
-                            data-idx="{{ $i }}"
+                    <select id="select-otro-{{ $i }}"
+                            class="mt-1.5 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs
+                                   focus:outline-none focus:ring-2 focus:ring-blue-400"
                             onchange="onSelectOtro({{ $i }}, this.value)">
                         <option value="">— Selecciona un producto —</option>
                         @foreach($productos as $p)
-                            <option value="{{ $p->id }}"
-                                {{ ($c['sugerencia_id'] ?? null) == $p->id ? 'selected' : '' }}>
+                            <option value="{{ $p->id }}">
                                 {{ $p->descripcion }} ({{ $p->nombre }})
                             </option>
                         @endforeach
                     </select>
-                    <input type="hidden" name="resoluciones[{{ $i }}][producto_id]"
-                           value="" class="input-otro-{{ $i }}">
                 </div>
             </label>
 
@@ -100,9 +106,9 @@
             <div class="rounded-lg border border-gray-200 mb-1 overflow-hidden">
                 <label class="flex items-center gap-3 p-3 hover:bg-emerald-50 hover:border-emerald-300 cursor-pointer transition">
                     <input type="radio" name="resoluciones[{{ $i }}][accion]" value="nuevo"
-                           class="radio-nuevo-{{ $i }}"
-                           {{ $c['similitud'] < 60 && empty($c['sugerencia_id']) ? 'checked' : '' }}
-                           onchange="toggleNuevo({{ $i }}, true)">
+                           data-idx="{{ $i }}" data-tipo="nuevo"
+                           {{ $autoNuevo ? 'checked' : '' }}
+                           onchange="onRadioChange({{ $i }}, 'nuevo', 0)">
                     <div>
                         <p class="text-sm font-semibold text-emerald-700">Crear como nuevo producto</p>
                         <p class="text-xs text-gray-400 mt-0.5">Se agrega a una categoría existente con la descripción del Excel.</p>
@@ -110,7 +116,7 @@
                 </label>
 
                 <div id="panel-nuevo-{{ $i }}"
-                     class="{{ $c['similitud'] < 60 && empty($c['sugerencia_id']) ? '' : 'hidden' }} border-t border-gray-100 bg-emerald-50 p-3 space-y-2">
+                     class="{{ $autoNuevo ? '' : 'hidden' }} border-t border-gray-100 bg-emerald-50 p-3 space-y-2">
 
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 mb-1">
@@ -155,38 +161,23 @@
 
 @push('scripts')
 <script>
-    function toggleNuevo(idx, show) {
+    function onRadioChange(idx, tipo, pid) {
+        // Actualizar el único hidden de producto_id
+        document.getElementById('input-pid-' + idx).value = (tipo === 'sugerencia') ? pid : '';
+        // Mostrar/ocultar panel nuevo
         const panel = document.getElementById('panel-nuevo-' + idx);
-        if (show) {
-            panel.classList.remove('hidden');
-        } else {
-            panel.classList.add('hidden');
-        }
+        panel.classList.toggle('hidden', tipo !== 'nuevo');
     }
 
     function onSelectOtro(idx, value) {
-        // Marcar el radio "otro"
-        document.querySelector('.radio-otro[data-idx="' + idx + '"]').checked = true;
-        toggleNuevo(idx, false);
-
-        // Actualizar el hidden input
-        document.querySelector('.input-otro-' + idx).value = value;
-
-        // Desactivar el hidden de sugerencia para que no pise
-        const sug = document.querySelector('.input-sugerencia-' + idx);
-        if (sug) sug.disabled = true;
-    }
-
-    // Al marcar "enlazar sugerencia", reactivar su hidden y desactivar el del otro
-    document.querySelectorAll('.radio-accion').forEach(function(radio) {
-        radio.addEventListener('change', function() {
-            const idx = this.dataset.idx;
-            const sug = document.querySelector('.input-sugerencia-' + idx);
-            const otro = document.querySelector('.input-otro-' + idx);
-            if (sug) sug.disabled = false;
-            if (otro) otro.value = '';
+        // Marcar el radio "otro" y actualizar el hidden
+        const radios = document.querySelectorAll('input[name="resoluciones[' + idx + '][accion]"]');
+        radios.forEach(function(r) {
+            if (r.dataset.tipo === 'otro') r.checked = true;
         });
-    });
+        document.getElementById('input-pid-' + idx).value = value;
+        document.getElementById('panel-nuevo-' + idx).classList.add('hidden');
+    }
 </script>
 @endpush
 

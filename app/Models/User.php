@@ -43,6 +43,27 @@ class User extends Authenticatable
         return $this->rol === 'admin';
     }
 
+    /**
+     * Retorna el prefijo del centro de costo (antes del primer paréntesis).
+     * "TIC(RAMO)" → "TIC", "TIC" → "TIC", null → null
+     */
+    public function centroCostoPrefix(): ?string
+    {
+        if (empty($this->centro_costo)) return null;
+        return trim(preg_replace('/\(.*$/u', '', $this->centro_costo));
+    }
+
+    /**
+     * True si el usuario tiene restricción de centro de costo
+     * (admin sin nombre "Administrador" y con centro_costo asignado).
+     */
+    public function tieneFiltroCC(): bool
+    {
+        return $this->esAdmin()
+            && $this->name !== 'Administrador'
+            && !empty($this->centro_costo);
+    }
+
     public function tienePermiso(string $permiso): bool
     {
         if ($this->esAdmin()) return true;

@@ -61,6 +61,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // SICD
     Route::get('/sicd/validar', [SicdController::class, 'validarCodigo'])->name('sicd.validar');
+    Route::get('/sicd/pdf-externo', [SicdController::class, 'verPdfExterno'])->name('sicd.pdf.externo');
+    Route::get('/sicd/verificar-pdf', [SicdController::class, 'verificarPdf'])->name('sicd.verificar.pdf');
     Route::get('/sicd', [SicdController::class, 'index'])->name('sicd.index');
     Route::get('/sicd/crear', [SicdController::class, 'create'])->name('sicd.create');
     Route::post('/sicd', [SicdController::class, 'store'])->name('sicd.store');

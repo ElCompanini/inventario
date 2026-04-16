@@ -1059,6 +1059,7 @@ function escHtmlGm(str) {
 
 @push('head')
 <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes btn-breathe-green { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.7)} 50%{box-shadow:0 0 0 6px rgba(22,163,74,0)} }
     @keyframes btn-breathe-blue  { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.7)} 50%{box-shadow:0 0 0 6px rgba(37,99,235,0)} }
     @keyframes btn-breathe-red   { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.7)} 50%{box-shadow:0 0 0 6px rgba(220,38,38,0)} }
@@ -1518,7 +1519,7 @@ function aiValidarCodigo(codigo) {
                         var bg = i % 2 === 0 ? '#f0fdf4' : '#ffffff';
                         html += '<tr style="background:' + bg + ';">'
                               + '<td style="padding:3px 6px;">' + (d.item_presup || '—') + '</td>'
-                              + '<td style="padding:3px 6px;">' + (d.detalle || '—') + '</td>'
+                              + '<td style="padding:3px 6px;">' + ((d.detalle || '').replace(/(\s+UND)+$/i, '').trim() || '—') + '</td>'
                               + '<td style="padding:3px 6px;text-align:right;">' + (d.cantidad ?? '—') + '</td>'
                               + '<td style="padding:3px 6px;">' + (d.unidad || '—') + '</td>'
                               + '<td style="padding:3px 6px;text-align:right;">' + (d.valor_unitario != null ? '$' + Number(d.valor_unitario).toLocaleString('es-CL') : '—') + '</td>'
@@ -1530,7 +1531,37 @@ function aiValidarCodigo(codigo) {
                 } else {
                     html += '<br><em style="color:#6b7280;">Sin detalles de compra registrados.</em>';
                 }
+                // Banner PDF: spinner mientras carga, luego resultado
+                html += '<div id="ai-pdf-banner" style="margin-top:0.6rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:0.6rem;padding:0.5rem 0.85rem;display:flex;align-items:center;gap:0.5rem;">'
+                      + '<svg style="width:15px;height:15px;flex-shrink:0;animation:spin 1s linear infinite;color:#ea580c;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v3m6.364 1.636-2.121 2.121M21 12h-3m-1.636 6.364-2.121-2.121M12 21v-3m-6.364-1.636 2.121-2.121M3 12h3m1.636-6.364 2.121 2.121"/></svg>'
+                      + '<span style="font-size:0.72rem;color:#c2410c;font-weight:500;">Verificando archivo asociado...</span>'
+                      + '</div>';
                 info.innerHTML = html;
+
+                // Check PDF en paralelo sin bloquear la validación
+                var urlVerificarPdf = '{{ route("admin.sicd.verificar.pdf") }}?codigo=' + encodeURIComponent(codigo);
+                var urlPdf = '{{ route("admin.sicd.pdf.externo") }}?codigo=' + encodeURIComponent(codigo);
+                fetch(urlVerificarPdf)
+                    .then(function(r) { return r.json(); })
+                    .then(function(pdf) {
+                        var banner = document.getElementById('ai-pdf-banner');
+                        if (!banner) return;
+                        if (pdf.tiene_pdf) {
+                            banner.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;width:100%;">'
+                                + '<div style="display:flex;align-items:center;gap:0.45rem;">'
+                                + '<svg style="width:15px;height:15px;flex-shrink:0;color:#ea580c;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>'
+                                + '<span style="font-size:0.72rem;font-weight:700;color:#c2410c;">ARCHIVO ASOCIADO ENCONTRADO</span>'
+                                + '</div>'
+                                + '<a href="' + urlPdf + '" target="_blank" style="font-size:0.7rem;font-weight:600;background:#ea580c;color:#fff;padding:3px 12px;border-radius:5px;text-decoration:none;">Ver PDF</a>'
+                                + '</div>';
+                        } else {
+                            banner.remove();
+                        }
+                    })
+                    .catch(function() {
+                        var banner = document.getElementById('ai-pdf-banner');
+                        if (banner) banner.remove();
+                    });
             } else {
                 aiSicdValido = false;
                 hint.innerHTML = '<svg style="width:13px;height:13px;flex-shrink:0" fill="none" stroke="#dc2626" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg><span style="color:#dc2626;font-weight:600;">' + data.mensaje + '</span>';
