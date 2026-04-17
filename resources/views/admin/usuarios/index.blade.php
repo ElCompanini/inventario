@@ -92,7 +92,9 @@
                     </td>
                     <td class="px-5 py-3 text-gray-600">{{ $u->email }}</td>
                     <td class="px-5 py-3 text-center">
-                        @if($u->esAdmin())
+                        @if($u->esDev())
+                            <span style="display:inline-block; background:#fae8ff; color:#7e22ce; font-size:0.75rem; font-weight:700; padding:2px 10px; border-radius:9999px;">Super Administrador</span>
+                        @elseif($u->esAdmin())
                             <span style="display:inline-block; background:#e0e7ff; color:#3730a3; font-size:0.75rem; font-weight:700; padding:2px 10px; border-radius:9999px;">Admin</span>
                         @else
                             <span style="display:inline-block; background:#f3f4f6; color:#374151; font-size:0.75rem; font-weight:600; padding:2px 10px; border-radius:9999px;">Usuario</span>

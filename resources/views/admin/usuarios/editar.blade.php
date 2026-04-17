@@ -43,7 +43,7 @@
             <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Centro de Costo</label>
                 <select name="centro_costo" id="cc-select-editar"
-                        class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                        class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer">
                     <option value="">— Sin centro de costo —</option>
                     @foreach($centrosCosto as $cc)
                         <option value="{{ $cc }}" {{ old('centro_costo', $usuario->centro_costo) === $cc ? 'selected' : '' }}>{{ $cc }}</option>
