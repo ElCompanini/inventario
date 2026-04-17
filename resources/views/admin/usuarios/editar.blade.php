@@ -22,7 +22,7 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Email</label>
-                <input type="email" name="email" value="{{ old('email', $usuario->email) }}" required
+                <input type="text" name="email" value="{{ old('email', $usuario->email) }}" required
                        class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 @error('email') <p class="text-red-500 text-xs mt-0.5">{{ $message }}</p> @enderror
             </div>
@@ -38,13 +38,24 @@
                 </select>
                 @error('rol') <p class="text-red-500 text-xs mt-0.5">{{ $message }}</p> @enderror
             </div>
+            @php $rolAuth = auth()->user()->rol; @endphp
+            @if($rolAuth === 'dev' || $rolAuth === 'admin')
             <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Centro de Costo</label>
-                <input type="text" name="centro_costo" value="{{ old('centro_costo', $usuario->centro_costo) }}"
-                       placeholder="Ej: TIC(RAMO)"
-                       class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <select name="centro_costo" id="cc-select-editar"
+                        class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <option value="">— Sin centro de costo —</option>
+                    @foreach($centrosCosto as $cc)
+                        <option value="{{ $cc }}" {{ old('centro_costo', $usuario->centro_costo) === $cc ? 'selected' : '' }}>{{ $cc }}</option>
+                    @endforeach
+                </select>
                 @error('centro_costo') <p class="text-red-500 text-xs mt-0.5">{{ $message }}</p> @enderror
+
+                @if($rolAuth === 'dev')
+                @include('admin.usuarios._nuevo-cc-panel', ['selectId' => 'cc-select-editar'])
+                @endif
             </div>
+            @endif
         </div>
 
         {{-- Permisos: solo visibles si rol = usuario --}}

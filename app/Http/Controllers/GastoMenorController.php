@@ -99,7 +99,7 @@ class GastoMenorController extends Controller
 
         $request->validate([
             'rut_proveedor'     => ['required', 'string', 'max:20'],
-            'folio'             => ['required', 'string', 'max:50'],
+            'folio'             => ['required', 'string', 'max:50', 'unique:gastos_menores,folio'],
             'fecha_emision'     => ['required', 'date', 'before_or_equal:now'],
             'documento'         => ['required', 'file', 'mimes:pdf', 'max:10240'],
             'items'             => ['required', 'array', 'min:1'],
@@ -110,6 +110,7 @@ class GastoMenorController extends Controller
         ], [
             'rut_proveedor.required'       => 'El RUT del proveedor es obligatorio.',
             'folio.required'               => 'El folio de la boleta es obligatorio.',
+            'folio.unique'                 => 'El folio ingresado ya existe en el sistema.',
             'fecha_emision.required'       => 'La fecha de emisión es obligatoria.',
             'fecha_emision.before_or_equal'=> 'La fecha de emisión no puede ser futura.',
             'documento.mimes'              => 'El documento debe ser un archivo PDF.',

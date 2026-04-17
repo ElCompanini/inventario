@@ -40,28 +40,33 @@ class User extends Authenticatable
 
     public function esAdmin(): bool
     {
-        return $this->rol === 'admin';
+        // dev tiene todos los permisos de admin y más
+        return $this->rol === 'admin' || $this->rol === 'dev';
+    }
+
+    public function esDev(): bool
+    {
+        return $this->rol === 'dev';
     }
 
     /**
-     * Retorna el prefijo del centro de costo (antes del primer paréntesis).
-     * "TIC(RAMO)" → "TIC", "TIC" → "TIC", null → null
+     * Retorna solo las letras iniciales del centro de costo.
+     * "TIC(RAMO)" → "TIC", "TIC/83" → "TIC", "TIC" → "TIC", null → null
      */
     public function centroCostoPrefix(): ?string
     {
         if (empty($this->centro_costo)) return null;
-        return trim(preg_replace('/\(.*$/u', '', $this->centro_costo));
+        return trim(preg_replace('/[^A-Za-z].*$/u', '', $this->centro_costo));
     }
 
     /**
-     * True si el usuario tiene restricción de centro de costo
-     * (admin sin nombre "Administrador" y con centro_costo asignado).
+     * True si el usuario tiene restricción de centro de costo.
+     * Aplica a cualquier usuario con centro_costo asignado, excepto dev.
      */
     public function tieneFiltroCC(): bool
     {
-        return $this->esAdmin()
-            && $this->name !== 'Administrador'
-            && !empty($this->centro_costo);
+        if ($this->esDev()) return false;
+        return !empty($this->centro_costo);
     }
 
     public function tienePermiso(string $permiso): bool

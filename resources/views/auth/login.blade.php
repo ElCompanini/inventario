@@ -37,9 +37,9 @@
                         Correo electrónico
                     </label>
                     <input
-                        id="email" name="email" type="email"
+                        id="email" name="email" type="text"
                         value="{{ old('email') }}"
-                        required autofocus autocomplete="email"
+                        required autofocus autocomplete="username"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                                focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
                                {{ $errors->has('email') ? 'border-red-400 bg-red-50' : '' }}"

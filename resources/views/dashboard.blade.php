@@ -1499,10 +1499,27 @@ function aiValidarCodigo(codigo) {
         .then(function(data) {
             if (data.valido) {
                 aiSicdValido = true;
+                // Si se buscó por ID numérico, reemplazar el campo con el código real
+                var codigoFinal = data.codigo_resuelto || codigo;
+                if (codigoFinal !== codigo) {
+                    document.getElementById('ai-codigo-sicd').value = codigoFinal;
+                }
                 hint.innerHTML = '<svg style="width:13px;height:13px;flex-shrink:0" fill="none" stroke="#16a34a" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg><span style="color:#16a34a;font-weight:600;">Código válido en el sistema</span>';
                 document.getElementById('ai-codigo-sicd').style.borderColor = '#16a34a';
                 info.style.display = 'block';
-                var html = '<strong>Centro de costo:</strong> ' + (data.centro_costo || '—') + ' &nbsp;·&nbsp; <strong>Fecha:</strong> ' + (data.fecha || '—').trim();
+                var sicdEstadoLabels = {
+                    1: 'Ingresada', 2: 'Enviada', 3: 'Aprobada',
+                    4: 'Rechazada', 5: 'En despacho', 6: 'Recibida'
+                };
+                var fmtEstado = function(val) {
+                    var n = parseInt(val, 10);
+                    var label = sicdEstadoLabels[n] || 'Desconocido';
+                    return '<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:4px;padding:1px 6px;font-weight:600;white-space:nowrap;">' + n + ' — ' + label + '</span>';
+                };
+                var estadoGeneral = data.estado != null ? fmtEstado(data.estado) : '—';
+                var html = '<strong>Centro de costo:</strong> ' + (data.centro_costo || '—')
+                         + ' &nbsp;·&nbsp; <strong>Fecha:</strong> ' + (data.fecha || '—').trim()
+                         + ' &nbsp;·&nbsp; <strong>Estado:</strong> ' + estadoGeneral;
                 if (data.detalles && data.detalles.length > 0) {
                     html += '<div style="margin-top:0.45rem;overflow-x:auto;">';
                     html += '<table style="width:100%;border-collapse:collapse;font-size:0.7rem;">';
@@ -1513,7 +1530,6 @@ function aiValidarCodigo(codigo) {
                           + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid #bbf7d0;">Unidad</th>'
                           + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid #bbf7d0;">V. Unit.</th>'
                           + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid #bbf7d0;">Total Neto</th>'
-                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid #bbf7d0;">Estado</th>'
                           + '</tr></thead><tbody>';
                     data.detalles.forEach(function(d, i) {
                         var bg = i % 2 === 0 ? '#f0fdf4' : '#ffffff';
@@ -1524,7 +1540,6 @@ function aiValidarCodigo(codigo) {
                               + '<td style="padding:3px 6px;">' + (d.unidad || '—') + '</td>'
                               + '<td style="padding:3px 6px;text-align:right;">' + (d.valor_unitario != null ? '$' + Number(d.valor_unitario).toLocaleString('es-CL') : '—') + '</td>'
                               + '<td style="padding:3px 6px;text-align:right;">' + (d.total_neto != null ? '$' + Number(d.total_neto).toLocaleString('es-CL') : '—') + '</td>'
-                              + '<td style="padding:3px 6px;">' + (d.estado || '—') + '</td>'
                               + '</tr>';
                     });
                     html += '</tbody></table></div>';
@@ -1539,8 +1554,8 @@ function aiValidarCodigo(codigo) {
                 info.innerHTML = html;
 
                 // Check PDF en paralelo sin bloquear la validación
-                var urlVerificarPdf = '{{ route("admin.sicd.verificar.pdf") }}?codigo=' + encodeURIComponent(codigo);
-                var urlPdf = '{{ route("admin.sicd.pdf.externo") }}?codigo=' + encodeURIComponent(codigo);
+                var urlVerificarPdf = '{{ route("admin.sicd.verificar.pdf") }}?codigo=' + encodeURIComponent(codigoFinal);
+                var urlPdf = '{{ route("admin.sicd.pdf.externo") }}?codigo=' + encodeURIComponent(codigoFinal);
                 fetch(urlVerificarPdf)
                     .then(function(r) { return r.json(); })
                     .then(function(pdf) {

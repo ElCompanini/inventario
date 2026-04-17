@@ -132,7 +132,7 @@ class AdminController extends Controller
                 $q->where(function ($q2) {
                     $q2->where('origen', '!=', 'sicd')->orWhereNull('origen');
                 })->orWhereHas('sicd', function ($q2) use ($prefix) {
-                    $q2->where('codigo_sicd', 'LIKE', $prefix . '(%');
+                    $q2->whereRaw("REGEXP_REPLACE(codigo_sicd, '[^A-Za-z].*', '') = ?", [$prefix]);
                 });
             });
         }
@@ -300,6 +300,16 @@ class AdminController extends Controller
         }
         if (!$sicdExterno) {
             return back()->with('error', "El código SICD \"{$codigoSicd}\" no existe en el sistema externo. Verifica el número e inténtalo de nuevo.");
+        }
+
+        // Verificar que el código pertenezca al centro de costo del usuario
+        $user = auth()->user();
+        if ($user->tieneFiltroCC()) {
+            $prefix  = $user->centroCostoPrefix();
+            $prefijo = strtoupper(trim(preg_replace('/[^A-Za-z].*$/u', '', $codigoSicd)));
+            if ($prefijo !== strtoupper($prefix)) {
+                return back()->with('error', "El código SICD \"{$codigoSicd}\" no pertenece a tu centro de costo ({$prefix}).");
+            }
         }
         $descripcion = $request->input('descripcion');
 

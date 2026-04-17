@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CentroCosto;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -17,25 +18,34 @@ class UsuarioController extends Controller
 
     public function create()
     {
-        return view('admin.usuarios.crear');
+        $centrosCosto = CentroCosto::orderBy('nombre')->pluck('nombre');
+        return view('admin.usuarios.crear', compact('centrosCosto'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
             'name'         => 'required|string|max:255',
-            'email'        => 'required|email|unique:users,email',
+            'email'        => 'required|string|max:255|unique:users,email',
             'password'     => 'required|string|min:6|confirmed',
             'rol'          => 'required|in:admin,usuario',
             'centro_costo' => 'nullable|string|max:100',
         ]);
+
+        $authUser = auth()->user();
+        $cc = ($authUser->esDev() || $authUser->esAdmin()) ? (trim($data['centro_costo'] ?? '') ?: null) : null;
+
+        // Si dev escribe un centro de costo nuevo, guardarlo en la tabla
+        if ($cc && $authUser->esDev()) {
+            CentroCosto::firstOrCreate(['nombre' => strtoupper($cc)]);
+        }
 
         User::create([
             'name'         => $data['name'],
             'email'        => $data['email'],
             'password'     => Hash::make($data['password']),
             'rol'          => $data['rol'],
-            'centro_costo' => $data['centro_costo'] ?? null,
+            'centro_costo' => $cc,
         ]);
 
         return redirect()->route('admin.usuarios.index')
@@ -44,8 +54,9 @@ class UsuarioController extends Controller
 
     public function edit(int $id)
     {
-        $usuario = User::findOrFail($id);
-        return view('admin.usuarios.editar', compact('usuario'));
+        $usuario      = User::findOrFail($id);
+        $centrosCosto = CentroCosto::orderBy('nombre')->pluck('nombre');
+        return view('admin.usuarios.editar', compact('usuario', 'centrosCosto'));
     }
 
     public function update(Request $request, int $id)
@@ -55,7 +66,7 @@ class UsuarioController extends Controller
 
         $data = $request->validate([
             'name'         => 'required|string|max:255',
-            'email'        => 'required|email|unique:users,email,' . $id,
+            'email'        => 'required|string|max:255|unique:users,email,' . $id,
             'rol'          => 'required|in:admin,usuario',
             'centro_costo' => 'nullable|string|max:100',
         ]);
@@ -63,7 +74,15 @@ class UsuarioController extends Controller
         $usuario->name         = $data['name'];
         $usuario->email        = $data['email'];
         $usuario->rol          = $data['rol'];
-        $usuario->centro_costo = $data['centro_costo'] ?? null;
+        $authUser = auth()->user();
+        if ($authUser->esDev() || $authUser->esAdmin()) {
+            $cc = trim($data['centro_costo'] ?? '') ?: null;
+            // Si dev escribe un valor nuevo, guardarlo en la tabla
+            if ($cc && $authUser->esDev()) {
+                CentroCosto::firstOrCreate(['nombre' => strtoupper($cc)]);
+            }
+            $usuario->centro_costo = $cc;
+        }
 
         // Permisos: solo si rol es usuario (admin tiene todo)
         if ($data['rol'] === 'usuario') {

@@ -11,6 +11,7 @@ use App\Http\Controllers\OrdenCompraController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\RetiroController;
 use App\Http\Controllers\UsuarioController;
+use App\Http\Controllers\CentroCostoController;
 use App\Http\Controllers\GastoMenorController;
 
 // Raíz → login
@@ -85,6 +86,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/ordenes/{id}/descargar-factura', [OrdenCompraController::class, 'descargarFactura'])->name('ordenes.factura.descargar');
     Route::get('/ordenes/{id}/descargar-guia', [OrdenCompraController::class, 'descargarGuia'])->name('ordenes.guia.descargar');
     Route::get('/ordenes/{id}/descargar', [OrdenCompraController::class, 'descargarOc'])->name('ordenes.descargar');
+
+    // Centros de Costo (solo dev)
+    Route::get('/centros-costo/verificar', [CentroCostoController::class, 'verificar'])->name('dev.centros-costo.verificar');
+    Route::post('/centros-costo', [CentroCostoController::class, 'store'])->name('dev.centros-costo.store');
 
     // Usuarios
     Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');

@@ -18,14 +18,19 @@ class SicdController extends Controller
 {
     public function validarCodigo(Request $request)
     {
-        $codigo = trim($request->query('codigo', ''));
+        $input = trim($request->query('codigo', ''));
 
-        if ($codigo === '') {
+        if ($input === '') {
             return response()->json(['valido' => false, 'mensaje' => 'Ingresa un código.']);
         }
 
         try {
-            $solicitud = SicdExterno::buscar($codigo);
+            // Si el input es numérico, buscar por id; si no, por num_int_sol
+            if (ctype_digit($input)) {
+                $solicitud = SicdExterno::find((int) $input);
+            } else {
+                $solicitud = SicdExterno::buscar($input);
+            }
         } catch (\Exception) {
             return response()->json(['valido' => false, 'mensaje' => 'No se pudo conectar al sistema externo.']);
         }
@@ -34,19 +39,33 @@ class SicdController extends Controller
             return response()->json(['valido' => false, 'mensaje' => 'Código SICD no encontrado en el sistema.']);
         }
 
+        // El código real siempre es num_int_sol del registro encontrado
+        $codigoReal = $solicitud->num_int_sol;
+
+        // Filtro por centro de costo: usar el prefijo del código real
+        $user = auth()->user();
+        if ($user && $user->tieneFiltroCC()) {
+            $prefix  = strtoupper($user->centroCostoPrefix());
+            $prefijo = strtoupper(trim(preg_replace('/[^A-Za-z].*$/u', '', $codigoReal)));
+            if ($prefijo !== $prefix) {
+                return response()->json(['valido' => false, 'mensaje' => "Este código no pertenece a tu centro de costo ({$prefix})."]);
+            }
+        }
+
         $detalles = DB::connection('sicd_externa')
             ->table('detalle_solicitud')
-            ->where('num_int_sol_comp', $codigo)
+            ->where('num_int_sol_comp', $codigoReal)
             ->select('item_presup', 'cantidad', 'unidad', 'detalle', 'valor_unitario', 'total_neto', 'estado')
             ->get();
 
         return response()->json([
-            'valido'        => true,
-            'mensaje'       => 'Código válido.',
-            'centro_costo'  => $solicitud->centro_costo,
-            'estado'        => $solicitud->estado,
-            'fecha'         => $solicitud->fecha_creacion,
-            'detalles'      => $detalles,
+            'valido'          => true,
+            'mensaje'         => 'Código válido.',
+            'codigo_resuelto' => $codigoReal,
+            'centro_costo'    => $solicitud->centro_costo,
+            'estado'          => $solicitud->estado,
+            'fecha'           => $solicitud->fecha_creacion,
+            'detalles'        => $detalles,
         ]);
     }
 
@@ -98,7 +117,8 @@ class SicdController extends Controller
 
         if ($user->tieneFiltroCC()) {
             $prefix = $user->centroCostoPrefix();
-            $query->where('codigo_sicd', 'LIKE', $prefix . '(%');
+            // Extrae solo las letras iniciales del codigo_sicd (ignora paréntesis, / y números)
+            $query->whereRaw("REGEXP_REPLACE(codigo_sicd, '[^A-Za-z].*', '') = ?", [$prefix]);
         }
 
         $sicds = $query->paginate(20);
