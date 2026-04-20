@@ -127,6 +127,7 @@
                 <td class="px-4 py-3 text-gray-700">{{ $primero->aprobado_por ?? '—' }}</td>
                 <td class="px-4 py-3">
                     @if($primero->origen === 'sicd')
+                        <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                         @if(auth()->user()->tienePermiso('sicd'))
                         <a href="{{ route('admin.sicd.show', $primero->origen_id) }}"
                            class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-indigo-200 transition">
@@ -137,6 +138,13 @@
                             {{ $primero->sicd?->codigo_sicd ?? 'SICD #' . $primero->origen_id }}
                         </span>
                         @endif
+                        @if($primero->sicd?->archivo_blob || $primero->sicd?->archivo_ruta)
+                        <a href="{{ route('admin.sicd.descargar', $primero->origen_id) }}"
+                           class="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition whitespace-nowrap">
+                            Ver boleta
+                        </a>
+                        @endif
+                        </div>
                     @elseif($primero->origen === 'solicitud')
                         <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">
                             Solicitud #{{ $primero->origen_id }}
@@ -197,6 +205,7 @@
                 <td class="px-4 py-3 text-gray-700">{{ $registro->aprobado_por ?? '—' }}</td>
                 <td class="px-4 py-3">
                     @if($registro->origen === 'sicd')
+                    <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                     @if(auth()->user()->tienePermiso('sicd'))
                     <a href="{{ route('admin.sicd.show', $registro->origen_id) }}"
                         class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-indigo-200 transition">
@@ -207,6 +216,13 @@
                         {{ $registro->sicd?->codigo_sicd ?? 'SICD #' . $registro->origen_id }}
                     </span>
                     @endif
+                    @if($registro->sicd?->archivo_blob || $registro->sicd?->archivo_ruta)
+                    <a href="{{ route('admin.sicd.descargar', $registro->origen_id) }}"
+                       class="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition whitespace-nowrap">
+                        Ver boleta
+                    </a>
+                    @endif
+                    </div>
                     @elseif($registro->origen === 'solicitud')
                     <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">
                         Solicitud #{{ $registro->origen_id }}

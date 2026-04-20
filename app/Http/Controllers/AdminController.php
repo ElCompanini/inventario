@@ -510,31 +510,28 @@ class AdminController extends Controller
         $actualizados = 0;
 
         if ($codigoSicd) {
-            // Crear el registro SICD primero para garantizar que siempre quede en la BD
+            $archivoNombre = '';
+            $archivoBlob   = null;
+            $archivoMime   = null;
+
+            if (!$vincularOc && $boletaTempRuta && Storage::disk('local')->exists($boletaTempRuta)) {
+                $rutaAbsoluta  = Storage::disk('local')->path($boletaTempRuta);
+                $archivoNombre = $boletaNombre ?? basename($boletaTempRuta);
+                $archivoBlob   = base64_encode(file_get_contents($rutaAbsoluta));
+                $archivoMime   = mime_content_type($rutaAbsoluta) ?: 'application/octet-stream';
+                Storage::disk('local')->delete($boletaTempRuta);
+            }
+
             $sicd = Sicd::create([
                 'codigo_sicd'    => $codigoSicd,
-                'archivo_nombre' => '',
+                'archivo_nombre' => $archivoNombre,
                 'archivo_ruta'   => '',
+                'archivo_blob'   => $archivoBlob,
+                'archivo_mime'   => $archivoMime,
                 'descripcion'    => $descripcion,
                 'estado'         => $vincularOc ? 'pendiente' : 'recibido',
                 'usuario_id'     => Auth::id(),
             ]);
-
-            // Mover la boleta después de crear el registro
-            if (!$vincularOc && $boletaTempRuta && Storage::disk('local')->exists($boletaTempRuta)) {
-                try {
-                    $safeName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $codigoSicd);
-                    $ext      = pathinfo($boletaNombre ?? 'boleta.pdf', PATHINFO_EXTENSION) ?: 'pdf';
-                    Storage::disk('local')->makeDirectory('documentos/sicd');
-                    $destino  = 'documentos/sicd/' . strtolower($safeName) . '_boleta.' . $ext;
-                    Storage::disk('local')->move($boletaTempRuta, $destino);
-                    $sicd->archivo_ruta   = $destino;
-                    $sicd->archivo_nombre = $boletaNombre ?? basename($destino);
-                    $sicd->save();
-                } catch (\Throwable) {
-                    // El registro SICD ya está creado; el archivo no se pudo mover
-                }
-            }
         }
 
         DB::transaction(function () use ($items, $motivo, $sicd, $vincularOc, &$actualizados) {
@@ -652,14 +649,20 @@ class AdminController extends Controller
         if ($codigoSicd) {
             $archivoNombre = '';
             $archivoRuta   = '';
+            $archivoBlob   = null;
+            $archivoMime   = null;
             if (!$vincularOc && $request->hasFile('boleta_sicd')) {
-                $archivoNombre = $request->file('boleta_sicd')->getClientOriginalName();
-                $archivoRuta   = $request->file('boleta_sicd')->store('documentos/sicd', 'local');
+                $file          = $request->file('boleta_sicd');
+                $archivoNombre = $file->getClientOriginalName();
+                $archivoBlob   = base64_encode(file_get_contents($file->getRealPath()));
+                $archivoMime   = $file->getMimeType();
             }
             $sicd = Sicd::create([
                 'codigo_sicd'    => $codigoSicd,
                 'archivo_nombre' => $archivoNombre,
                 'archivo_ruta'   => $archivoRuta,
+                'archivo_blob'   => $archivoBlob,
+                'archivo_mime'   => $archivoMime,
                 'descripcion'    => $descripcion,
                 'estado'         => $vincularOc ? 'pendiente' : 'recibido',
                 'usuario_id'     => Auth::id(),

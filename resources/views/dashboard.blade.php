@@ -1087,6 +1087,7 @@ function escHtmlGm(str) {
 @push('head')
 <style>
     @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes ai-spin { to { transform: rotate(360deg); } }
     @keyframes btn-breathe-green { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.7)} 50%{box-shadow:0 0 0 6px rgba(22,163,74,0)} }
     @keyframes btn-breathe-blue  { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.7)} 50%{box-shadow:0 0 0 6px rgba(37,99,235,0)} }
     @keyframes btn-breathe-red   { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.7)} 50%{box-shadow:0 0 0 6px rgba(220,38,38,0)} }
@@ -1537,16 +1538,116 @@ function aiToggleBoleta(panel) {
 }
 
 function aiEnlazarSolicitud() {
+    var btn = document.getElementById('ai-btn-enlazar');
+    if (!btn) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:5px;">'
+        + '<svg style="width:13px;height:13px;animation:ai-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>'
+        + 'Enlazando...</span>';
+
+    function doPost(enlazarUrl, sicdUrl) {
+        fetch(enlazarUrl, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Accept': 'application/json',
+            }
+        })
+        .then(function(r) {
+            if (!r.ok) return r.json().then(function(e) { throw new Error(e.msg || 'HTTP ' + r.status); });
+            return r.json();
+        })
+        .then(function(res) {
+            btn.disabled = false;
+            if (res.ok) {
+                if (sicdUrl) {
+                    var link = document.createElement('a');
+                    link.href = sicdUrl;
+                    link.target = '_blank';
+                    link.textContent = '✓ Ver SICD';
+                    link.style.cssText = 'font-size:0.7rem;font-weight:600;background:#dcfce7;color:#166534;padding:3px 12px;border-radius:5px;text-decoration:none;';
+                    btn.replaceWith(link);
+                } else {
+                    btn.innerHTML = '✓ Documento enlazado';
+                    btn.style.cssText += ';background:#dcfce7;color:#166534;cursor:default;';
+                }
+            } else {
+                btn.textContent = 'Enlazar documento';
+                btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
+                setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar documento'; btn.disabled = false; }, 3000);
+            }
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = 'Error: ' + (e.message || 'conexión');
+            btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
+            setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar documento'; }, 4000);
+        });
+    }
+
+    // Si la URL ya fue resuelta por el pre-fetch, usar directamente
+    if (window._aiEnlazarUrl) {
+        doPost(window._aiEnlazarUrl, window._aiSicdUrl);
+        return;
+    }
+
+    // Si no (SICD no existe aún), intentar buscar primero y si sigue sin existir, crear y enlazar
     var codigo = window._aiEnlazarCodigo;
-    if (!codigo) return;
+    if (!codigo) {
+        btn.disabled = false; btn.textContent = 'Enlazar documento';
+        return;
+    }
     fetch('{{ route("admin.sicd.buscar-por-codigo") }}?codigo=' + encodeURIComponent(codigo))
         .then(function(r) { return r.json(); })
         .then(function(d) {
             if (d.encontrado) {
-                window.location = d.url;
-            } else {
-                alert('No existe una solicitud interna registrada con el código ' + codigo + '.');
+                window._aiEnlazarUrl = d.enlazar_url;
+                window._aiSicdUrl    = d.url;
+                doPost(d.enlazar_url, d.url);
+                return;
             }
+            // No existe: crear SICD y enlazar en un solo paso
+            var fd = new FormData();
+            fd.append('codigo', codigo);
+            fetch('{{ route("admin.sicd.crear-y-enlazar") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'application/json',
+                },
+                body: fd,
+            })
+            .then(function(r) {
+                if (!r.ok) return r.json().then(function(e) { throw new Error(e.msg || 'HTTP ' + r.status); });
+                return r.json();
+            })
+            .then(function(res) {
+                btn.disabled = false;
+                if (res.ok) {
+                    window._aiSicdUrl = res.url;
+                    var link = document.createElement('a');
+                    link.href = res.url;
+                    link.target = '_blank';
+                    link.textContent = '✓ Ver SICD';
+                    link.style.cssText = 'font-size:0.7rem;font-weight:600;background:#dcfce7;color:#166534;padding:3px 12px;border-radius:5px;text-decoration:none;';
+                    btn.replaceWith(link);
+                } else {
+                    btn.textContent = 'Error: ' + (res.msg || 'desconocido');
+                    btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
+                    setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar documento'; btn.disabled = false; }, 4000);
+                }
+            })
+            .catch(function(e) {
+                btn.disabled = false;
+                btn.textContent = 'Error: ' + (e.message || 'conexión');
+                btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
+                setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar documento'; }, 4000);
+            });
+        })
+        .catch(function() {
+            btn.disabled = false; btn.textContent = 'Error de conexión';
+            setTimeout(function() { btn.textContent = 'Enlazar documento'; }, 3000);
         });
 }
 
@@ -1632,17 +1733,43 @@ function aiValidarCodigo(codigo) {
                         var banner = document.getElementById('ai-pdf-banner');
                         if (!banner) return;
                         if (pdf.tiene_pdf) {
-                            window._aiEnlazarCodigo = codigoFinal;
-                            banner.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;width:100%;">'
-                                + '<div style="display:flex;align-items:center;gap:0.45rem;">'
-                                + '<svg style="width:15px;height:15px;flex-shrink:0;color:#ea580c;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>'
-                                + '<span style="font-size:0.72rem;font-weight:700;color:#c2410c;">ARCHIVO ASOCIADO ENCONTRADO</span>'
-                                + '</div>'
-                                + '<div style="display:flex;gap:0.4rem;align-items:center;">'
-                                + '<a href="' + urlPdf + '" target="_blank" style="font-size:0.7rem;font-weight:600;background:#ea580c;color:#fff;padding:3px 12px;border-radius:5px;text-decoration:none;">Ver PDF</a>'
-                                + '<button onclick="aiEnlazarSolicitud()" style="font-size:0.7rem;font-weight:600;background:#e0e7ff;color:#3730a3;padding:3px 12px;border-radius:5px;border:none;cursor:pointer;">Enlazar a la solicitud</button>'
-                                + '</div>'
-                                + '</div>';
+                            // Mostrar banner con botón siempre; resolver URL al hacer clic
+                                window._aiEnlazarCodigo = codigoFinal;
+                                window._aiEnlazarUrl    = null;
+                                window._aiSicdUrl       = null;
+
+                                // Pre-buscar SICD pero sin bloquear el banner
+                                fetch('{{ route("admin.sicd.buscar-por-codigo") }}?codigo=' + encodeURIComponent(codigoFinal))
+                                    .then(function(r) { return r.json(); })
+                                    .then(function(sicdData) {
+                                        if (sicdData.encontrado) {
+                                            window._aiEnlazarUrl = sicdData.enlazar_url;
+                                            window._aiSicdUrl    = sicdData.url;
+                                            if (sicdData.ya_enlazado) {
+                                                var btn = document.getElementById('ai-btn-enlazar');
+                                                if (btn) {
+                                                    var link = document.createElement('a');
+                                                    link.href = sicdData.url;
+                                                    link.target = '_blank';
+                                                    link.textContent = '✓ Ver SICD enlazado';
+                                                    link.style.cssText = 'font-size:0.7rem;font-weight:600;background:#dcfce7;color:#166534;padding:3px 12px;border-radius:5px;text-decoration:none;';
+                                                    btn.replaceWith(link);
+                                                }
+                                            }
+                                        }
+                                    })
+                                    .catch(function() {});
+
+                                banner.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;width:100%;">'
+                                    + '<div style="display:flex;align-items:center;gap:0.45rem;">'
+                                    + '<svg style="width:15px;height:15px;flex-shrink:0;color:#ea580c;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>'
+                                    + '<span style="font-size:0.72rem;font-weight:700;color:#c2410c;">ARCHIVO ASOCIADO ENCONTRADO</span>'
+                                    + '</div>'
+                                    + '<div style="display:flex;gap:0.4rem;align-items:center;">'
+                                    + '<a href="' + urlPdf + '" target="_blank" style="font-size:0.7rem;font-weight:600;background:#ea580c;color:#fff;padding:3px 12px;border-radius:5px;text-decoration:none;">Ver PDF</a>'
+                                    + '<button id="ai-btn-enlazar" onclick="aiEnlazarSolicitud()" style="font-size:0.7rem;font-weight:600;background:#e0e7ff;color:#3730a3;padding:3px 12px;border-radius:5px;border:none;cursor:pointer;">Enlazar documento</button>'
+                                    + '</div>'
+                                    + '</div>';
                         } else {
                             banner.remove();
                         }

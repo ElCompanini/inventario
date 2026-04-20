@@ -288,16 +288,22 @@ class SicdController extends Controller
 
     private function crearSicd(string $codigo, string $nombreOriginal, string $rutaTemp, ?string $descripcion, array $items)
     {
-        // Mover archivo de temp a ubicación final
-        $rutaFinal = 'documentos/sicd/' . basename($rutaTemp);
-        if (Storage::disk('local')->exists($rutaTemp) && $rutaTemp !== $rutaFinal) {
-            Storage::disk('local')->move($rutaTemp, $rutaFinal);
+        // Leer blob antes de mover/eliminar el archivo temporal
+        $archivoBlob = null;
+        $archivoMime = null;
+        if (Storage::disk('local')->exists($rutaTemp)) {
+            $rutaAbsoluta = Storage::disk('local')->path($rutaTemp);
+            $archivoBlob  = base64_encode(file_get_contents($rutaAbsoluta));
+            $archivoMime  = mime_content_type($rutaAbsoluta) ?: 'application/octet-stream';
+            Storage::disk('local')->delete($rutaTemp);
         }
 
         $sicd = Sicd::create([
             'codigo_sicd'    => $codigo,
             'archivo_nombre' => $nombreOriginal,
-            'archivo_ruta'   => $rutaFinal,
+            'archivo_ruta'   => '',
+            'archivo_blob'   => $archivoBlob,
+            'archivo_mime'   => $archivoMime,
             'descripcion'    => $descripcion,
             'estado'         => 'pendiente',
             'usuario_id'     => Auth::id(),
@@ -430,17 +436,23 @@ class SicdController extends Controller
             $items[] = $item;
         }
 
-        // Mover archivo a ubicación final
-        $rutaFinal = 'documentos/sicd/' . basename($rutaSicdTemp);
+        // Leer blob del archivo temporal antes de eliminarlo
+        $archivoBlob = null;
+        $archivoMime = null;
         if (Storage::disk('local')->exists($rutaSicdTemp)) {
-            Storage::disk('local')->move($rutaSicdTemp, $rutaFinal);
+            $rutaAbsoluta = Storage::disk('local')->path($rutaSicdTemp);
+            $archivoBlob  = base64_encode(file_get_contents($rutaAbsoluta));
+            $archivoMime  = mime_content_type($rutaAbsoluta) ?: 'application/octet-stream';
+            Storage::disk('local')->delete($rutaSicdTemp);
         }
 
-        DB::transaction(function () use ($codigo, $nombreOriginal, $rutaFinal, $data, $items) {
+        DB::transaction(function () use ($codigo, $nombreOriginal, $archivoBlob, $archivoMime, $data, $items) {
             $sicd = Sicd::create([
                 'codigo_sicd'    => $codigo,
                 'archivo_nombre' => $nombreOriginal,
-                'archivo_ruta'   => $rutaFinal,
+                'archivo_ruta'   => '',
+                'archivo_blob'   => $archivoBlob,
+                'archivo_mime'   => $archivoMime,
                 'descripcion'    => $data['descripcion'] ?? null,
                 'estado'         => 'recibido',
                 'usuario_id'     => Auth::id(),
@@ -500,26 +512,155 @@ class SicdController extends Controller
     {
         $sicd = Sicd::findOrFail($id);
 
-        if (empty($sicd->archivo_ruta) || !Storage::disk('local')->exists($sicd->archivo_ruta)) {
-            return back()->with('error', 'El archivo no está disponible en el servidor.');
+        // Preferir blob almacenado en BD
+        if ($sicd->archivo_blob) {
+            $contenido = base64_decode($sicd->archivo_blob);
+            $mime      = $sicd->archivo_mime ?: 'application/octet-stream';
+            $nombre    = $sicd->archivo_nombre ?: 'boleta';
+            return response($contenido, 200)
+                ->header('Content-Type', $mime)
+                ->header('Content-Disposition', 'inline; filename="' . $nombre . '"')
+                ->header('Content-Length', strlen($contenido));
         }
 
-        return Storage::disk('local')->download($sicd->archivo_ruta, $sicd->archivo_nombre ?: basename($sicd->archivo_ruta));
+        // Fallback: archivo en filesystem (registros anteriores)
+        if (!empty($sicd->archivo_ruta) && Storage::disk('local')->exists($sicd->archivo_ruta)) {
+            return Storage::disk('local')->download($sicd->archivo_ruta, $sicd->archivo_nombre ?: basename($sicd->archivo_ruta));
+        }
+
+        return back()->with('error', 'El archivo no está disponible.');
     }
 
     public function buscarPorCodigo(Request $request)
     {
         $codigo = strtoupper(trim($request->query('codigo', '')));
-        $sicd   = Sicd::where('codigo_sicd', $codigo)->latest()->first();
+
+        // Prefer the record that still doesn't have documento_blob
+        $sicd = Sicd::where('codigo_sicd', $codigo)->whereNull('documento_blob')->latest()->first()
+             ?? Sicd::where('codigo_sicd', $codigo)->latest()->first();
 
         if (!$sicd) {
             return response()->json(['encontrado' => false]);
         }
 
         return response()->json([
-            'encontrado' => true,
-            'url'        => route('admin.sicd.show', $sicd->id),
+            'encontrado'    => true,
+            'id'            => $sicd->id,
+            'ya_enlazado'   => !empty($sicd->documento_blob),
+            'url'           => route('admin.sicd.show', $sicd->id),
+            'enlazar_url'   => route('admin.sicd.enlazar-pdf', $sicd->id),
         ]);
+    }
+
+    public function crearYEnlazar(Request $request)
+    {
+        $codigo = strtoupper(trim($request->input('codigo', '')));
+        if ($codigo === '') {
+            return response()->json(['ok' => false, 'msg' => 'Código requerido.'], 422);
+        }
+
+        // Verificar que el código existe en el sistema externo
+        try {
+            $externa = SicdExterno::buscar($codigo);
+        } catch (\Exception $e) {
+            return response()->json(['ok' => false, 'msg' => 'No se pudo conectar al sistema externo.'], 500);
+        }
+        if (!$externa) {
+            return response()->json(['ok' => false, 'msg' => 'Código no encontrado en el sistema externo.'], 404);
+        }
+
+        // Obtener o crear el SICD en la BD interna
+        $sicd = Sicd::where('codigo_sicd', $codigo)->whereNull('documento_blob')->latest()->first()
+             ?? Sicd::where('codigo_sicd', $codigo)->latest()->first();
+
+        if (!$sicd) {
+            $sicd = Sicd::create([
+                'codigo_sicd'    => $codigo,
+                'archivo_nombre' => '',
+                'archivo_ruta'   => '',
+                'estado'         => 'pendiente',
+                'usuario_id'     => Auth::id(),
+            ]);
+        }
+
+        // Enlazar PDF si aún no tiene
+        if (!$sicd->documento_blob) {
+            try {
+                $pdf = SicdExterno::obtenerPdf($codigo);
+            } catch (\Exception $e) {
+                return response()->json(['ok' => false, 'msg' => 'Error al obtener el PDF externo.'], 500);
+            }
+
+            if (!$pdf) {
+                return response()->json(['ok' => false, 'msg' => 'No se encontró PDF en el sistema externo.'], 404);
+            }
+
+            try {
+                \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
+                \DB::table('sicds')->where('id', $sicd->id)->update([
+                    'documento_blob' => base64_encode($pdf),
+                    'documento_mime' => 'application/pdf',
+                    'updated_at'     => now(),
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('crearYEnlazar: error guardando blob', ['id' => $sicd->id, 'error' => $e->getMessage()]);
+                return response()->json(['ok' => false, 'msg' => 'Error al guardar el documento.'], 500);
+            }
+        }
+
+        return response()->json([
+            'ok'  => true,
+            'id'  => $sicd->id,
+            'url' => route('admin.sicd.show', $sicd->id),
+        ]);
+    }
+
+    public function enlazarPdf(int $id)
+    {
+        $sicd = Sicd::findOrFail($id);
+
+        if ($sicd->documento_blob) {
+            return response()->json(['ok' => true, 'ya_tenia' => true, 'msg' => 'Ya tiene documento SICD enlazado.']);
+        }
+
+        try {
+            $pdf = SicdExterno::obtenerPdf($sicd->codigo_sicd);
+        } catch (\Exception $e) {
+            \Log::error('enlazarPdf: error externo', ['id' => $id, 'error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'msg' => 'No se pudo conectar al sistema externo: ' . $e->getMessage()], 500);
+        }
+
+        if (!$pdf) {
+            return response()->json(['ok' => false, 'msg' => 'No se encontró PDF en el sistema externo para "' . $sicd->codigo_sicd . '".'], 404);
+        }
+
+        try {
+            $blob = base64_encode($pdf);
+            \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
+            \DB::table('sicds')->where('id', $id)->update([
+                'documento_blob' => $blob,
+                'documento_mime' => 'application/pdf',
+                'updated_at'     => now(),
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('enlazarPdf: error guardando blob', ['id' => $id, 'error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'msg' => 'Error al guardar el documento: ' . $e->getMessage()], 500);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function verDocumento(int $id)
+    {
+        $sicd = Sicd::findOrFail($id);
+        abort_unless($sicd->documento_blob, 404);
+
+        $contenido = base64_decode($sicd->documento_blob);
+        $nombre    = $sicd->codigo_sicd . '.pdf';
+        return response($contenido, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="' . $nombre . '"')
+            ->header('Content-Length', strlen($contenido));
     }
 
     public function descargarExterno(int $id)

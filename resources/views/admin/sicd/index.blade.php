@@ -57,7 +57,7 @@
                     <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ $sicd->created_at->format('d/m/Y H:i') }}</td>
                     <td class="px-4 py-3 text-right">
                         <div class="flex items-center justify-end gap-3">
-                            @if($sicd->archivo_ruta)
+                            @if($sicd->archivo_blob || $sicd->archivo_ruta)
                                 <a href="{{ route('admin.sicd.descargar', $sicd->id) }}"
                                    class="text-xs font-medium text-gray-500 hover:text-gray-700 transition whitespace-nowrap">
                                     Ver boleta

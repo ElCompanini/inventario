@@ -39,27 +39,39 @@
                 </div>
             </div>
 
-            @if($sicd->archivo_ruta)
-            <div class="px-5 py-4 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                    </div>
-                    <p class="text-sm font-medium text-gray-800">{{ $sicd->archivo_nombre }}</p>
-                </div>
-                <a href="{{ route('admin.sicd.descargar', $sicd->id) }}"
-                   class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                    </svg>
-                    Descargar
-                </a>
+            @if($sicd->documento_blob)
+            {{-- PDF externo enlazado --}}
+            <div class="px-5 py-4">
+                <iframe src="{{ route('admin.sicd.ver-documento', $sicd->id) }}"
+                        class="w-full rounded border border-gray-200"
+                        style="height:540px;"
+                        title="Documento SICD {{ $sicd->codigo_sicd }}">
+                </iframe>
             </div>
             @else
-            <div class="px-5 py-4">
-                <p class="text-sm text-gray-400 italic">Este SICD no tiene documento adjunto.</p>
+            <div class="px-5 py-4 flex items-center gap-4">
+                <p class="text-sm text-gray-400 italic">Sin documento SICD enlazado.</p>
+                <button id="btn-enlazar-show"
+                        onclick="enlazarDesdeShow()"
+                        class="text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-lg transition">
+                    Enlazar PDF
+                </button>
+                <span id="enlazar-show-msg" class="text-xs hidden"></span>
+            </div>
+            @endif
+
+            @if($sicd->archivo_blob || $sicd->archivo_ruta)
+            <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <p class="text-xs text-gray-500">{{ $sicd->archivo_nombre ?: 'Boleta adjunta' }}</p>
+                </div>
+                <a href="{{ route('admin.sicd.descargar', $sicd->id) }}" target="_blank"
+                   class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition">
+                    Ver boleta
+                </a>
             </div>
             @endif
         </div>
@@ -153,5 +165,50 @@
     </div>
 
 </div>
+
+@push('scripts')
+<script>
+function enlazarDesdeShow() {
+    var btn = document.getElementById('btn-enlazar-show');
+    var msg = document.getElementById('enlazar-show-msg');
+    if (!btn) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Enlazando...';
+    if (msg) { msg.className = 'text-xs text-gray-400'; msg.textContent = ''; msg.classList.remove('hidden'); }
+
+    fetch('{{ route("admin.sicd.enlazar-pdf", $sicd->id) }}', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            'Accept': 'application/json',
+        }
+    })
+    .then(function(r) {
+        if (!r.ok) {
+            return r.json().then(function(e) { throw new Error(e.msg || 'Error ' + r.status); });
+        }
+        return r.json();
+    })
+    .then(function(res) {
+        if (res.ok) {
+            if (msg) { msg.className = 'text-xs text-green-600 font-semibold'; msg.textContent = '✓ Enlazado. Recarga para ver el PDF.'; }
+            btn.textContent = '✓ Listo';
+            btn.disabled = true;
+            btn.className = 'text-xs font-semibold bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg';
+        } else {
+            btn.disabled = false;
+            btn.textContent = 'Enlazar PDF';
+            if (msg) { msg.className = 'text-xs text-red-500'; msg.textContent = res.msg || 'Error desconocido'; }
+        }
+    })
+    .catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = 'Enlazar PDF';
+        if (msg) { msg.className = 'text-xs text-red-500'; msg.textContent = e.message || 'Error de conexión'; }
+    });
+}
+</script>
+@endpush
 
 @endsection
