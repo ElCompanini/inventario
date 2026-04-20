@@ -38,6 +38,8 @@
                     <span>{{ $sicd->created_at->format('d/m/Y H:i') }}</span>
                 </div>
             </div>
+
+            @if($sicd->archivo_ruta)
             <div class="px-5 py-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -55,9 +57,14 @@
                     Descargar
                 </a>
             </div>
+            @else
+            <div class="px-5 py-4">
+                <p class="text-sm text-gray-400 italic">Este SICD no tiene documento adjunto.</p>
+            </div>
+            @endif
         </div>
 
-        {{-- Tabla de productos (del Excel) --}}
+{{-- Tabla de productos (del Excel) --}}
         <div class="bg-white rounded-xl shadow overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100">
                 <h2 class="text-base font-semibold text-gray-700">Detalle de productos</h2>

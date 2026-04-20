@@ -10,14 +10,23 @@
     foreach ($filas as $idx => $fila) {
         if ($fila['tipo'] !== 'grupo') continue;
         $regs = $fila['registros'];
-        $h  = '<div style="padding:0.5rem 1rem 0.75rem 2.5rem;">';
-        $h .= '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">';
-        $h .= '<thead><tr style="background:#f3f4f6;">';
-        $h .= '<th style="padding:5px 10px;text-align:left;font-weight:600;color:#374151;">Producto</th>';
-        $h .= '<th style="padding:5px 10px;text-align:left;font-weight:600;color:#374151;">Contenedor</th>';
-        $h .= '<th style="padding:5px 10px;text-align:center;font-weight:600;color:#374151;">Cant.</th>';
-        $h .= '<th style="padding:5px 10px;text-align:left;font-weight:600;color:#374151;">Motivo</th>';
-        $h .= '<th style="padding:5px 10px;text-align:left;font-weight:600;color:#374151;">Aprobado por</th>';
+        $h  = '<div class="subtabla-wrap" style="border-top:1px solid #e5e7eb;background:#fafafa;">';
+        $h .= '<table class="subtabla-grupo" style="border-collapse:collapse;font-size:0.8rem;table-layout:fixed;">';
+        $h .= '<colgroup>';
+        $h .= '<col class="sg-producto">';
+        $h .= '<col class="sg-contenedor">';
+        $h .= '<col class="sg-tipo">';
+        $h .= '<col class="sg-cantidad">';
+        $h .= '<col class="sg-motivo">';
+        $h .= '<col class="sg-aprobado">';
+        $h .= '</colgroup>';
+        $h .= '<thead><tr style="background:#f1f5f9;">';
+        $h .= '<th style="padding:5px 16px;text-align:left;font-weight:600;color:#6b7280;">Producto</th>';
+        $h .= '<th style="padding:5px 16px;text-align:left;font-weight:600;color:#6b7280;">Contenedor</th>';
+        $h .= '<th style="padding:5px 0;"></th>';
+        $h .= '<th style="padding:5px 16px;text-align:left;font-weight:600;color:#6b7280;">Cant.</th>';
+        $h .= '<th style="padding:5px 16px;text-align:left;font-weight:600;color:#6b7280;">Motivo</th>';
+        $h .= '<th style="padding:5px 16px;text-align:left;font-weight:600;color:#6b7280;">Aprobado por</th>';
         $h .= '</tr></thead><tbody>';
         foreach ($regs as $r) {
             if ($r->tipo === 'entrada') {
@@ -28,14 +37,15 @@
                 $color = '#2563eb'; $signo = '';
             }
             $contNombre = $r->container?->nombre ?? ($r->contenedor_id ? 'C'.$r->contenedor_id : '—');
-            $h .= '<tr style="border-top:1px solid #f1f5f9;">';
             $prodDesc = $r->producto?->descripcion ?? $r->producto?->nombre ?? '—';
             $prodNom  = ($r->producto?->descripcion && $r->producto?->nombre) ? '<br><span style="font-size:0.7rem;color:#9ca3af;">' . e($r->producto->nombre) . '</span>' : '';
-            $h .= '<td style="padding:5px 10px;">' . e($prodDesc) . $prodNom . '</td>';
-            $h .= '<td style="padding:5px 10px;"><span style="font-size:0.72rem;background:#f3f4f6;color:#374151;padding:1px 7px;border-radius:999px;">' . e($contNombre) . '</span></td>';
-            $h .= '<td style="padding:5px 10px;text-align:center;font-weight:700;color:' . $color . ';">' . $signo . $r->cantidad . '</td>';
-            $h .= '<td style="padding:5px 10px;color:#4b5563;">' . e($r->motivo) . '</td>';
-            $h .= '<td style="padding:5px 10px;color:#6b7280;">' . e($r->aprobado_por ?? '—') . '</td>';
+            $h .= '<tr style="border-top:1px solid #f1f5f9;">';
+            $h .= '<td style="padding:6px 16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#111827;" title="' . e($prodDesc) . '">' . e($prodDesc) . $prodNom . '</td>';
+            $h .= '<td style="padding:6px 16px;"><span style="font-size:0.72rem;background:#e5e7eb;color:#374151;padding:2px 8px;border-radius:999px;">' . e($contNombre) . '</span></td>';
+            $h .= '<td style="padding:6px 0;"></td>';
+            $h .= '<td style="padding:6px 16px;font-weight:700;color:' . $color . ';">' . $signo . $r->cantidad . '</td>';
+            $h .= '<td style="padding:6px 16px;color:#4b5563;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' . e($r->motivo) . '</td>';
+            $h .= '<td style="padding:6px 16px;color:#6b7280;">' . e($r->aprobado_por ?? '—') . '</td>';
             $h .= '</tr>';
         }
         $h .= '</tbody></table></div>';
@@ -64,7 +74,7 @@
         <thead class="bg-gray-50 text-left">
             <tr>
                 <th class="px-4 py-3 font-semibold text-gray-600">Fecha</th>
-                <th class="px-4 py-3 font-semibold text-gray-600">Producto</th>
+                <th class="px-4 py-3 font-semibold text-gray-600" style="width:200px;max-width:200px;">Producto</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Contenedor</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Tipo</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Cantidad</th>
@@ -88,7 +98,7 @@
                 <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
                     {{ $primero->created_at->format('d/m/Y H:i') }}
                 </td>
-                <td class="px-4 py-3 font-medium text-indigo-700">
+                <td class="px-4 py-3 font-medium text-indigo-700" style="max-width:200px;">
                     <div style="display:flex;align-items:center;gap:0.4rem;">
                         <svg class="grupo-chevron" style="width:14px;height:14px;flex-shrink:0;transition:transform .2s;color:#818cf8;"
                              fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -152,10 +162,10 @@
                 <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
                     {{ $registro->created_at->format('d/m/Y H:i') }}
                 </td>
-                <td class="px-4 py-3">
-                    <p class="font-medium text-gray-900">{{ $registro->producto->descripcion ?? $registro->producto->nombre }}</p>
+                <td class="px-4 py-3" style="max-width:200px;">
+                    <p class="font-medium text-gray-900 truncate" title="{{ $registro->producto->descripcion ?? $registro->producto->nombre }}">{{ $registro->producto->descripcion ?? $registro->producto->nombre }}</p>
                     @if($registro->producto->descripcion)
-                        <p class="text-xs text-gray-400 mt-0.5">{{ $registro->producto->nombre }}</p>
+                        <p class="text-xs text-gray-400 mt-0.5 truncate" title="{{ $registro->producto->nombre }}">{{ $registro->producto->nombre }}</p>
                     @endif
                 </td>
                 <td class="px-4 py-3">
@@ -259,6 +269,35 @@ $(document).ready(function() {
         table.search(this.value).draw();
     });
 
+    function alinearSubtabla(childNode) {
+        const ths = document.querySelectorAll('#tabla-historial thead th');
+        // Índices en la tabla padre: 0=Fecha,1=Producto,2=Contenedor,3=Tipo,4=Cantidad,5=Motivo,6=Solicitante,7=Aprobado,8=Origen
+        const fechaW     = ths[0] ? ths[0].offsetWidth : 0;
+        const productoW  = ths[1] ? ths[1].offsetWidth : 200;
+        const contenW    = ths[2] ? ths[2].offsetWidth : 120;
+        const tipoW      = ths[3] ? ths[3].offsetWidth : 90;
+        const cantidadW  = ths[4] ? ths[4].offsetWidth : 90;
+        const motivoW    = ths[5] ? ths[5].offsetWidth : 200;
+        const aprobadoW  = ths[7] ? ths[7].offsetWidth : 120;
+
+        const sgProductoW = fechaW + productoW;
+        const totalW = sgProductoW + contenW + tipoW + cantidadW + motivoW + aprobadoW;
+
+        const wrap = childNode.querySelector('.subtabla-wrap');
+        const tbl  = childNode.querySelector('table.subtabla-grupo');
+        if (!wrap || !tbl) return;
+
+        wrap.style.paddingLeft = '0';
+        tbl.style.width = totalW + 'px';
+
+        tbl.querySelector('.sg-producto').style.width   = sgProductoW + 'px';
+        tbl.querySelector('.sg-contenedor').style.width = contenW + 'px';
+        tbl.querySelector('.sg-tipo').style.width       = tipoW + 'px';
+        tbl.querySelector('.sg-cantidad').style.width   = cantidadW + 'px';
+        tbl.querySelector('.sg-motivo').style.width     = motivoW + 'px';
+        tbl.querySelector('.sg-aprobado').style.width   = aprobadoW + 'px';
+    }
+
     // Toggle desplegable en filas de grupo
     $('#tabla-historial tbody').on('click', 'tr.fila-grupo', function () {
         const row  = table.row(this);
@@ -270,8 +309,9 @@ $(document).ready(function() {
             $(this).removeClass('shown');
             chev.style.transform = '';
         } else {
-            // Parsear el HTML como nodo DOM para que DataTables lo muestre correctamente
-            row.child($(grupoChildren[gidx])).show();
+            const childDom = $(grupoChildren[gidx]);
+            row.child(childDom).show();
+            alinearSubtabla(row.child()[0]);
             $(this).addClass('shown');
             chev.style.transform = 'rotate(90deg)';
         }

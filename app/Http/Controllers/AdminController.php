@@ -292,6 +292,14 @@ class AdminController extends Controller
         $motivo      = trim($request->input('motivo_masivo', '')) ?: 'Carga masiva de inventario';
         $codigoSicd  = strtoupper(trim($request->input('codigo_sicd', '')));
 
+        // Guardar boleta en temp si viene y no es OC
+        $boletaTempRuta   = null;
+        $boletaNombreOrig = null;
+        if (!$vincularOc && $request->hasFile('boleta_sicd')) {
+            $boletaTempRuta   = $request->file('boleta_sicd')->store('temp/boletas', 'local');
+            $boletaNombreOrig = $request->file('boleta_sicd')->getClientOriginalName();
+        }
+
         // Verificar que el código SICD exista en la BD externa
         try {
             $sicdExterno = \App\Models\SicdExterno::buscar($codigoSicd);
@@ -366,12 +374,14 @@ class AdminController extends Controller
         if (!empty($conflictos)) {
             session([
                 'carga_masiva_pendiente' => [
-                    'codigo_sicd' => $codigoSicd,
-                    'descripcion' => $descripcion,
-                    'motivo'      => $motivo,
-                    'vincular_oc' => $vincularOc,
-                    'exactos'     => $exactos,
-                    'conflictos'  => $conflictos,
+                    'codigo_sicd'        => $codigoSicd,
+                    'descripcion'        => $descripcion,
+                    'motivo'             => $motivo,
+                    'vincular_oc'        => $vincularOc,
+                    'boleta_ruta'        => $boletaTempRuta,
+                    'boleta_nombre'      => $boletaNombreOrig,
+                    'exactos'            => $exactos,
+                    'conflictos'         => $conflictos,
                 ],
             ]);
             return redirect()->route('admin.productos.carga.masiva.resolver');
@@ -380,11 +390,13 @@ class AdminController extends Controller
         // Sin conflictos → ir a asignar contenedores
         session([
             'carga_masiva_items' => [
-                'codigo_sicd' => $codigoSicd,
-                'descripcion' => $descripcion,
-                'motivo'      => $motivo,
-                'vincular_oc' => $vincularOc,
-                'items'       => $exactos,
+                'codigo_sicd'   => $codigoSicd,
+                'descripcion'   => $descripcion,
+                'motivo'        => $motivo,
+                'vincular_oc'   => $vincularOc,
+                'boleta_ruta'   => $boletaTempRuta,
+                'boleta_nombre' => $boletaNombreOrig,
+                'items'         => $exactos,
             ],
         ]);
         return redirect()->route('admin.productos.carga.masiva.contenedores');
@@ -440,11 +452,13 @@ class AdminController extends Controller
         session()->forget('carga_masiva_pendiente');
         session([
             'carga_masiva_items' => [
-                'codigo_sicd' => $pendiente['codigo_sicd'],
-                'descripcion' => $pendiente['descripcion'],
-                'motivo'      => $pendiente['motivo'],
-                'vincular_oc' => $pendiente['vincular_oc'],
-                'items'       => $items,
+                'codigo_sicd'   => $pendiente['codigo_sicd'],
+                'descripcion'   => $pendiente['descripcion'],
+                'motivo'        => $pendiente['motivo'],
+                'vincular_oc'   => $pendiente['vincular_oc'],
+                'boleta_ruta'   => $pendiente['boleta_ruta'] ?? null,
+                'boleta_nombre' => $pendiente['boleta_nombre'] ?? null,
+                'items'         => $items,
             ],
         ]);
         return redirect()->route('admin.productos.carga.masiva.contenedores');
@@ -484,16 +498,19 @@ class AdminController extends Controller
             $pendiente['codigo_sicd'],
             $pendiente['descripcion'],
             $pendiente['motivo'],
-            $pendiente['vincular_oc']
+            $pendiente['vincular_oc'],
+            $pendiente['boleta_ruta']   ?? null,
+            $pendiente['boleta_nombre'] ?? null
         );
     }
 
-    private function procesarCargaMasiva(array $items, string $codigoSicd, ?string $descripcion, string $motivo, bool $vincularOc)
+    private function procesarCargaMasiva(array $items, string $codigoSicd, ?string $descripcion, string $motivo, bool $vincularOc, ?string $boletaTempRuta = null, ?string $boletaNombre = null)
     {
         $sicd         = null;
         $actualizados = 0;
 
         if ($codigoSicd) {
+            // Crear el registro SICD primero para garantizar que siempre quede en la BD
             $sicd = Sicd::create([
                 'codigo_sicd'    => $codigoSicd,
                 'archivo_nombre' => '',
@@ -502,6 +519,22 @@ class AdminController extends Controller
                 'estado'         => $vincularOc ? 'pendiente' : 'recibido',
                 'usuario_id'     => Auth::id(),
             ]);
+
+            // Mover la boleta después de crear el registro
+            if (!$vincularOc && $boletaTempRuta && Storage::disk('local')->exists($boletaTempRuta)) {
+                try {
+                    $safeName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $codigoSicd);
+                    $ext      = pathinfo($boletaNombre ?? 'boleta.pdf', PATHINFO_EXTENSION) ?: 'pdf';
+                    Storage::disk('local')->makeDirectory('documentos/sicd');
+                    $destino  = 'documentos/sicd/' . strtolower($safeName) . '_boleta.' . $ext;
+                    Storage::disk('local')->move($boletaTempRuta, $destino);
+                    $sicd->archivo_ruta   = $destino;
+                    $sicd->archivo_nombre = $boletaNombre ?? basename($destino);
+                    $sicd->save();
+                } catch (\Throwable) {
+                    // El registro SICD ya está creado; el archivo no se pudo mover
+                }
+            }
         }
 
         DB::transaction(function () use ($items, $motivo, $sicd, $vincularOc, &$actualizados) {
@@ -610,14 +643,36 @@ class AdminController extends Controller
             'items_manual.*.cantidad.min'         => 'La cantidad debe ser al menos 1.',
         ]);
 
-        DB::transaction(function () use ($request) {
-            foreach ($request->items_manual as $item) {
-                $producto       = Producto::findOrFail($item['producto_id']);
-                $cantidad       = (int) $item['cantidad'];
-                $motivo         = trim($item['motivo'] ?? '') ?: 'Carga manual de inventario';
-                $contenedorId   = isset($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
+        $codigoSicd  = strtoupper(trim($request->input('codigo_sicd', ''))) ?: null;
+        $descripcion = trim($request->input('descripcion', '')) ?: null;
+        $vincularOc  = (bool) $request->input('vincular_oc_manual');
 
-                // Si el usuario eligió un contenedor distinto, buscar o crear el producto allí
+        // Crear registro SICD si viene con código externo
+        $sicd = null;
+        if ($codigoSicd) {
+            $archivoNombre = '';
+            $archivoRuta   = '';
+            if (!$vincularOc && $request->hasFile('boleta_sicd')) {
+                $archivoNombre = $request->file('boleta_sicd')->getClientOriginalName();
+                $archivoRuta   = $request->file('boleta_sicd')->store('documentos/sicd', 'local');
+            }
+            $sicd = Sicd::create([
+                'codigo_sicd'    => $codigoSicd,
+                'archivo_nombre' => $archivoNombre,
+                'archivo_ruta'   => $archivoRuta,
+                'descripcion'    => $descripcion,
+                'estado'         => $vincularOc ? 'pendiente' : 'recibido',
+                'usuario_id'     => Auth::id(),
+            ]);
+        }
+
+        DB::transaction(function () use ($request, $sicd, $codigoSicd) {
+            foreach ($request->items_manual as $item) {
+                $producto     = Producto::findOrFail($item['producto_id']);
+                $cantidad     = (int) $item['cantidad'];
+                $motivo       = trim($item['motivo'] ?? '') ?: ($codigoSicd ? "Carga manual – SICD {$codigoSicd}" : 'Carga manual de inventario');
+                $contenedorId = isset($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
+
                 if ($contenedorId && $contenedorId !== $producto->contenedor) {
                     $enDestino = Producto::where('descripcion', $producto->descripcion)
                         ->where('contenedor', $contenedorId)
@@ -636,6 +691,16 @@ class AdminController extends Controller
                     }
                 }
 
+                if ($sicd) {
+                    $sicd->detalles()->create([
+                        'producto_id'           => $producto->id,
+                        'nombre_producto_excel' => $producto->descripcion ?? $producto->nombre,
+                        'unidad'                => null,
+                        'cantidad_solicitada'   => $cantidad,
+                        'cantidad_recibida'     => $cantidad,
+                    ]);
+                }
+
                 $producto->stock_actual += $cantidad;
                 $producto->actualizarFechasStock();
                 $producto->save();
@@ -648,9 +713,16 @@ class AdminController extends Controller
                     'motivo'       => $motivo,
                     'aprobado_por' => Auth::user()->name,
                     'usuario_id'   => Auth::id(),
+                    'origen'       => $sicd ? 'sicd' : null,
+                    'origen_id'    => $sicd ? $sicd->id : null,
                 ]);
             }
         });
+
+        if ($sicd) {
+            return redirect()->route('admin.sicd.show', $sicd->id)
+                ->with('success', "SICD {$codigoSicd} creado y stock actualizado.");
+        }
 
         return redirect()->route('dashboard')
             ->with('success', 'Stock actualizado correctamente.');

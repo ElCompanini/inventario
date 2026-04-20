@@ -139,6 +139,20 @@ class GastoMenorController extends Controller
                 $producto->actualizarFechasStock();
                 $producto->save();
 
+                // Crear GastoMenor primero para obtener su ID real
+                $gasto = GastoMenor::create([
+                    'id_gm'         => $nextNumero,
+                    'producto_id'   => $producto->id,
+                    'user_id'       => Auth::id(),
+                    'rut_proveedor' => $request->rut_proveedor,
+                    'folio'         => $request->folio,
+                    'monto'         => $item['monto'],
+                    'cantidad'      => $item['cantidad'],
+                    'precio_neto'   => $item['precio_neto'] ?? null,
+                    'fecha_emision' => $request->fecha_emision,
+                    'documento_path'=> $rutaDoc,
+                ]);
+
                 $historial = HistorialCambio::create([
                     'producto_id'  => $producto->id,
                     'contenedor_id'=> $producto->contenedor,
@@ -148,22 +162,11 @@ class GastoMenorController extends Controller
                     'aprobado_por' => Auth::user()->name,
                     'usuario_id'   => Auth::id(),
                     'origen'       => 'gasto_menor',
-                    'origen_id'    => $nextNumero,
+                    'origen_id'    => $gasto->id,
                 ]);
 
-                GastoMenor::create([
-                    'id_gm'              => $nextNumero,
-                    'producto_id'        => $producto->id,
-                    'historial_cambio_id'=> $historial->id,
-                    'user_id'            => Auth::id(),
-                    'rut_proveedor'      => $request->rut_proveedor,
-                    'folio'              => $request->folio,
-                    'monto'              => $item['monto'],
-                    'cantidad'           => $item['cantidad'],
-                    'precio_neto'        => $item['precio_neto'] ?? null,
-                    'fecha_emision'      => $request->fecha_emision,
-                    'documento_path'     => $rutaDoc,
-                ]);
+                $gasto->historial_cambio_id = $historial->id;
+                $gasto->save();
             }
         });
 

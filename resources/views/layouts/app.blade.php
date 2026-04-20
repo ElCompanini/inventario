@@ -200,7 +200,7 @@
             </div>
             <div class="sb-footer-text flex-1 overflow-hidden" style="min-width:0;">
                 <p class="text-sm font-medium truncate leading-tight" style="color:#818cf8;">{{ $u->name }}</p>
-                <p class="text-xs text-slate-400 truncate leading-tight">{{ $u->esAdmin() ? 'Administrador' : 'Usuario' }}</p>
+                <p class="text-xs text-slate-400 truncate leading-tight">{{ $u->esDev() ? 'Super Administrador' : ($u->esAdmin() ? 'Administrador' : 'Usuario') }}</p>
             </div>
             <form method="POST" action="{{ route('logout') }}" class="sb-logout-btn flex-shrink-0">
                 @csrf

@@ -56,10 +56,18 @@
                     <td class="px-4 py-3 text-gray-600">{{ $sicd->usuario->name }}</td>
                     <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ $sicd->created_at->format('d/m/Y H:i') }}</td>
                     <td class="px-4 py-3 text-right">
-                        <a href="{{ route('admin.sicd.show', $sicd->id) }}"
-                           class="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition">
-                            Ver →
-                        </a>
+                        <div class="flex items-center justify-end gap-3">
+                            @if($sicd->archivo_ruta)
+                                <a href="{{ route('admin.sicd.descargar', $sicd->id) }}"
+                                   class="text-xs font-medium text-gray-500 hover:text-gray-700 transition whitespace-nowrap">
+                                    Ver boleta
+                                </a>
+                            @endif
+                            <a href="{{ route('admin.sicd.show', $sicd->id) }}"
+                               class="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition">
+                                Ver →
+                            </a>
+                        </div>
                     </td>
                 </tr>
             @endforeach

@@ -84,14 +84,16 @@ class UsuarioController extends Controller
             $usuario->centro_costo = $cc;
         }
 
-        // Permisos: solo si rol es usuario (admin tiene todo)
-        if ($data['rol'] === 'usuario') {
-            $permisos = array_keys(array_filter(
-                $request->only(array_keys(User::PERMISOS_DISPONIBLES))
-            ));
-            $usuario->permisos = count($permisos) ? $permisos : null;
-        } else {
-            $usuario->permisos = null;
+        // Permisos: solo dev puede modificarlos
+        if ($authUser->esDev()) {
+            if ($data['rol'] === 'usuario') {
+                $permisos = array_keys(array_filter(
+                    $request->only(array_keys(User::PERMISOS_DISPONIBLES))
+                ));
+                $usuario->permisos = count($permisos) ? $permisos : null;
+            } else {
+                $usuario->permisos = null;
+            }
         }
 
         $usuario->save();

@@ -499,6 +499,46 @@ class SicdController extends Controller
     public function descargar(int $id)
     {
         $sicd = Sicd::findOrFail($id);
-        return Storage::disk('local')->download($sicd->archivo_ruta, $sicd->archivo_nombre);
+
+        if (empty($sicd->archivo_ruta) || !Storage::disk('local')->exists($sicd->archivo_ruta)) {
+            return back()->with('error', 'El archivo no está disponible en el servidor.');
+        }
+
+        return Storage::disk('local')->download($sicd->archivo_ruta, $sicd->archivo_nombre ?: basename($sicd->archivo_ruta));
+    }
+
+    public function buscarPorCodigo(Request $request)
+    {
+        $codigo = strtoupper(trim($request->query('codigo', '')));
+        $sicd   = Sicd::where('codigo_sicd', $codigo)->latest()->first();
+
+        if (!$sicd) {
+            return response()->json(['encontrado' => false]);
+        }
+
+        return response()->json([
+            'encontrado' => true,
+            'url'        => route('admin.sicd.show', $sicd->id),
+        ]);
+    }
+
+    public function descargarExterno(int $id)
+    {
+        $sicd = Sicd::findOrFail($id);
+
+        $pdf = SicdExterno::obtenerPdf($sicd->codigo_sicd);
+
+        if (!$pdf) {
+            return back()->with('error', 'No se encontró documento PDF en el sistema externo para este SICD.');
+        }
+
+        $nombre = $sicd->codigo_sicd . '.pdf';
+        $nombre = str_replace(['/', '\\', '(', ')'], ['-', '-', '', ''], $nombre);
+
+        return response($pdf, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $nombre . '"',
+            'Content-Length'      => strlen($pdf),
+        ]);
     }
 }

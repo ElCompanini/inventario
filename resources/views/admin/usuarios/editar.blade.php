@@ -58,7 +58,8 @@
             @endif
         </div>
 
-        {{-- Permisos: solo visibles si rol = usuario --}}
+        {{-- Permisos: solo visibles para Super Administrador --}}
+        @if(auth()->user()->esDev())
         <div id="bloque-permisos" style="border-top:1px solid #e5e7eb; padding-top:0.75rem; {{ old('rol', $usuario->rol) === 'admin' ? 'display:none;' : '' }}">
             <p class="text-xs font-semibold text-gray-600 mb-1.5">Permisos</p>
             <div class="grid grid-cols-2 gap-1">
@@ -75,6 +76,7 @@
                 @endforeach
             </div>
         </div>
+        @endif
 
         <div class="flex justify-end gap-2 pt-1">
             <a href="{{ route('admin.usuarios.index') }}"
@@ -92,8 +94,8 @@
 @push('scripts')
 <script>
     document.querySelector('select[name="rol"]').addEventListener('change', function () {
-        document.getElementById('bloque-permisos').style.display =
-            this.value === 'usuario' ? '' : 'none';
+        var bloque = document.getElementById('bloque-permisos');
+        if (bloque) bloque.style.display = this.value === 'usuario' ? '' : 'none';
     });
 
     var chkAprobar     = document.querySelector('input[name="aprobar_solicitudes"]');

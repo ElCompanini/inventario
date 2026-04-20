@@ -833,6 +833,7 @@ function escHtmlGm(str) {
             </div>
 
             <form method="POST" action="" id="form-agregar-inv" enctype="multipart/form-data"
+                onsubmit="return false;"
                 data-url-local="{{ route('admin.gastos-menores.store') }}"
                 data-url-externa="{{ route('admin.sicd.recibir.directo') }}"
                 data-url-masiva="{{ route('admin.productos.carga.masiva') }}"
@@ -990,6 +991,14 @@ function escHtmlGm(str) {
                                 <input type="file" name="excel_masivo" id="ai-excel-masivo" accept=".xlsx,.xls,.csv"
                                     style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
                             </div>
+                            <div id="ai-boleta-masiva" style="display:flex; flex-direction:column; gap:0.25rem;">
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151;">
+                                    Boleta / Factura <span style="color:#ef4444;">*</span>
+                                    <span style="font-weight:400; color:#9ca3af;">(PDF)</span>
+                                </label>
+                                <input type="file" name="boleta_sicd" id="ai-boleta-masiva-input" accept=".pdf,.jpg,.jpeg,.png"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
+                            </div>
                             <div>
                                 <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
                                     Motivo general <span style="font-weight:400; color:#9ca3af;">(opcional)</span>
@@ -999,6 +1008,7 @@ function escHtmlGm(str) {
                             </div>
                             <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; padding:0.5rem 0.65rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.5rem;">
                                 <input type="checkbox" name="vincular_oc" id="ai-vincular-oc" value="1"
+                                    onchange="aiToggleBoleta('masiva')"
                                     style="width:1rem; height:1rem; accent-color:#16a34a; cursor:pointer;">
                                 <span style="font-size:0.78rem; font-weight:600; color:#166534;">
                                     Continuar con asignación a Orden de Compra
@@ -1017,6 +1027,14 @@ function escHtmlGm(str) {
                                 <div id="ai-resultados-manual"
                                     style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #e5e7eb; border-radius:0.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.1); max-height:200px; overflow-y:auto; margin-top:2px;"></div>
                             </div>
+                            <div id="ai-boleta-manual" style="display:flex; flex-direction:column; gap:0.25rem;">
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151;">
+                                    Boleta / Factura <span style="color:#ef4444;">*</span>
+                                    <span style="font-weight:400; color:#9ca3af;">(PDF)</span>
+                                </label>
+                                <input type="file" name="boleta_sicd" id="ai-boleta-manual-input" accept=".pdf,.jpg,.jpeg,.png"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
+                            </div>
                             <div id="ai-tabla-manual-wrap" style="display:none;">
                                 <table style="width:100%; font-size:0.78rem; border-collapse:collapse;">
                                     <thead>
@@ -1034,6 +1052,15 @@ function escHtmlGm(str) {
                             <p id="ai-sin-items-manual" style="font-size:0.75rem; color:#9ca3af; text-align:center; display:none;">
                                 Agrega al menos un producto para continuar.
                             </p>
+                            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; padding:0.5rem 0.65rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.5rem;">
+                                <input type="checkbox" name="vincular_oc_manual" id="ai-vincular-oc-manual" value="1"
+                                    onchange="aiToggleBoleta('manual')"
+                                    style="width:1rem; height:1rem; accent-color:#16a34a; cursor:pointer;">
+                                <span style="font-size:0.78rem; font-weight:600; color:#166534;">
+                                    Continuar con asignación a Orden de Compra
+                                </span>
+                                <span style="font-size:0.72rem; color:#4ade80; margin-left:auto;">Opcional</span>
+                            </label>
                         </div>
 
                     </div>
@@ -1464,11 +1491,28 @@ function aiEnviar() {
             if (!document.getElementById('ai-excel-masivo').files.length) {
                 alert('El archivo Excel de productos es obligatorio.'); return;
             }
+            var vincularOc = document.getElementById('ai-vincular-oc').checked;
+            if (!vincularOc && !document.getElementById('ai-boleta-masiva-input').files.length) {
+                alert('La boleta/factura es obligatoria cuando no se asigna a una Orden de Compra.'); return;
+            }
             aiForm.action = aiUrlMasiva;
         } else {
             if (aiItemsManual.length === 0) { alert('Agrega al menos un producto.'); document.getElementById('ai-buscador-manual').focus(); return; }
+            var vincularOcManual = document.getElementById('ai-vincular-oc-manual').checked;
+            if (!vincularOcManual && !document.getElementById('ai-boleta-manual-input').files.length) {
+                alert('La boleta/factura es obligatoria cuando no se asigna a una Orden de Compra.'); return;
+            }
             aiForm.action = aiUrlManual;
         }
+    }
+
+    // Deshabilitar el input de boleta del panel inactivo para que no pise el del panel activo
+    if (aiMetodoCargaActual === 'masiva') {
+        var inactivo = document.getElementById('ai-boleta-manual-input');
+        if (inactivo) inactivo.disabled = true;
+    } else {
+        var inactivo = document.getElementById('ai-boleta-masiva-input');
+        if (inactivo) inactivo.disabled = true;
     }
 
     aiForm.submit();
@@ -1479,6 +1523,32 @@ function aiEnviar() {
 var aiSicdValidTimer = null;
 var aiSicdValido = false;
 var aiUrlValidar = '{{ route('admin.sicd.validar') }}';
+
+function aiToggleBoleta(panel) {
+    if (panel === 'masiva') {
+        var chk = document.getElementById('ai-vincular-oc');
+        var box = document.getElementById('ai-boleta-masiva');
+        if (box) box.style.display = chk && chk.checked ? 'none' : 'flex';
+    } else {
+        var chk = document.getElementById('ai-vincular-oc-manual');
+        var box = document.getElementById('ai-boleta-manual');
+        if (box) box.style.display = chk && chk.checked ? 'none' : 'flex';
+    }
+}
+
+function aiEnlazarSolicitud() {
+    var codigo = window._aiEnlazarCodigo;
+    if (!codigo) return;
+    fetch('{{ route("admin.sicd.buscar-por-codigo") }}?codigo=' + encodeURIComponent(codigo))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.encontrado) {
+                window.location = d.url;
+            } else {
+                alert('No existe una solicitud interna registrada con el código ' + codigo + '.');
+            }
+        });
+}
 
 function aiValidarCodigo(codigo) {
     var hint = document.getElementById('ai-codigo-hint');
@@ -1562,12 +1632,16 @@ function aiValidarCodigo(codigo) {
                         var banner = document.getElementById('ai-pdf-banner');
                         if (!banner) return;
                         if (pdf.tiene_pdf) {
+                            window._aiEnlazarCodigo = codigoFinal;
                             banner.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;width:100%;">'
                                 + '<div style="display:flex;align-items:center;gap:0.45rem;">'
                                 + '<svg style="width:15px;height:15px;flex-shrink:0;color:#ea580c;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>'
                                 + '<span style="font-size:0.72rem;font-weight:700;color:#c2410c;">ARCHIVO ASOCIADO ENCONTRADO</span>'
                                 + '</div>'
+                                + '<div style="display:flex;gap:0.4rem;align-items:center;">'
                                 + '<a href="' + urlPdf + '" target="_blank" style="font-size:0.7rem;font-weight:600;background:#ea580c;color:#fff;padding:3px 12px;border-radius:5px;text-decoration:none;">Ver PDF</a>'
+                                + '<button onclick="aiEnlazarSolicitud()" style="font-size:0.7rem;font-weight:600;background:#e0e7ff;color:#3730a3;padding:3px 12px;border-radius:5px;border:none;cursor:pointer;">Enlazar a la solicitud</button>'
+                                + '</div>'
                                 + '</div>';
                         } else {
                             banner.remove();

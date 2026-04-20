@@ -70,8 +70,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/sicd/recibir-directo', [SicdController::class, 'recibirDirecto'])->name('sicd.recibir.directo');
     Route::get('/sicd/resolver-conflictos', [SicdController::class, 'resolver'])->name('sicd.resolver');
     Route::post('/sicd/confirmar', [SicdController::class, 'confirmar'])->name('sicd.confirmar');
+    Route::get('/sicd/buscar-por-codigo', [SicdController::class, 'buscarPorCodigo'])->name('sicd.buscar-por-codigo');
     Route::get('/sicd/{id}', [SicdController::class, 'show'])->name('sicd.show');
     Route::get('/sicd/{id}/descargar', [SicdController::class, 'descargar'])->name('sicd.descargar');
+    Route::get('/sicd/{id}/descargar-externo', [SicdController::class, 'descargarExterno'])->name('sicd.descargar-externo');
 
     // Órdenes de Compra
     Route::get('/ordenes', [OrdenCompraController::class, 'index'])->name('ordenes.index');
