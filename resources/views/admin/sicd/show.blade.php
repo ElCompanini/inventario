@@ -54,19 +54,19 @@
                 <button id="btn-enlazar-show"
                         onclick="enlazarDesdeShow()"
                         class="text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-lg transition">
-                    Enlazar PDF
+                    Enlazar PDF SICD
                 </button>
                 <span id="enlazar-show-msg" class="text-xs hidden"></span>
             </div>
             @endif
 
-            @if($sicd->archivo_blob || $sicd->archivo_ruta)
+            @if($sicd->boleta)
             <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    <p class="text-xs text-gray-500">{{ $sicd->archivo_nombre ?: 'Boleta adjunta' }}</p>
+                    <p class="text-xs text-gray-500">{{ $sicd->boleta?->archivo_nombre ?: 'Boleta adjunta' }}</p>
                 </div>
                 <a href="{{ route('admin.sicd.descargar', $sicd->id) }}" target="_blank"
                    class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition">
@@ -198,13 +198,13 @@ function enlazarDesdeShow() {
             btn.className = 'text-xs font-semibold bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg';
         } else {
             btn.disabled = false;
-            btn.textContent = 'Enlazar PDF';
+            btn.textContent = 'Enlazar PDF SICD';
             if (msg) { msg.className = 'text-xs text-red-500'; msg.textContent = res.msg || 'Error desconocido'; }
         }
     })
     .catch(function(e) {
         btn.disabled = false;
-        btn.textContent = 'Enlazar PDF';
+        btn.textContent = 'Enlazar PDF SICD';
         if (msg) { msg.className = 'text-xs text-red-500'; msg.textContent = e.message || 'Error de conexión'; }
     });
 }

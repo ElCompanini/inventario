@@ -13,16 +13,18 @@ class Sicd extends Model
 
     protected $fillable = [
         'codigo_sicd',
-        'archivo_nombre',
-        'archivo_ruta',
-        'archivo_blob',
-        'archivo_mime',
+        'boleta_id',
         'documento_blob',
         'documento_mime',
         'descripcion',
         'estado',
         'usuario_id',
     ];
+
+    public function boleta()
+    {
+        return $this->belongsTo(Boleta::class);
+    }
 
     public function usuario()
     {

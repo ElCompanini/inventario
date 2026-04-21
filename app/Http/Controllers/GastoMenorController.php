@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Container;
 use App\Models\GastoMenor;
 use App\Models\HistorialCambio;
 use App\Models\Producto;
@@ -16,14 +17,15 @@ class GastoMenorController extends Controller
     {
         abort_unless(auth()->user()->esAdmin(), 403);
 
-        $registros = GastoMenor::with(['producto', 'user'])
+        $registros = GastoMenor::with(['producto', 'user', 'historialCambio.container'])
             ->orderByDesc('created_at')
             ->get()
             ->groupBy('folio');
 
-        $productos = Producto::orderBy('nombre')->get();
+        $productos  = Producto::orderBy('nombre')->get();
+        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
 
-        return view('admin.gastos-menores.index', compact('registros', 'productos'));
+        return view('admin.gastos-menores.index', compact('registros', 'productos', 'containers'));
     }
 
     public function edit(string $folio)
@@ -35,7 +37,8 @@ class GastoMenorController extends Controller
             ->orderBy('id')
             ->get();
         abort_if($items->isEmpty(), 404);
-        return view('admin.gastos-menores.editar', compact('folio', 'items'));
+        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+        return view('admin.gastos-menores.editar', compact('folio', 'items', 'containers'));
     }
 
     public function update(Request $request, string $folio)
@@ -85,6 +88,18 @@ class GastoMenorController extends Controller
             ->with('success', "Folio {$folio} actualizado correctamente.");
     }
 
+    public function actualizarContenedor(Request $request, int $id)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+        $request->validate(['contenedor_id' => ['required', 'integer', 'exists:containers,id']]);
+        $gasto = GastoMenor::findOrFail($id);
+        if ($gasto->historialCambio) {
+            $gasto->historialCambio->contenedor_id = $request->contenedor_id;
+            $gasto->historialCambio->save();
+        }
+        return response()->json(['ok' => true]);
+    }
+
     public function descargarBoleta(int $id)
     {
         abort_unless(auth()->user()->esAdmin(), 403);
@@ -106,7 +121,8 @@ class GastoMenorController extends Controller
             'items.*.producto_id' => ['required', 'integer', 'exists:productos,id'],
             'items.*.cantidad'    => ['required', 'integer', 'min:1'],
             'items.*.monto'       => ['required', 'numeric', 'min:0'],
-            'items.*.precio_neto' => ['nullable', 'numeric', 'min:0'],
+            'items.*.precio_neto'   => ['nullable', 'numeric', 'min:0'],
+            'items.*.contenedor_id' => ['nullable', 'integer', 'exists:containers,id'],
         ], [
             'rut_proveedor.required'       => 'El RUT del proveedor es obligatorio.',
             'folio.required'               => 'El folio de la boleta es obligatorio.',
@@ -155,7 +171,7 @@ class GastoMenorController extends Controller
 
                 $historial = HistorialCambio::create([
                     'producto_id'  => $producto->id,
-                    'contenedor_id'=> $producto->contenedor,
+                    'contenedor_id'=> $item['contenedor_id'] ?? $producto->contenedor,
                     'cantidad'     => $item['cantidad'],
                     'tipo'         => 'entrada',
                     'motivo'       => "Compra de gasto menor — Folio {$request->folio}",

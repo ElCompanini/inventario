@@ -510,27 +510,25 @@ class AdminController extends Controller
         $actualizados = 0;
 
         if ($codigoSicd) {
-            $archivoNombre = '';
-            $archivoBlob   = null;
-            $archivoMime   = null;
-
+            $boletaId = null;
             if (!$vincularOc && $boletaTempRuta && Storage::disk('local')->exists($boletaTempRuta)) {
-                $rutaAbsoluta  = Storage::disk('local')->path($boletaTempRuta);
-                $archivoNombre = $boletaNombre ?? basename($boletaTempRuta);
-                $archivoBlob   = base64_encode(file_get_contents($rutaAbsoluta));
-                $archivoMime   = mime_content_type($rutaAbsoluta) ?: 'application/octet-stream';
+                $rutaAbsoluta = Storage::disk('local')->path($boletaTempRuta);
+                \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
+                $boleta   = \App\Models\Boleta::create([
+                    'archivo_nombre' => $boletaNombre ?? basename($boletaTempRuta),
+                    'archivo_blob'   => base64_encode(file_get_contents($rutaAbsoluta)),
+                    'archivo_mime'   => mime_content_type($rutaAbsoluta) ?: 'application/octet-stream',
+                ]);
+                $boletaId = $boleta->id;
                 Storage::disk('local')->delete($boletaTempRuta);
             }
 
             $sicd = Sicd::create([
-                'codigo_sicd'    => $codigoSicd,
-                'archivo_nombre' => $archivoNombre,
-                'archivo_ruta'   => '',
-                'archivo_blob'   => $archivoBlob,
-                'archivo_mime'   => $archivoMime,
-                'descripcion'    => $descripcion,
-                'estado'         => $vincularOc ? 'pendiente' : 'recibido',
-                'usuario_id'     => Auth::id(),
+                'codigo_sicd' => $codigoSicd,
+                'boleta_id'   => $boletaId,
+                'descripcion' => $descripcion,
+                'estado'      => $vincularOc ? 'pendiente' : 'recibido',
+                'usuario_id'  => Auth::id(),
             ]);
         }
 
@@ -647,25 +645,23 @@ class AdminController extends Controller
         // Crear registro SICD si viene con código externo
         $sicd = null;
         if ($codigoSicd) {
-            $archivoNombre = '';
-            $archivoRuta   = '';
-            $archivoBlob   = null;
-            $archivoMime   = null;
+            $boletaId = null;
             if (!$vincularOc && $request->hasFile('boleta_sicd')) {
-                $file          = $request->file('boleta_sicd');
-                $archivoNombre = $file->getClientOriginalName();
-                $archivoBlob   = base64_encode(file_get_contents($file->getRealPath()));
-                $archivoMime   = $file->getMimeType();
+                $file = $request->file('boleta_sicd');
+                \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
+                $boleta   = \App\Models\Boleta::create([
+                    'archivo_nombre' => $file->getClientOriginalName(),
+                    'archivo_blob'   => base64_encode(file_get_contents($file->getRealPath())),
+                    'archivo_mime'   => $file->getMimeType(),
+                ]);
+                $boletaId = $boleta->id;
             }
             $sicd = Sicd::create([
-                'codigo_sicd'    => $codigoSicd,
-                'archivo_nombre' => $archivoNombre,
-                'archivo_ruta'   => $archivoRuta,
-                'archivo_blob'   => $archivoBlob,
-                'archivo_mime'   => $archivoMime,
-                'descripcion'    => $descripcion,
-                'estado'         => $vincularOc ? 'pendiente' : 'recibido',
-                'usuario_id'     => Auth::id(),
+                'codigo_sicd' => $codigoSicd,
+                'boleta_id'   => $boletaId,
+                'descripcion' => $descripcion,
+                'estado'      => $vincularOc ? 'pendiente' : 'recibido',
+                'usuario_id'  => Auth::id(),
             ]);
         }
 

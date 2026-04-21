@@ -73,6 +73,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/sicd/buscar-por-codigo', [SicdController::class, 'buscarPorCodigo'])->name('sicd.buscar-por-codigo');
     Route::post('/sicd/crear-y-enlazar', [SicdController::class, 'crearYEnlazar'])->name('sicd.crear-y-enlazar');
     Route::post('/sicd/{id}/enlazar-pdf', [SicdController::class, 'enlazarPdf'])->name('sicd.enlazar-pdf');
+    Route::delete('/sicd/{id}/cancelar', [SicdController::class, 'cancelar'])->name('sicd.cancelar');
     Route::get('/sicd/{id}/ver-documento', [SicdController::class, 'verDocumento'])->name('sicd.ver-documento');
     Route::get('/sicd/{id}', [SicdController::class, 'show'])->name('sicd.show');
     Route::get('/sicd/{id}/descargar', [SicdController::class, 'descargar'])->name('sicd.descargar');
@@ -108,6 +109,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/gastos-menores', [GastoMenorController::class, 'index'])->name('gastos-menores.index');
     Route::post('/gastos-menores', [GastoMenorController::class, 'store'])->name('gastos-menores.store');
     Route::get('/gastos-menores/{id}/boleta', [GastoMenorController::class, 'descargarBoleta'])->name('gastos-menores.boleta');
+    Route::patch('/gastos-menores/{id}/contenedor', [GastoMenorController::class, 'actualizarContenedor'])->name('gastos-menores.contenedor');
     Route::get('/gastos-menores/{folio}/editar', [GastoMenorController::class, 'edit'])->name('gastos-menores.edit');
     Route::put('/gastos-menores/{folio}', [GastoMenorController::class, 'update'])->name('gastos-menores.update');
 

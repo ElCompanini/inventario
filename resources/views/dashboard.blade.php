@@ -661,9 +661,10 @@
                             <thead>
                                 <tr style="background:#fef3c7; color:#92400e;">
                                     <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; border-radius:0.25rem 0 0 0;">Producto</th>
-                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:80px;">Cant.</th>
-                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">Monto ($)</th>
-                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:140px;">P. Neto s/IVA ($)</th>
+                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:70px;">Cant.</th>
+                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:110px;">Monto ($)</th>
+                                    <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">P. Neto s/IVA ($)</th>
+                                    <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; width:140px;">Contenedor</th>
                                     <th style="padding:0.4rem 0.6rem; width:36px;"></th>
                                 </tr>
                             </thead>
@@ -695,8 +696,9 @@
 
 @push('scripts')
 <script>
-// ── Datos de productos (JSON) ─────────────────────────────────────────────────
-const gmProductos = {!! json_encode($productos->map(fn($p) => ['id' => $p->id, 'nombre' => $p->nombre, 'descripcion' => $p->descripcion, 'stock' => $p->stock_actual])->values()) !!};
+// ── Datos de productos y contenedores (JSON) ──────────────────────────────────
+const gmProductos    = {!! json_encode($productos->map(fn($p) => ['id' => $p->id, 'nombre' => $p->nombre, 'descripcion' => $p->descripcion, 'stock' => $p->stock_actual])->values()) !!};
+const gmContainers   = {!! json_encode($containers->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values()) !!};
 
 let gmItems   = [];   // { idx, id, nombre }
 let gmCounter = 0;
@@ -769,6 +771,9 @@ function gmRenderFila(idx, id, nombre) {
     const tr = document.createElement('tr');
     tr.id = `gm-row-${idx}`;
     tr.style.borderBottom = '1px solid #f3f4f6';
+    const contOptions = gmContainers.map(c =>
+        `<option value="${c.id}">${escHtmlGm(c.nombre)}</option>`
+    ).join('');
     tr.innerHTML = `
         <td style="padding:0.4rem 0.6rem;">
             <input type="hidden" name="items[${idx}][producto_id]" value="${id}">
@@ -776,15 +781,21 @@ function gmRenderFila(idx, id, nombre) {
         </td>
         <td style="padding:0.4rem 0.4rem; text-align:center;">
             <input type="number" name="items[${idx}][cantidad]" value="1" min="1" required
-                   style="width:68px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
+                   style="width:60px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
         </td>
         <td style="padding:0.4rem 0.4rem; text-align:center;">
             <input type="number" name="items[${idx}][monto]" placeholder="0" min="0" step="1" required
-                   style="width:108px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
+                   style="width:95px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
         </td>
         <td style="padding:0.4rem 0.4rem; text-align:center;">
             <input type="number" name="items[${idx}][precio_neto]" placeholder="0" min="0" step="1"
-                   style="width:120px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
+                   style="width:105px; text-align:center; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.8rem;">
+        </td>
+        <td style="padding:0.4rem 0.4rem;">
+            <select name="items[${idx}][contenedor_id]"
+                    style="width:100%; border:1px solid #d1d5db; border-radius:0.375rem; padding:0.3rem 0.4rem; font-size:0.78rem; background:#fff;">
+                ${contOptions}
+            </select>
         </td>
         <td style="padding:0.4rem 0.3rem; text-align:center;">
             <button type="button" onclick="gmQuitar(${idx})"
@@ -820,7 +831,7 @@ function escHtmlGm(str) {
 <div id="modal-agregar-inv"
     style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.5); overflow-y:auto;">
     <div style="min-height:100%; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1rem;">
-        <div class="ai-modal-inner" style="background:#fff; border-radius:1rem; width:100%; max-width:820px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div class="ai-modal-inner" style="background:#fff; border-radius:1rem; width:100%; max-width:820px; box-shadow:0 20px 60px rgba(0,0,0,0.3); position:relative;">
 
             {{-- Header --}}
             <div style="display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #e5e7eb;">
@@ -828,7 +839,7 @@ function escHtmlGm(str) {
                     <p style="font-size:1rem; font-weight:700; color:#1e40af;">Agregar Inventario</p>
                     <p style="font-size:0.75rem; color:#6b7280; margin-top:0.1rem;">Registra una entrada por boleta local o documento SICD externo</p>
                 </div>
-                <button type="button" onclick="cerrarModalAgregarInv()"
+                <button type="button" onclick="cerrarConConfirmacion()"
                     style="color:#9ca3af; font-size:1.25rem; line-height:1; background:none; border:none; cursor:pointer;">✕</button>
             </div>
 
@@ -919,9 +930,10 @@ function escHtmlGm(str) {
                                 <thead>
                                     <tr style="background:#fef3c7; color:#92400e;">
                                         <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Producto</th>
-                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:80px;">Cant.</th>
-                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">Monto ($)</th>
-                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:140px;">P. Neto s/IVA</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:70px;">Cant.</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:110px;">Monto ($)</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">P. Neto s/IVA</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; width:140px;">Contenedor</th>
                                         <th style="padding:0.4rem 0.6rem; width:36px;"></th>
                                     </tr>
                                 </thead>
@@ -984,10 +996,19 @@ function escHtmlGm(str) {
                         {{-- Panel Carga masiva --}}
                         <div id="ai-ext-panel-masiva" style="display:flex; flex-direction:column; gap:0.75rem;">
                             <div>
-                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                    Excel de productos <span style="color:#ef4444;">*</span>
-                                    <span style="font-weight:400; color:#9ca3af;">(col A = descripción, col B = unidad, col C = cantidad — fila 1 es encabezado)</span>
-                                </label>
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.25rem;">
+                                    <label style="font-size:0.75rem; font-weight:600; color:#374151;">
+                                        Excel de productos <span style="color:#ef4444;">*</span>
+                                        <span style="font-weight:400; color:#9ca3af;">(col A = descripción, col B = unidad, col C = cantidad — fila 1 es encabezado)</span>
+                                    </label>
+                                    <a href="{{ asset('templates/plantilla_carga_masiva.xlsx') }}" download
+                                        style="font-size:0.78rem; font-weight:700; color:#fff; background:#2563eb; text-decoration:none; display:inline-flex; align-items:center; gap:0.35rem; white-space:nowrap; padding:0.3rem 0.75rem; border-radius:0.4rem;">
+                                        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+                                        </svg>
+                                        Descargar plantilla
+                                    </a>
+                                </div>
                                 <input type="file" name="excel_masivo" id="ai-excel-masivo" accept=".xlsx,.xls,.csv"
                                     style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
                             </div>
@@ -1069,7 +1090,7 @@ function escHtmlGm(str) {
 
                 {{-- Footer --}}
                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:0.5rem; padding:0.75rem 1.25rem; border-top:1px solid #e5e7eb; background:#fafafa; border-radius:0 0 1rem 1rem;">
-                    <button type="button" onclick="cerrarModalAgregarInv()"
+                    <button type="button" onclick="cerrarConConfirmacion()"
                         style="padding:0.4rem 1rem; font-size:0.8rem; font-weight:600; color:#374151; background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">
                         Cancelar
                     </button>
@@ -1079,6 +1100,23 @@ function escHtmlGm(str) {
                     </button>
                 </div>
             </form>
+
+            {{-- Confirmación salida con SICD enlazado --}}
+            <div id="ai-confirm-salida" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.45); border-radius:1rem; z-index:10; align-items:center; justify-content:center;">
+                <div style="background:#fff; border-radius:0.75rem; padding:1.5rem; max-width:360px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.2); text-align:center;">
+                    <div style="font-size:2rem; margin-bottom:0.5rem;">⚠️</div>
+                    <p style="font-size:0.95rem; font-weight:700; color:#1e293b; margin-bottom:0.4rem;">¿Salir de Agregar Inventario?</p>
+                    <p style="font-size:0.8rem; color:#64748b; margin-bottom:1.25rem;">Si sales ahora, se cancelará el PDF SICD enlazado y la acción de ingresar no se completará.</p>
+                    <div style="display:flex; gap:0.6rem; justify-content:center;">
+                        <button onclick="aiConfirmarSalida()" style="padding:0.45rem 1.1rem; font-size:0.8rem; font-weight:600; background:#ef4444; color:#fff; border:none; border-radius:0.5rem; cursor:pointer;">
+                            Sí, salir y cancelar
+                        </button>
+                        <button onclick="aiCancelarSalida()" style="padding:0.45rem 1.1rem; font-size:0.8rem; font-weight:600; background:#f1f5f9; color:#374151; border:none; border-radius:0.5rem; cursor:pointer;">
+                            Quedarme
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -1376,7 +1414,46 @@ document.getElementById('btn-agregar-inventario').addEventListener('click', func
     inner.style.animation = '';
 });
 
+var _aiSicdEnlazadoId = null;
+
+function cerrarConConfirmacion() {
+    if (_aiSicdEnlazadoId) {
+        var overlay = document.getElementById('ai-confirm-salida');
+        if (overlay) overlay.style.display = 'flex';
+    } else {
+        cerrarModalAgregarInv();
+    }
+}
+
+function aiCancelarSalida() {
+    var overlay = document.getElementById('ai-confirm-salida');
+    if (overlay) overlay.style.display = 'none';
+}
+
+function aiConfirmarSalida() {
+    var id = _aiSicdEnlazadoId;
+    if (!id) { cerrarModalAgregarInv(); return; }
+
+    fetch('{{ url("admin/sicd") }}/' + id + '/cancelar', {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            'Accept': 'application/json',
+        }
+    })
+    .finally(function() {
+        _aiSicdEnlazadoId = null;
+        cerrarModalAgregarInv();
+    });
+}
+
 function cerrarModalAgregarInv() {
+    _aiSicdEnlazadoId = null;
+    var overlay = document.getElementById('ai-confirm-salida');
+    if (overlay) overlay.style.display = 'none';
+    window._aiEnlazarUrl = null;
+    window._aiSicdUrl = null;
+    window._aiEnlazarCodigo = null;
     document.getElementById('modal-agregar-inv').style.display = 'none';
     document.body.style.overflow = '';
     aiForm.reset();
@@ -1402,7 +1479,7 @@ function cerrarModalAgregarInv() {
 }
 
 document.getElementById('modal-agregar-inv').addEventListener('click', function(e) {
-    if (e.target === this) cerrarModalAgregarInv();
+    if (e.target === this) cerrarConConfirmacion();
 });
 
 function aiMetodoCarga(metodo) {
@@ -1561,28 +1638,30 @@ function aiEnlazarSolicitud() {
         .then(function(res) {
             btn.disabled = false;
             if (res.ok) {
-                if (sicdUrl) {
+                if (res.id) _aiSicdEnlazadoId = res.id;
+                var url = sicdUrl || res.url || null;
+                if (url) {
                     var link = document.createElement('a');
-                    link.href = sicdUrl;
+                    link.href = url;
                     link.target = '_blank';
                     link.textContent = '✓ Ver SICD';
                     link.style.cssText = 'font-size:0.7rem;font-weight:600;background:#dcfce7;color:#166534;padding:3px 12px;border-radius:5px;text-decoration:none;';
                     btn.replaceWith(link);
                 } else {
-                    btn.innerHTML = '✓ Documento enlazado';
+                    btn.innerHTML = '✓ PDF SICD enlazado';
                     btn.style.cssText += ';background:#dcfce7;color:#166534;cursor:default;';
                 }
             } else {
-                btn.textContent = 'Enlazar documento';
+                btn.textContent = 'Enlazar PDF SICD';
                 btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
-                setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar documento'; btn.disabled = false; }, 3000);
+                setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar PDF SICD'; btn.disabled = false; }, 3000);
             }
         })
         .catch(function(e) {
             btn.disabled = false;
             btn.textContent = 'Error: ' + (e.message || 'conexión');
             btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
-            setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar documento'; }, 4000);
+            setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar PDF SICD'; }, 4000);
         });
     }
 
@@ -1595,7 +1674,7 @@ function aiEnlazarSolicitud() {
     // Si no (SICD no existe aún), intentar buscar primero y si sigue sin existir, crear y enlazar
     var codigo = window._aiEnlazarCodigo;
     if (!codigo) {
-        btn.disabled = false; btn.textContent = 'Enlazar documento';
+        btn.disabled = false; btn.textContent = 'Enlazar PDF SICD';
         return;
     }
     fetch('{{ route("admin.sicd.buscar-por-codigo") }}?codigo=' + encodeURIComponent(codigo))
@@ -1625,6 +1704,7 @@ function aiEnlazarSolicitud() {
             .then(function(res) {
                 btn.disabled = false;
                 if (res.ok) {
+                    if (res.id) _aiSicdEnlazadoId = res.id;
                     window._aiSicdUrl = res.url;
                     var link = document.createElement('a');
                     link.href = res.url;
@@ -1635,19 +1715,19 @@ function aiEnlazarSolicitud() {
                 } else {
                     btn.textContent = 'Error: ' + (res.msg || 'desconocido');
                     btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
-                    setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar documento'; btn.disabled = false; }, 4000);
+                    setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar PDF SICD'; btn.disabled = false; }, 4000);
                 }
             })
             .catch(function(e) {
                 btn.disabled = false;
                 btn.textContent = 'Error: ' + (e.message || 'conexión');
                 btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
-                setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar documento'; }, 4000);
+                setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar PDF SICD'; }, 4000);
             });
         })
         .catch(function() {
             btn.disabled = false; btn.textContent = 'Error de conexión';
-            setTimeout(function() { btn.textContent = 'Enlazar documento'; }, 3000);
+            setTimeout(function() { btn.textContent = 'Enlazar PDF SICD'; }, 3000);
         });
 }
 
@@ -1767,7 +1847,7 @@ function aiValidarCodigo(codigo) {
                                     + '</div>'
                                     + '<div style="display:flex;gap:0.4rem;align-items:center;">'
                                     + '<a href="' + urlPdf + '" target="_blank" style="font-size:0.7rem;font-weight:600;background:#ea580c;color:#fff;padding:3px 12px;border-radius:5px;text-decoration:none;">Ver PDF</a>'
-                                    + '<button id="ai-btn-enlazar" onclick="aiEnlazarSolicitud()" style="font-size:0.7rem;font-weight:600;background:#e0e7ff;color:#3730a3;padding:3px 12px;border-radius:5px;border:none;cursor:pointer;">Enlazar documento</button>'
+                                    + '<button id="ai-btn-enlazar" onclick="aiEnlazarSolicitud()" style="font-size:0.7rem;font-weight:600;background:#e0e7ff;color:#3730a3;padding:3px 12px;border-radius:5px;border:none;cursor:pointer;">Enlazar PDF SICD</button>'
                                     + '</div>'
                                     + '</div>';
                         } else {
@@ -1935,6 +2015,9 @@ function aiRenderFila(idx, id, nombre) {
     var tr = document.createElement('tr');
     tr.id = 'ai-row-' + idx;
     tr.style.borderBottom = '1px solid #f3f4f6';
+    var contOpts = aiContainers.map(function(c) {
+        return '<option value="' + c.id + '">' + escHtmlAi(c.nombre) + '</option>';
+    }).join('');
     tr.innerHTML =
         '<td style="padding:0.4rem 0.6rem;">'
         + '<input type="hidden" name="items[' + idx + '][producto_id]" value="' + id + '">'
@@ -1942,15 +2025,20 @@ function aiRenderFila(idx, id, nombre) {
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
         + '<input type="number" name="items[' + idx + '][cantidad]" value="1" min="1"'
-        + ' style="width:68px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + ' style="width:60px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
         + '<input type="number" name="items[' + idx + '][monto]" placeholder="0" min="0" step="1"'
-        + ' style="width:108px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + ' style="width:95px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
         + '<input type="number" name="items[' + idx + '][precio_neto]" placeholder="0" min="0" step="1"'
-        + ' style="width:120px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + ' style="width:105px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;">'
+        + '<select name="items[' + idx + '][contenedor_id]"'
+        + ' style="width:100%;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.78rem;background:#fff;">'
+        + contOpts + '</select>'
         + '</td>'
         + '<td style="padding:0.4rem 0.3rem;text-align:center;">'
         + '<button type="button" onclick="aiQuitar(' + idx + ')" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;">&#x2715;</button>'

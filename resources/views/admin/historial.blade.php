@@ -138,7 +138,7 @@
                             {{ $primero->sicd?->codigo_sicd ?? 'SICD #' . $primero->origen_id }}
                         </span>
                         @endif
-                        @if($primero->sicd?->archivo_blob || $primero->sicd?->archivo_ruta)
+                        @if($primero->sicd?->boleta)
                         <a href="{{ route('admin.sicd.descargar', $primero->origen_id) }}"
                            class="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition whitespace-nowrap">
                             Ver boleta
@@ -216,7 +216,7 @@
                         {{ $registro->sicd?->codigo_sicd ?? 'SICD #' . $registro->origen_id }}
                     </span>
                     @endif
-                    @if($registro->sicd?->archivo_blob || $registro->sicd?->archivo_ruta)
+                    @if($registro->sicd?->boleta)
                     <a href="{{ route('admin.sicd.descargar', $registro->origen_id) }}"
                        class="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition whitespace-nowrap">
                         Ver boleta

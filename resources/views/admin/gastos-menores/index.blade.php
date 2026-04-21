@@ -82,37 +82,36 @@ if (strlen($limpio) < 2) return $rut;
         <div class="bg-white rounded-xl shadow overflow-hidden gm-card" data-search="{{ $searchText }}">
             {{-- Header de boleta --}}
             <div style="background:#fef3c7; border-left:4px solid #d97706;"
-                class="px-5 py-3 flex items-center justify-between gap-4 flex-wrap">
-                <div class="flex items-center gap-4 flex-wrap">
-                    <div style="background:#d97706; border-radius:0.5rem; padding:0.25rem 0.6rem; min-width:56px; text-align:center;">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color:#fef3c7;">ID</p>
-                        <p class="text-base font-bold font-mono" style="color:#fff;">
+                class="px-5 py-3 flex items-center justify-between gap-3">
+                <div style="display:grid; grid-template-columns:90px 120px 130px 150px 130px 150px 100px; align-items:stretch; gap:0; flex:1; overflow:hidden;">
+                    <div style="background:#d97706; border-radius:0.4rem; display:flex; align-items:center; justify-content:center; padding:0.2rem 0; margin:0.25rem 0;">
+                        <span style="color:#fff; font-size:0.85rem; font-weight:800; font-family:monospace; letter-spacing:0.03em; white-space:nowrap; display:inline-block;">
                             GM-{{ str_pad($primero->id_gm ?? 0, 4, '0', STR_PAD_LEFT) }}
-                        </p>
+                        </span>
                     </div>
-                    <div>
+                    <div style="padding:0 0.5rem;">
                         <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Folio</p>
-                        <p class="text-base font-bold text-amber-900 font-mono">{{ $folio }}</p>
+                        <p class="text-sm font-extrabold text-amber-900 font-mono truncate">{{ $folio }}</p>
                     </div>
-                    <div>
+                    <div style="padding:0 0.5rem;">
                         <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">RUT Proveedor</p>
-                        <p class="text-sm font-semibold text-amber-900">{{ formatearRut($primero->rut_proveedor) }}</p>
+                        <p class="text-sm font-semibold text-amber-900 truncate">{{ formatearRut($primero->rut_proveedor) }}</p>
                     </div>
-                    <div>
+                    <div style="padding:0 0.5rem;">
                         <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Fecha Emisión</p>
                         <p class="text-sm font-semibold text-amber-900">{{ $fecha->format('d/m/Y H:i') }}</p>
                     </div>
-                    <div>
+                    <div style="padding:0 0.5rem;">
                         <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Registrado por</p>
-                        <p class="text-sm font-semibold text-amber-900">{{ $primero->user->name ?? '—' }}</p>
+                        <p class="text-sm font-semibold text-amber-900 truncate">{{ $primero->user->name ?? '—' }}</p>
                     </div>
-                    <div>
+                    <div style="padding:0 0.5rem;">
                         <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Fecha Ingreso</p>
                         <p class="text-sm font-semibold text-amber-900">
                             {{ $primero->created_at ? $primero->created_at->format('d/m/Y H:i') : '—' }}
                         </p>
                     </div>
-                    <div>
+                    <div style="padding:0 0.5rem;">
                         <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Total Monto</p>
                         <p class="text-sm font-bold text-amber-900">${{ number_format($totalMonto, 0, ',', '.') }}</p>
                     </div>
@@ -146,30 +145,48 @@ if (strlen($limpio) < 2) return $rut;
             </div>
 
             {{-- Tabla de productos --}}
-            <table class="w-full text-sm">
+            <table class="w-full text-sm" style="table-layout:fixed;">
+                <colgroup>
+                    <col style="width:52px;">
+                    <col>
+                    <col style="width:80px;">
+                    <col style="width:110px;">
+                    <col style="width:130px;">
+                    <col style="width:150px;">
+                </colgroup>
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">#</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Producto</th>
                         <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500">Cantidad</th>
                         <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Monto</th>
-                        <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Precio Neto s/IVA</th>
+                        <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">P. Neto s/IVA</th>
+                        <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Contenedor</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @foreach($items as $item)
                     <tr class="hover:bg-gray-50 transition">
                         <td class="px-4 py-2.5 text-xs text-gray-400 font-mono">#{{ $item->id }}</td>
-                        <td class="px-4 py-2.5 font-medium text-gray-800">
-                            {{ $item->producto->nombre ?? '—' }}
+                        <td class="px-4 py-2.5 font-medium text-gray-800" style="overflow:hidden;">
+                            <p class="truncate">{{ $item->producto->nombre ?? '—' }}</p>
                             @if($item->producto?->descripcion)
-                            <p class="text-xs text-gray-400 font-normal">{{ $item->producto->descripcion }}</p>
+                            <p class="text-xs text-gray-400 font-normal truncate">{{ $item->producto->descripcion }}</p>
                             @endif
                         </td>
                         <td class="px-4 py-2.5 text-center text-gray-700">{{ $item->cantidad }}</td>
                         <td class="px-4 py-2.5 text-right text-gray-700">${{ number_format($item->monto, 0, ',', '.') }}</td>
                         <td class="px-4 py-2.5 text-right text-gray-700">
                             {{ $item->precio_neto ? '$' . number_format($item->precio_neto, 0, ',', '.') : '—' }}
+                        </td>
+                        <td class="px-4 py-2.5 text-right">
+                            @if($item->historialCambio?->container)
+                                <span class="inline-block bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full text-xs">
+                                    {{ $item->historialCambio->container->nombre }}
+                                </span>
+                            @else
+                                <span class="text-gray-400 text-xs">—</span>
+                            @endif
                         </td>
                     </tr>
                     @endforeach

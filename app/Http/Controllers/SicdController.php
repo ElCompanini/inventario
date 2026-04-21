@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Imports\SicdDetallesImport;
+use App\Models\Boleta;
 use App\Models\HistorialCambio;
 use App\Models\Producto;
 use App\Models\Sicd;
@@ -288,25 +289,25 @@ class SicdController extends Controller
 
     private function crearSicd(string $codigo, string $nombreOriginal, string $rutaTemp, ?string $descripcion, array $items)
     {
-        // Leer blob antes de mover/eliminar el archivo temporal
-        $archivoBlob = null;
-        $archivoMime = null;
+        $boletaId = null;
         if (Storage::disk('local')->exists($rutaTemp)) {
             $rutaAbsoluta = Storage::disk('local')->path($rutaTemp);
-            $archivoBlob  = base64_encode(file_get_contents($rutaAbsoluta));
-            $archivoMime  = mime_content_type($rutaAbsoluta) ?: 'application/octet-stream';
+            \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
+            $boleta   = Boleta::create([
+                'archivo_nombre' => $nombreOriginal,
+                'archivo_blob'   => base64_encode(file_get_contents($rutaAbsoluta)),
+                'archivo_mime'   => mime_content_type($rutaAbsoluta) ?: 'application/octet-stream',
+            ]);
+            $boletaId = $boleta->id;
             Storage::disk('local')->delete($rutaTemp);
         }
 
         $sicd = Sicd::create([
-            'codigo_sicd'    => $codigo,
-            'archivo_nombre' => $nombreOriginal,
-            'archivo_ruta'   => '',
-            'archivo_blob'   => $archivoBlob,
-            'archivo_mime'   => $archivoMime,
-            'descripcion'    => $descripcion,
-            'estado'         => 'pendiente',
-            'usuario_id'     => Auth::id(),
+            'codigo_sicd' => $codigo,
+            'boleta_id'   => $boletaId,
+            'descripcion' => $descripcion,
+            'estado'      => 'pendiente',
+            'usuario_id'  => Auth::id(),
         ]);
 
         foreach ($items as $item) {
@@ -436,26 +437,26 @@ class SicdController extends Controller
             $items[] = $item;
         }
 
-        // Leer blob del archivo temporal antes de eliminarlo
-        $archivoBlob = null;
-        $archivoMime = null;
+        $boletaId = null;
         if (Storage::disk('local')->exists($rutaSicdTemp)) {
             $rutaAbsoluta = Storage::disk('local')->path($rutaSicdTemp);
-            $archivoBlob  = base64_encode(file_get_contents($rutaAbsoluta));
-            $archivoMime  = mime_content_type($rutaAbsoluta) ?: 'application/octet-stream';
+            \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
+            $boleta   = Boleta::create([
+                'archivo_nombre' => $nombreOriginal,
+                'archivo_blob'   => base64_encode(file_get_contents($rutaAbsoluta)),
+                'archivo_mime'   => mime_content_type($rutaAbsoluta) ?: 'application/octet-stream',
+            ]);
+            $boletaId = $boleta->id;
             Storage::disk('local')->delete($rutaSicdTemp);
         }
 
-        DB::transaction(function () use ($codigo, $nombreOriginal, $archivoBlob, $archivoMime, $data, $items) {
+        DB::transaction(function () use ($codigo, $boletaId, $data, $items) {
             $sicd = Sicd::create([
-                'codigo_sicd'    => $codigo,
-                'archivo_nombre' => $nombreOriginal,
-                'archivo_ruta'   => '',
-                'archivo_blob'   => $archivoBlob,
-                'archivo_mime'   => $archivoMime,
-                'descripcion'    => $data['descripcion'] ?? null,
-                'estado'         => 'recibido',
-                'usuario_id'     => Auth::id(),
+                'codigo_sicd' => $codigo,
+                'boleta_id'   => $boletaId,
+                'descripcion' => $data['descripcion'] ?? null,
+                'estado'      => 'recibido',
+                'usuario_id'  => Auth::id(),
             ]);
 
             foreach ($items as $item) {
@@ -504,28 +505,27 @@ class SicdController extends Controller
     public function show(int $id)
     {
         abort_unless(auth()->user()->tienePermiso('sicd'), 403);
-        $sicd = Sicd::with(['usuario', 'detalles.producto', 'ordenesCompra'])->findOrFail($id);
+        $sicd = Sicd::with(['usuario', 'boleta', 'detalles.producto', 'ordenesCompra'])->findOrFail($id);
         return view('admin.sicd.show', compact('sicd'));
     }
 
     public function descargar(int $id)
     {
-        $sicd = Sicd::findOrFail($id);
+        $sicd   = Sicd::with('boleta')->findOrFail($id);
+        $boleta = $sicd->boleta;
 
-        // Preferir blob almacenado en BD
-        if ($sicd->archivo_blob) {
-            $contenido = base64_decode($sicd->archivo_blob);
-            $mime      = $sicd->archivo_mime ?: 'application/octet-stream';
-            $nombre    = $sicd->archivo_nombre ?: 'boleta';
+        if ($boleta?->archivo_blob) {
+            $contenido = base64_decode($boleta->archivo_blob);
+            $mime      = $boleta->archivo_mime ?: 'application/octet-stream';
+            $nombre    = $boleta->archivo_nombre ?: 'boleta';
             return response($contenido, 200)
                 ->header('Content-Type', $mime)
                 ->header('Content-Disposition', 'inline; filename="' . $nombre . '"')
                 ->header('Content-Length', strlen($contenido));
         }
 
-        // Fallback: archivo en filesystem (registros anteriores)
-        if (!empty($sicd->archivo_ruta) && Storage::disk('local')->exists($sicd->archivo_ruta)) {
-            return Storage::disk('local')->download($sicd->archivo_ruta, $sicd->archivo_nombre ?: basename($sicd->archivo_ruta));
+        if ($boleta?->archivo_ruta && Storage::disk('local')->exists($boleta->archivo_ruta)) {
+            return Storage::disk('local')->download($boleta->archivo_ruta, $boleta->archivo_nombre ?: basename($boleta->archivo_ruta));
         }
 
         return back()->with('error', 'El archivo no está disponible.');
@@ -575,11 +575,9 @@ class SicdController extends Controller
 
         if (!$sicd) {
             $sicd = Sicd::create([
-                'codigo_sicd'    => $codigo,
-                'archivo_nombre' => '',
-                'archivo_ruta'   => '',
-                'estado'         => 'pendiente',
-                'usuario_id'     => Auth::id(),
+                'codigo_sicd' => $codigo,
+                'estado'      => 'pendiente',
+                'usuario_id'  => Auth::id(),
             ]);
         }
 
@@ -647,6 +645,13 @@ class SicdController extends Controller
             return response()->json(['ok' => false, 'msg' => 'Error al guardar el documento: ' . $e->getMessage()], 500);
         }
 
+        return response()->json(['ok' => true, 'id' => $sicd->id, 'url' => route('admin.sicd.show', $sicd->id)]);
+    }
+
+    public function cancelar(int $id)
+    {
+        $sicd = Sicd::findOrFail($id);
+        $sicd->delete();
         return response()->json(['ok' => true]);
     }
 

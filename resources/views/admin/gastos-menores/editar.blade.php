@@ -46,16 +46,25 @@
                 <span class="font-normal text-gray-400">(opcional — deja vacío para mantener la actual)</span>
             </label>
             @if($items->first()->documento_path)
-            <p class="text-xs text-green-600 mb-1">
+            <p class="text-xs text-green-600 mb-2">
                 ✓ Tiene boleta adjunta:
                 <a href="{{ route('admin.gastos-menores.boleta', $items->first()->id) }}"
-                    target="_blank" class="underline">ver PDF actual</a>
+                    target="_blank" class="underline font-semibold">ver PDF actual</a>
             </p>
             @endif
-            <input type="file" name="documento" accept=".pdf"
-                class="w-full text-sm text-gray-600 border border-gray-300 rounded-lg px-2.5 py-1.5
-                          file:mr-3 file:py-1 file:px-3 file:rounded file:border-0
-                          file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200">
+            <div class="flex items-center gap-3">
+                <label for="doc-input"
+                    class="cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg transition"
+                    style="background:#d97706; white-space:nowrap;">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                    </svg>
+                    {{ $items->first()->documento_path ? 'Reemplazar boleta' : 'Seleccionar PDF' }}
+                </label>
+                <span id="doc-nombre" class="text-xs text-gray-500 italic">Ningún archivo seleccionado</span>
+                <input type="file" id="doc-input" name="documento" accept=".pdf" class="hidden"
+                    onchange="document.getElementById('doc-nombre').textContent = this.files[0]?.name || 'Ningún archivo seleccionado'">
+            </div>
         </div>
 
         {{-- Tabla de ítems --}}
@@ -65,9 +74,10 @@
                 <thead>
                     <tr style="background:#fef3c7;">
                         <th class="px-3 py-2 text-left text-xs font-semibold text-amber-800">Producto</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-amber-800" style="width:80px;">Cant.</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-amber-800" style="width:120px;">Monto ($)</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-amber-800" style="width:140px;">P. Neto s/IVA ($)</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-amber-800" style="width:70px;">Cant.</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-amber-800" style="width:110px;">Monto ($)</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-amber-800" style="width:120px;">P. Neto s/IVA ($)</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-amber-800" style="width:160px;">Contenedor</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -98,6 +108,19 @@
                                 min="0"
                                 class="w-full text-center border border-gray-300 rounded-lg px-1 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
                         </td>
+                        <td class="px-2 py-2">
+                            <select class="gm-cont-select w-full border border-gray-300 rounded-lg px-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    data-id="{{ $item->id }}"
+                                    data-url="{{ route('admin.gastos-menores.contenedor', $item->id) }}">
+                                @foreach($containers as $c)
+                                    <option value="{{ $c->id }}"
+                                        {{ ($item->historialCambio?->contenedor_id == $c->id) ? 'selected' : '' }}>
+                                        {{ $c->nombre }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <span class="gm-cont-msg text-xs hidden"></span>
+                        </td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -119,3 +142,40 @@
 </div>
 
 @endsection
+
+@push('scripts')
+<script>
+document.querySelectorAll('.gm-cont-select').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+        var msg = this.closest('td').querySelector('.gm-cont-msg');
+        msg.className = 'gm-cont-msg text-xs text-gray-400';
+        msg.textContent = 'Guardando...';
+        msg.classList.remove('hidden');
+        fetch(this.dataset.url, {
+            method: 'PATCH',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ contenedor_id: this.value })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.ok) {
+                msg.className = 'gm-cont-msg text-xs text-green-600 font-semibold';
+                msg.textContent = '✓ Guardado';
+                setTimeout(function() { msg.classList.add('hidden'); }, 2000);
+            } else {
+                msg.className = 'gm-cont-msg text-xs text-red-500';
+                msg.textContent = 'Error';
+            }
+        })
+        .catch(function() {
+            msg.className = 'gm-cont-msg text-xs text-red-500';
+            msg.textContent = 'Error de conexión';
+        });
+    });
+});
+</script>
+@endpush
