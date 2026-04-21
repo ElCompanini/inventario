@@ -697,8 +697,8 @@
 @push('scripts')
 <script>
 // ── Datos de productos y contenedores (JSON) ──────────────────────────────────
-const gmProductos    = {!! json_encode($productos->map(fn($p) => ['id' => $p->id, 'nombre' => $p->nombre, 'descripcion' => $p->descripcion, 'stock' => $p->stock_actual])->values()) !!};
-const gmContainers   = {!! json_encode($containers->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values()) !!};
+const gmProductos    = {!! json_encode($productos->map(fn($p) => ['id' => $p->id, 'nombre' => $p->nombre, 'descripcion' => $p->descripcion, 'stock' => $p->stock_actual])->values(), JSON_HEX_TAG | JSON_HEX_AMP) !!};
+const gmContainers   = {!! json_encode($containers->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values(), JSON_HEX_TAG | JSON_HEX_AMP) !!};
 
 let gmItems   = [];   // { idx, id, nombre }
 let gmCounter = 0;

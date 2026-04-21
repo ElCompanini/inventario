@@ -42,11 +42,11 @@
 
 <script>
 (function() {
-    var selectId = {!! json_encode($selectId) !!};
+    var selectId = {!! json_encode($selectId, JSON_HEX_TAG | JSON_HEX_AMP) !!};
     var safeId   = selectId.replace(/-/g, '_');
-    var urlVerif = {!! json_encode(route('admin.dev.centros-costo.verificar')) !!};
-    var urlStore = {!! json_encode(route('admin.dev.centros-costo.store')) !!};
-    var csrf     = {!! json_encode(csrf_token()) !!};
+    var urlVerif = {!! json_encode(route('admin.dev.centros-costo.verificar'), JSON_HEX_TAG | JSON_HEX_AMP) !!};
+    var urlStore = {!! json_encode(route('admin.dev.centros-costo.store'), JSON_HEX_TAG | JSON_HEX_AMP) !!};
+    var csrf     = {!! json_encode(csrf_token(), JSON_HEX_TAG | JSON_HEX_AMP) !!};
     var timer    = null;
 
     function msg(text, color) {

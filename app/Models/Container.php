@@ -8,7 +8,12 @@ class Container extends Model
 {
     protected $table = 'containers';
 
-    protected $fillable = ['nombre', 'descripcion'];
+    protected $fillable = ['nombre', 'descripcion', 'activo'];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('activo', fn($q) => $q->where('activo', 1));
+    }
 
     public function productos()
     {

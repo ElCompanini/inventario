@@ -219,7 +219,6 @@ class SicdController extends Controller
         }
 
         // Sin conflictos → crear SICD directamente
-        Storage::disk('local')->delete($rutaExcelTemp);
         Storage::disk('local')->move($rutaSicdTemp, 'documentos/sicd/' . basename($rutaSicdTemp));
         $rutaFinal = 'documentos/sicd/' . basename($rutaSicdTemp);
 
@@ -299,7 +298,6 @@ class SicdController extends Controller
                 'archivo_mime'   => mime_content_type($rutaAbsoluta) ?: 'application/octet-stream',
             ]);
             $boletaId = $boleta->id;
-            Storage::disk('local')->delete($rutaTemp);
         }
 
         $sicd = Sicd::create([
@@ -447,7 +445,6 @@ class SicdController extends Controller
                 'archivo_mime'   => mime_content_type($rutaAbsoluta) ?: 'application/octet-stream',
             ]);
             $boletaId = $boleta->id;
-            Storage::disk('local')->delete($rutaSicdTemp);
         }
 
         DB::transaction(function () use ($codigo, $boletaId, $data, $items) {
@@ -651,7 +648,8 @@ class SicdController extends Controller
     public function cancelar(int $id)
     {
         $sicd = Sicd::findOrFail($id);
-        $sicd->delete();
+        $sicd->estado = 'cancelado';
+        $sicd->save();
         return response()->json(['ok' => true]);
     }
 

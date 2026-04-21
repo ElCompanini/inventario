@@ -520,7 +520,6 @@ class AdminController extends Controller
                     'archivo_mime'   => mime_content_type($rutaAbsoluta) ?: 'application/octet-stream',
                 ]);
                 $boletaId = $boleta->id;
-                Storage::disk('local')->delete($boletaTempRuta);
             }
 
             $sicd = Sicd::create([

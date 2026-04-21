@@ -37,6 +37,11 @@ class User extends Authenticatable
         'permisos',
     ];
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope('activo', fn($q) => $q->where('activo', 1));
+    }
+
 
     public function esAdmin(): bool
     {

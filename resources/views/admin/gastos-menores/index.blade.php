@@ -267,6 +267,9 @@ if (strlen($limpio) < 2) return $rut;
                                 <div id="gm-resultados"
                                     style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #e5e7eb; border-radius:0.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.1); max-height:200px; overflow-y:auto; margin-top:2px;"></div>
                             </div>
+                            <p id="gm-limite-msg" style="display:none; font-size:0.75rem; color:#dc2626; font-weight:600; margin-top:0.4rem;">
+                                ⚠ Límite de 25 productos por compra alcanzado.
+                            </p>
                         </div>
 
                         {{-- Tabla de productos seleccionados --}}
@@ -386,12 +389,21 @@ document.addEventListener('click', function(e) {
     }
 });
 
+var GM_MAX_ITEMS = 25;
+
 function gmAgregar(id, nombre) {
     if (gmItems.find(function(i) { return i.id === id; })) {
         document.getElementById('gm-buscador').value = '';
         document.getElementById('gm-resultados').style.display = 'none';
         return;
     }
+    if (gmItems.length >= GM_MAX_ITEMS) {
+        document.getElementById('gm-buscador').value = '';
+        document.getElementById('gm-resultados').style.display = 'none';
+        document.getElementById('gm-limite-msg').style.display = '';
+        return;
+    }
+    document.getElementById('gm-limite-msg').style.display = 'none';
     var idx = gmCounter++;
     gmItems.push({ idx: idx, id: id, nombre: nombre });
     gmRenderFila(idx, id, nombre);

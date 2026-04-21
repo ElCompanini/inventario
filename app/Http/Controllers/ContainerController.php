@@ -22,11 +22,13 @@ class ContainerController extends Controller
 
     public function create()
     {
+        abort_unless(auth()->user()->esAdmin(), 403);
         return view('admin.containers.create');
     }
 
     public function store(Request $request)
     {
+        abort_unless(auth()->user()->esAdmin(), 403);
         $data = $request->validate([
             'nombre'      => ['required', 'string', 'max:100'],
             'descripcion' => ['nullable', 'string', 'max:500'],
@@ -48,13 +50,15 @@ class ContainerController extends Controller
                 "No se puede eliminar el container \"{$container->nombre}\" porque tiene {$container->productos_count} producto(s) asignado(s).");
         }
 
-        $container->delete();
+        $container->activo = 0;
+        $container->save();
 
-        return back()->with('success', "Container \"{$container->nombre}\" eliminado correctamente.");
+        return back()->with('success', "Container \"{$container->nombre}\" desactivado correctamente.");
     }
 
     public function trasladar(int $id, Request $request)
     {
+        abort_unless(auth()->user()->esAdmin(), 403);
         $data = $request->validate([
             'contenedor_destino_id' => ['required', 'integer', 'exists:containers,id'],
             'motivo'                => ['required', 'string', 'max:500'],

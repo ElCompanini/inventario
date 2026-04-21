@@ -104,15 +104,17 @@ class UsuarioController extends Controller
 
     public function destroy(int $id)
     {
+        abort_unless(auth()->user()->esAdmin(), 403);
         $usuario = User::findOrFail($id);
 
         if ($usuario->id === auth()->id()) {
             return back()->with('error', 'No puedes eliminar tu propia cuenta.');
         }
 
-        $usuario->delete();
+        $usuario->activo = 0;
+        $usuario->save();
 
         return redirect()->route('admin.usuarios.index')
-            ->with('success', "Usuario eliminado.");
+            ->with('success', "Usuario desactivado.");
     }
 }
