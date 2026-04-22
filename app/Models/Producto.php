@@ -16,6 +16,7 @@ class Producto extends Model
         'stock_minimo',
         'stock_critico',
         'contenedor',
+        'categoria_id',
         'stock_minimo_desde',
         'stock_critico_desde',
     ];
@@ -28,6 +29,11 @@ class Producto extends Model
     public function container()
     {
         return $this->belongsTo(Container::class, 'contenedor');
+    }
+
+    public function categoria()
+    {
+        return $this->belongsTo(Categoria::class);
     }
 
     public function solicitudes()

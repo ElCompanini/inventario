@@ -10,7 +10,7 @@
         <p class="text-sm text-gray-500 mt-1">Gestión de contenedores de almacenamiento</p>
     </div>
     <a href="{{ route('admin.containers.create') }}"
-       class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+       class="btn-primary inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
         </svg>
@@ -223,7 +223,7 @@
 
 {{-- Modal de traslado de container --}}
 <div id="modalTrasladar" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-ct-in .25s cubic-bezier(.22,.68,0,1.2) both;">
         <h2 class="text-lg font-bold text-gray-800 mb-1">Trasladar productos de container</h2>
         <p class="text-sm text-gray-500 mb-4">
             Todos los productos de <span id="origenNombre" class="font-semibold text-blue-700"></span> serán movidos al container destino. El stock no se modifica.
@@ -251,11 +251,11 @@
 
             <div class="flex justify-end gap-3">
                 <button type="button" onclick="cerrarModalTrasladar()"
-                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                        class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
                     Cancelar
                 </button>
                 <button type="submit"
-                        class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">
+                        class="btn-primary px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
                     Confirmar traslado
                 </button>
             </div>
@@ -265,19 +265,18 @@
 
 {{-- Modal de confirmación de eliminación --}}
 <div id="modalEliminar" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-2">¿Eliminar container?</h2>
-        <p class="text-sm text-gray-600 mb-1">Estás a punto de eliminar:</p>
-        <p id="nombreContainer" class="text-base font-semibold text-red-600 mb-4"></p>
-        <p class="text-xs text-gray-500 mb-5">Esta acción no se puede deshacer. Solo puedes eliminar containers sin productos asignados.</p>
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-ct-in .25s cubic-bezier(.22,.68,0,1.2) both;">
+        <h2 class="text-lg font-bold text-gray-800 mb-1">Desactivar container</h2>
+        <p class="text-sm text-gray-500 mb-1">¿Confirmas que deseas desactivar <strong id="nombreContainer" class="text-gray-800"></strong>?</p>
+        <p class="text-xs text-gray-400 mb-6">El container no aparecerá en el sistema, pero sus datos se conservan.</p>
         <div class="flex justify-end gap-3">
             <button type="button" onclick="cerrarModalEliminar()"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                    class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
                 Cancelar
             </button>
             <button type="button" id="btnConfirmarEliminar"
-                    class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition">
-                Sí, eliminar
+                    class="btn-danger px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg">
+                Confirmar
             </button>
         </div>
     </div>
@@ -285,7 +284,8 @@
 
 @push('head')
 <style>
-@keyframes btn-breathe-green { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.7)} 50%{box-shadow:0 0 0 6px rgba(22,163,74,0)} }
+@keyframes modal-ct-in { from { opacity:0; transform:scale(.94); } to { opacity:1; transform:scale(1); } }
+    @keyframes btn-breathe-green { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.7)} 50%{box-shadow:0 0 0 6px rgba(22,163,74,0)} }
     @keyframes btn-breathe-blue  { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.7)} 50%{box-shadow:0 0 0 6px rgba(37,99,235,0)} }
     @keyframes btn-breathe-red   { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.7)} 50%{box-shadow:0 0 0 6px rgba(220,38,38,0)} }
     .dt-btn-excel { background:#16a34a; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s,transform .15s; }

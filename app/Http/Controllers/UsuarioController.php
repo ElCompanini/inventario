@@ -71,9 +71,12 @@ class UsuarioController extends Controller
             'centro_costo' => 'nullable|string|max:100',
         ]);
 
-        $usuario->name         = $data['name'];
-        $usuario->email        = $data['email'];
-        $usuario->rol          = $data['rol'];
+        $usuario->name  = $data['name'];
+        $usuario->email = $data['email'];
+
+        if (auth()->id() !== $usuario->id) {
+            $usuario->rol = $data['rol'];
+        }
         $authUser = auth()->user();
         if ($authUser->esDev() || $authUser->esAdmin()) {
             $cc = trim($data['centro_costo'] ?? '') ?: null;

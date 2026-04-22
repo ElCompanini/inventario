@@ -409,7 +409,7 @@
                 </div>
             </div>
 
-            <div class="px-6 py-4 border-t flex gap-3 justify-end">
+            <div class="px-6 py-4 flex gap-3 justify-end" style="border-top:1px solid #f3f4f6;">
                 <button type="button" onclick="cerrarModal()"
                     class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
                     Cancelar
@@ -479,8 +479,8 @@
 @if(auth()->user()->esAdmin())
 <div id="modal-traslado"
     class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div class="flex items-center justify-between px-6 py-4 border-b">
+    <div id="modal-traslado-inner" class="bg-white rounded-2xl shadow-2xl w-full max-w-md" style="animation: traslado-in .25s cubic-bezier(.22,.68,0,1.2) both;">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <div>
                 <h3 class="text-lg font-semibold text-gray-800">Trasladar container</h3>
                 <p class="text-sm text-gray-500" id="traslado-subtitulo"></p>
@@ -521,8 +521,8 @@
                 </div>
             </div>
 
-            <div class="px-6 py-4 border-t flex gap-3 justify-end">
-                <button type="button" onclick="cerrarModalTrasladar()"
+            <div class="px-6 py-4 flex gap-3 justify-end" style="border-top:1px solid #f3f4f6;">
+                <button type="button" onclick="pedirCancelarTrasladar()"
                     class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
                     Cancelar
                 </button>
@@ -532,6 +532,25 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+{{-- Modal: confirmar cancelación traslado --}}
+<div id="modal-traslado-cancelar"
+    style="display:none; position:fixed; inset:0; z-index:10001; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:1rem;">
+    <div id="modal-traslado-cancelar-inner" style="background:#fff; border-radius:0.75rem; box-shadow:0 20px 60px rgba(0,0,0,0.3); width:100%; max-width:420px; padding:1.5rem;">
+        <h2 class="text-lg font-bold text-gray-800 mb-1">¿Cancelar traslado?</h2>
+        <p class="text-sm text-gray-500 mb-6">Los datos ingresados se perderán. ¿Deseas cerrar de todas formas?</p>
+        <div class="flex justify-end gap-3">
+            <button type="button" onclick="cerrarCancelarTrasladar()"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                Seguir editando
+            </button>
+            <button type="button" onclick="cerrarModalTrasladar(); cerrarCancelarTrasladar();"
+                    class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition">
+                Sí, cancelar
+            </button>
+        </div>
     </div>
 </div>
 
@@ -547,7 +566,30 @@
             opt.hidden = parseInt(opt.value) === contenedorActual;
         });
 
+        var inner = document.getElementById('modal-traslado-inner');
+        inner.style.animation = 'none';
+        inner.offsetHeight;
+        inner.style.animation = 'traslado-in .25s cubic-bezier(.22,.68,0,1.2) both';
         document.getElementById('modal-traslado').classList.remove('hidden');
+    }
+
+    function pedirCancelarTrasladar() {
+        var destino = document.getElementById('traslado-destino').value;
+        var motivo  = document.getElementById('traslado-motivo').value.trim();
+        if (destino || motivo) {
+            var m = document.getElementById('modal-traslado-cancelar');
+            var inner = document.getElementById('modal-traslado-cancelar-inner');
+            inner.style.animation = 'none';
+            inner.offsetHeight;
+            inner.style.animation = 'traslado-in .25s cubic-bezier(.22,.68,0,1.2) both';
+            m.style.display = 'flex';
+        } else {
+            cerrarModalTrasladar();
+        }
+    }
+
+    function cerrarCancelarTrasladar() {
+        document.getElementById('modal-traslado-cancelar').style.display = 'none';
     }
 
     function confirmarTraslado() {
@@ -1124,6 +1166,7 @@ function escHtmlGm(str) {
 
 @push('head')
 <style>
+    @keyframes traslado-in { from { opacity:0; transform:scale(.94); } to { opacity:1; transform:scale(1); } }
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes ai-spin { to { transform: rotate(360deg); } }
     @keyframes btn-breathe-green { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.7)} 50%{box-shadow:0 0 0 6px rgba(22,163,74,0)} }

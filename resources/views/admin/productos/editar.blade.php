@@ -65,7 +65,7 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('admin.productos.stock', $producto->id) }}" novalidate>
+        <form method="POST" action="{{ route('admin.productos.stock', $producto->id) }}" id="formStock" novalidate>
             @csrf
 
             {{-- Tipo --}}
@@ -126,16 +126,17 @@
             </div>
 
             <div class="flex gap-3">
-                <button type="submit"
-                        class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold
-                               py-2.5 rounded-lg transition text-sm"
-                        onclick="return confirm('¿Confirmar modificación directa de stock? Esta acción se registrará en el historial.')">
+                <button type="button"
+                        onclick="abrirModalStock()"
+                        class="btn-primary flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold
+                               py-2.5 rounded-lg text-sm">
                     Confirmar Modificación
                 </button>
-                <a href="{{ route('dashboard') }}"
-                   class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition text-sm text-center">
+                <button type="button"
+                        onclick="abrirModalCancelarStock()"
+                        class="btn-secondary flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm">
                     Cancelar
-                </a>
+                </button>
             </div>
         </form>
     </div>
@@ -152,7 +153,7 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('admin.productos.trasladar', $producto->id) }}" novalidate>
+    <form method="POST" action="{{ route('admin.productos.trasladar', $producto->id) }}" id="formTraslado" novalidate>
         @csrf
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-end">
             <div>
@@ -183,9 +184,9 @@
             </div>
         </div>
         <div class="mt-4">
-            <button type="submit"
-                    class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-5 rounded-lg transition text-sm"
-                    onclick="return confirm('¿Confirmar traslado de container? Esta acción se registrará en el historial.')">
+            <button type="button"
+                    onclick="abrirModalTraslado()"
+                    class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-5 rounded-lg transition text-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
                 </svg>
@@ -195,5 +196,114 @@
     </form>
 </div>
 
+
+{{-- Modal: confirmar cancelación --}}
+<div id="modalCancelarStock" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-prod-in .25s cubic-bezier(.22,.68,0,1.2) both;">
+        <h2 class="text-lg font-bold text-gray-800 mb-1">¿Cancelar modificación?</h2>
+        <p class="text-sm text-gray-500 mb-6">Los datos ingresados se perderán. ¿Deseas volver al listado de productos?</p>
+        <div class="flex justify-end gap-3">
+            <button type="button" onclick="cerrarModalCancelarStock()"
+                    class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                Seguir editando
+            </button>
+            <a href="{{ route('dashboard') }}"
+               class="btn-danger px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg">
+                Sí, cancelar
+            </a>
+        </div>
+    </div>
+</div>
+
+{{-- Modal: confirmar modificación de stock --}}
+<div id="modalStock" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-prod-in .25s cubic-bezier(.22,.68,0,1.2) both;">
+        <h2 class="text-lg font-bold text-gray-800 mb-1">Confirmar modificación de stock</h2>
+        <p class="text-sm text-gray-500 mb-6">Esta acción se registrará en el historial de cambios y no puede deshacerse.</p>
+        <div class="flex justify-end gap-3">
+            <button type="button" onclick="cerrarModalStock()"
+                    class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                Cancelar
+            </button>
+            <button type="button" onclick="document.getElementById('formStock').submit()"
+                    class="btn-primary px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+                Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- Modal: confirmar traslado de container --}}
+<div id="modalTraslado" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-prod-in .25s cubic-bezier(.22,.68,0,1.2) both;">
+        <h2 class="text-lg font-bold text-gray-800 mb-1">Confirmar traslado de container</h2>
+        <p class="text-sm text-gray-500 mb-6">El producto será movido al container seleccionado. Esta acción quedará registrada en el historial.</p>
+        <div class="flex justify-end gap-3">
+            <button type="button" onclick="cerrarModalTraslado()"
+                    class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                Cancelar
+            </button>
+            <button type="button" onclick="document.getElementById('formTraslado').submit()"
+                    class="btn-primary px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+                Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
+@push('head')
+<style>
+    @keyframes modal-prod-in {
+        from { opacity:0; transform:scale(.94); }
+        to   { opacity:1; transform:scale(1); }
+    }
+</style>
+@endpush
+
+@push('scripts')
+<script>
+    function abrirModalCancelarStock() {
+        var cantidad = document.getElementById('cantidad').value.trim();
+        var motivo   = document.getElementById('motivo').value.trim();
+        if (cantidad || motivo) {
+            var m = document.getElementById('modalCancelarStock');
+            m.classList.remove('hidden'); m.classList.add('flex');
+        } else {
+            window.location = '{{ route('dashboard') }}';
+        }
+    }
+    function cerrarModalCancelarStock() {
+        var m = document.getElementById('modalCancelarStock');
+        m.classList.add('hidden'); m.classList.remove('flex');
+    }
+    document.getElementById('modalCancelarStock').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalCancelarStock();
+    });
+
+    function abrirModalStock() {
+        var m = document.getElementById('modalStock');
+        m.classList.remove('hidden'); m.classList.add('flex');
+    }
+    function cerrarModalStock() {
+        var m = document.getElementById('modalStock');
+        m.classList.add('hidden'); m.classList.remove('flex');
+    }
+    document.getElementById('modalStock').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalStock();
+    });
+
+    function abrirModalTraslado() {
+        var m = document.getElementById('modalTraslado');
+        m.classList.remove('hidden'); m.classList.add('flex');
+    }
+    function cerrarModalTraslado() {
+        var m = document.getElementById('modalTraslado');
+        m.classList.add('hidden'); m.classList.remove('flex');
+    }
+    document.getElementById('modalTraslado').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalTraslado();
+    });
+</script>
+@endpush
 
 @endsection

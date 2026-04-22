@@ -132,15 +132,15 @@ if (strlen($limpio) < 2) return $rut;
                     <span class="text-xs text-gray-400 italic">Sin documento</span>
                     @endif
 
-                    <a href="{{ route('admin.gastos-menores.edit', urlencode($folio)) }}"
-                        onclick="return confirm('¿Seguro que deseas editar el folio {{ $folio }}? Los cambios quedarán registrados.')"
+                    <button type="button"
+                        onclick="abrirEditarGm('{{ route('admin.gastos-menores.edit', urlencode($folio)) }}', '{{ addslashes($folio) }}')"
                         class="inline-flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg transition"
                         style="background:#ea580c;">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                         Editar
-                    </a>
+                    </button>
                 </div>
             </div>
 
@@ -196,6 +196,24 @@ if (strlen($limpio) < 2) return $rut;
         @endforeach
     </div>
     @endif
+
+    {{-- ══ MODAL EDITAR GASTO MENOR ══ --}}
+    <div id="modal-editar-gm"
+        style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.5); overflow-y:auto;">
+        <div style="min-height:100%; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1rem;">
+            <div class="gm-edit-modal-inner" style="background:#fff; border-radius:1rem; width:100%; max-width:780px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #e5e7eb;">
+                    <div>
+                        <p style="font-size:0.7rem; color:#9ca3af; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.1rem;">Gasto Menor</p>
+                        <p style="font-size:1rem; font-weight:700; color:#92400e;">Editar Folio <span id="gm-edit-titulo" class="font-mono"></span></p>
+                    </div>
+                    <button type="button" onclick="cerrarModalEditarGm()"
+                        style="color:#9ca3af; font-size:1.25rem; line-height:1; background:none; border:none; cursor:pointer;">✕</button>
+                </div>
+                <div id="gm-edit-body" style="padding:1.25rem;"></div>
+            </div>
+        </div>
+    </div>
 
     {{-- ══ MODAL NUEVA COMPRA ══ --}}
     <div id="modal-gasto-menor"
@@ -326,7 +344,8 @@ if (strlen($limpio) < 2) return $rut;
             }
         }
 
-        .gm-modal-inner {
+        .gm-modal-inner,
+        .gm-edit-modal-inner {
             animation: gmFadeUp 0.35s cubic-bezier(.22, .68, 0, 1.2) both;
         }
     </style>
@@ -494,5 +513,108 @@ document.getElementById('buscador-gm').addEventListener('input', function() {
         gmFiltrar(val, label);
     }
 })();
+
+// ══ Modal Editar Gasto Menor ══
+function abrirEditarGm(url, folio) {
+    var modal = document.getElementById('modal-editar-gm');
+    var inner = modal.querySelector('.gm-edit-modal-inner');
+    document.getElementById('gm-edit-titulo').textContent = folio;
+    document.getElementById('gm-edit-body').innerHTML = '<p style="text-align:center;color:#9ca3af;padding:2rem 0;font-size:0.875rem;">Cargando...</p>';
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    inner.style.animation = 'none';
+    inner.offsetHeight;
+    inner.style.animation = '';
+
+    fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
+    })
+    .then(function(r) { return r.text(); })
+    .then(function(html) {
+        document.getElementById('gm-edit-body').innerHTML = html;
+        gmEditInit();
+    })
+    .catch(function() {
+        document.getElementById('gm-edit-body').innerHTML = '<p style="text-align:center;color:#ef4444;padding:2rem 0;font-size:0.875rem;">Error al cargar el formulario.</p>';
+    });
+}
+
+function gmEditInit() {
+    // Contenedor selects AJAX
+    document.querySelectorAll('#modal-editar-gm .gm-cont-select').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+            fetch(this.dataset.url, {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ contenedor_id: this.value })
+            });
+        });
+    });
+
+    // Cancelar
+    var btnCancelar = document.getElementById('btn-cancelar-editar-gm');
+    if (btnCancelar) btnCancelar.addEventListener('click', cerrarModalEditarGm);
+
+    // Submit via fetch
+    var form = document.getElementById('form-editar-gm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var btn = document.getElementById('btn-submit-editar-gm');
+            var errDiv = document.getElementById('gm-edit-errors');
+            if (errDiv) errDiv.classList.add('hidden');
+            if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                body: new FormData(form)
+            })
+            .then(function(r) {
+                return r.json().then(function(d) { return { ok: r.ok, data: d }; });
+            })
+            .then(function(res) {
+                if (res.ok && res.data.ok) {
+                    cerrarModalEditarGm();
+                    window.location.reload();
+                } else {
+                    if (btn) { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+                    if (errDiv) {
+                        var msgs = res.data.errors
+                            ? Object.values(res.data.errors).flat().join(' · ')
+                            : (res.data.message || 'Error al guardar.');
+                        errDiv.textContent = msgs;
+                        errDiv.classList.remove('hidden');
+                    }
+                }
+            })
+            .catch(function() {
+                if (btn) { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+                if (errDiv) {
+                    errDiv.textContent = 'Error de conexión. Intenta de nuevo.';
+                    errDiv.classList.remove('hidden');
+                }
+            });
+        });
+    }
+}
+
+function cerrarModalEditarGm() {
+    var modal = document.getElementById('modal-editar-gm');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    document.getElementById('gm-edit-body').innerHTML = '';
+}
+
+document.getElementById('modal-editar-gm').addEventListener('click', function(e) {
+    if (e.target === this) cerrarModalEditarGm();
+});
 </script>
 @endpush

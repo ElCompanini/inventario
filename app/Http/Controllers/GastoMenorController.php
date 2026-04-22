@@ -28,16 +28,20 @@ class GastoMenorController extends Controller
         return view('admin.gastos-menores.index', compact('registros', 'productos', 'containers'));
     }
 
-    public function edit(string $folio)
+    public function edit(Request $request, string $folio)
     {
         abort_unless(auth()->user()->esAdmin(), 403);
         $folio = urldecode($folio);
-        $items = GastoMenor::with('producto')
+        $items = GastoMenor::with(['producto', 'historialCambio'])
             ->where('folio', $folio)
             ->orderBy('id')
             ->get();
         abort_if($items->isEmpty(), 404);
         $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+
+        if ($request->ajax()) {
+            return view('admin.gastos-menores._editar-form', compact('folio', 'items', 'containers'));
+        }
         return view('admin.gastos-menores.editar', compact('folio', 'items', 'containers'));
     }
 
@@ -84,6 +88,10 @@ class GastoMenorController extends Controller
             }
         });
 
+        if ($request->ajax()) {
+            return response()->json(['ok' => true]);
+        }
+
         return redirect()->route('admin.gastos-menores.index')
             ->with('success', "Folio {$folio} actualizado correctamente.");
     }
@@ -105,7 +113,10 @@ class GastoMenorController extends Controller
         abort_unless(auth()->user()->esAdmin(), 403);
         $gasto = GastoMenor::findOrFail($id);
         abort_unless($gasto->documento_path && Storage::disk('local')->exists($gasto->documento_path), 404);
-        return Storage::disk('local')->download($gasto->documento_path);
+        return response()->file(
+            Storage::disk('local')->path($gasto->documento_path),
+            ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline']
+        );
     }
 
     public function store(Request $request)

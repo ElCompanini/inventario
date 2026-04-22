@@ -207,23 +207,20 @@
                 <div class="px-6 py-3 bg-gray-50 border-t flex items-center gap-3">
                     @if(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'))
                         @if(!$stockInsuficiente)
-                            <form method="POST" action="{{ route('admin.solicitudes.aprobar', $solicitud->id) }}">
-                                @csrf
-                                <button type="submit"
-                                        class="btn-aprobar inline-flex items-center gap-2 bg-green-600 hover:bg-green-700
-                                               text-white text-sm font-semibold px-4 py-2 rounded-lg"
-                                        onclick="return confirm('¿Aprobar esta solicitud?')">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                                    </svg>
-                                    Aprobar
-                                </button>
-                            </form>
+                            <button type="button"
+                                    onclick="abrirModalAprobacion({{ $solicitud->id }}, '{{ route('admin.solicitudes.aprobar', $solicitud->id) }}')"
+                                    class="btn-aprobar btn-primary inline-flex items-center gap-2 bg-green-600 hover:bg-green-700
+                                           text-white text-sm font-semibold px-4 py-2 rounded-lg">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                Aprobar
+                            </button>
                         @endif
 
                         <button type="button"
                                 onclick="abrirModalRechazo({{ $solicitud->id }}, '{{ route('admin.solicitudes.rechazar', $solicitud->id) }}')"
-                                class="btn-rechazar inline-flex items-center gap-2 bg-red-600 hover:bg-red-700
+                                class="btn-rechazar btn-danger inline-flex items-center gap-2 bg-red-600 hover:bg-red-700
                                        text-white text-sm font-semibold px-4 py-2 rounded-lg">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -268,12 +265,34 @@
 
             <div class="flex justify-end gap-3">
                 <button type="button" onclick="cerrarModalRechazo()"
-                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                        class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
                     Cancelar
                 </button>
                 <button type="submit"
-                        class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition">
+                        class="btn-danger px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg">
                     Confirmar rechazo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Modal de aprobación --}}
+<div id="modalAprobacion" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+        <h2 class="text-lg font-bold text-gray-800 mb-1">Aprobar solicitud</h2>
+        <p class="text-sm text-gray-500 mb-6">¿Confirmas que deseas aprobar esta solicitud? El stock se actualizará de inmediato.</p>
+
+        <form id="formAprobacion" method="POST" action="">
+            @csrf
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="cerrarModalAprobacion()"
+                        class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="btn-primary px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg">
+                    Confirmar aprobación
                 </button>
             </div>
         </form>
@@ -332,12 +351,13 @@
         animation: badge-pulse 1.8s ease-in-out infinite;
     }
 
-    /* ── Modal rechazo ── */
+    /* ── Modales ── */
     @keyframes modal-in {
         from { opacity:0; transform:scale(.94); }
         to   { opacity:1; transform:scale(1); }
     }
-    #modalRechazo > div {
+    #modalRechazo > div,
+    #modalAprobacion > div {
         animation: modal-in .25s cubic-bezier(.22,.68,0,1.2) both;
     }
 
@@ -489,6 +509,23 @@
         if (d) d.value = ''; if (h) h.value = '';
         if (buscadorSol) buscadorSol.value = '';
         aplicarFiltrosSol();
+    });
+
+    function abrirModalAprobacion(id, url) {
+        const modal = document.getElementById('modalAprobacion');
+        document.getElementById('formAprobacion').action = url;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function cerrarModalAprobacion() {
+        const modal = document.getElementById('modalAprobacion');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    document.getElementById('modalAprobacion').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalAprobacion();
     });
 
     function abrirModalRechazo(id, url) {

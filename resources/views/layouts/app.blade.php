@@ -163,6 +163,43 @@
         box-shadow: 0 0 0 3px rgba(59,130,246,.25) !important;
         outline: none !important;
     }
+
+    /* ── Button animation templates ── */
+
+    /* Primary: indigo solid — press-down scale */
+    button.btn-primary, a.btn-primary {
+        transition: background-color .15s, transform .1s, box-shadow .15s;
+    }
+    button.btn-primary:active, a.btn-primary:active {
+        transform: scale(.96);
+        box-shadow: none;
+    }
+
+    /* Secondary: gray/outline — soft fade */
+    button.btn-secondary, a.btn-secondary {
+        transition: background-color .15s, border-color .15s, transform .1s;
+    }
+    button.btn-secondary:active, a.btn-secondary:active {
+        transform: scale(.97);
+        filter: brightness(.95);
+    }
+
+    /* Danger: red — quick pulse-shrink */
+    button.btn-danger, a.btn-danger {
+        transition: background-color .15s, transform .12s;
+    }
+    button.btn-danger:active, a.btn-danger:active {
+        transform: scale(.95);
+        filter: brightness(.9);
+    }
+
+    /* Ghost: dashed/outline only — subtle lift */
+    button.btn-ghost, a.btn-ghost {
+        transition: background-color .15s, border-color .15s, transform .12s;
+    }
+    button.btn-ghost:active, a.btn-ghost:active {
+        transform: scale(.96);
+    }
 </style>
 </head>
 <body class="bg-gray-100 font-sans">
@@ -370,6 +407,17 @@
                 </svg>
                 <span class="sb-label">Usuarios</span>
             </a>
+
+            @if($u->esDev())
+            <a href="{{ route('admin.productos.catalogo') }}" data-tip="Catálogo de Productos"
+               class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
+                      {{ request()->routeIs('admin.productos.catalogo*') ? 'bg-indigo-600 text-white' : 'text-slate-300 text-slate-300' }}">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                <span class="sb-label">Catálogo de Productos</span>
+            </a>
+            @endif
         </div>
         @endif
 

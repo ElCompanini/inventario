@@ -13,6 +13,7 @@ use App\Http\Controllers\RetiroController;
 use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\CentroCostoController;
 use App\Http\Controllers\GastoMenorController;
+use App\Http\Controllers\CatalogoController;
 
 // Raíz → login
 Route::get('/', fn() => redirect()->route('login'));
@@ -112,6 +113,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/gastos-menores/{id}/contenedor', [GastoMenorController::class, 'actualizarContenedor'])->name('gastos-menores.contenedor');
     Route::get('/gastos-menores/{folio}/editar', [GastoMenorController::class, 'edit'])->name('gastos-menores.edit');
     Route::put('/gastos-menores/{folio}', [GastoMenorController::class, 'update'])->name('gastos-menores.update');
+
+    // Catálogo de Productos
+    Route::get('/productos/catalogo', [CatalogoController::class, 'index'])->name('productos.catalogo');
+    Route::post('/catalogo/familias', [CatalogoController::class, 'storeFamilia'])->name('catalogo.familias.store');
+    Route::post('/catalogo/categorias', [CatalogoController::class, 'storeCategoria'])->name('catalogo.categorias.store');
+    Route::put('/catalogo/categorias/{categoria}', [CatalogoController::class, 'updateCategoria'])->name('catalogo.categorias.update');
+    Route::post('/catalogo/productos', [CatalogoController::class, 'storeProducto'])->name('catalogo.productos.store');
+    Route::put('/catalogo/productos/{producto}', [CatalogoController::class, 'updateProducto'])->name('catalogo.productos.update');
 
     // Containers
     Route::get('/containers', [ContainerController::class, 'index'])->name('containers.index');

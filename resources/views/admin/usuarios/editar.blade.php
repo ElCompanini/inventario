@@ -31,11 +31,18 @@
         <div class="grid grid-cols-2 gap-3">
             <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Rol</label>
-                <select name="rol" required
-                        class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                    <option value="usuario" {{ old('rol', $usuario->rol) === 'usuario' ? 'selected' : '' }}>Usuario</option>
-                    <option value="admin"   {{ old('rol', $usuario->rol) === 'admin'   ? 'selected' : '' }}>Admin</option>
-                </select>
+                @if(auth()->id() === $usuario->id)
+                    <input type="hidden" name="rol" value="{{ $usuario->rol }}">
+                    <div class="w-full border border-gray-200 bg-gray-50 rounded-lg px-2.5 py-1.5 text-sm text-gray-400 select-none">
+                        {{ ucfirst($usuario->rol) }} <span class="text-xs">(no modificable)</span>
+                    </div>
+                @else
+                    <select name="rol" required
+                            class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                        <option value="usuario" {{ old('rol', $usuario->rol) === 'usuario' ? 'selected' : '' }}>Usuario</option>
+                        <option value="admin"   {{ old('rol', $usuario->rol) === 'admin'   ? 'selected' : '' }}>Admin</option>
+                    </select>
+                @endif
                 @error('rol') <p class="text-red-500 text-xs mt-0.5">{{ $message }}</p> @enderror
             </div>
             @php $rolAuth = auth()->user()->rol; @endphp
@@ -61,18 +68,26 @@
         {{-- Permisos: solo visibles para Super Administrador --}}
         @if(auth()->user()->esDev())
         <div id="bloque-permisos" style="border-top:1px solid #e5e7eb; padding-top:0.75rem; {{ old('rol', $usuario->rol) === 'admin' ? 'display:none;' : '' }}">
-            <p class="text-xs font-semibold text-gray-600 mb-1.5">Permisos</p>
-            <div class="grid grid-cols-2 gap-1">
+            <p class="text-xs font-semibold text-gray-600 mb-2">Permisos</p>
+            <div class="grid grid-cols-2 gap-2">
                 @foreach(\App\Models\User::PERMISOS_DISPONIBLES as $key => $label)
-                    @php $activo = in_array($key, $usuario->permisos ?? []); @endphp
-                    <label class="flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox"
-                               name="{{ $key }}"
-                               value="1"
-                               {{ old($key, $activo ? '1' : '') ? 'checked' : '' }}
-                               style="width:0.875rem; height:0.875rem; accent-color:#4f46e5;">
+                    @php $activo = old($key, in_array($key, $usuario->permisos ?? []) ? '1' : '') === '1'; @endphp
+                    <div class="flex items-center justify-between gap-3 select-none py-1 px-2 rounded-lg hover:bg-gray-50 transition">
                         <span class="text-xs text-gray-700">{{ $label }}</span>
-                    </label>
+                        <input type="checkbox" name="{{ $key }}" value="1" {{ $activo ? 'checked' : '' }}
+                               id="perm-{{ $key }}" class="perm-toggle" style="display:none;">
+                        <div class="perm-track" data-for="perm-{{ $key }}" style="
+                            width:34px; height:19px; border-radius:9999px; position:relative; cursor:pointer; flex-shrink:0;
+                            background: {{ $activo ? '#2563eb' : '#6b7280' }};
+                            transition: background .12s;">
+                            <div class="perm-thumb" style="
+                                width:13px; height:13px; border-radius:50%; background:#fff;
+                                position:absolute; top:3px;
+                                left: {{ $activo ? '18px' : '3px' }};
+                                transition: left .12s;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.25);"></div>
+                        </div>
+                    </div>
                 @endforeach
             </div>
         </div>
@@ -98,31 +113,51 @@
         if (bloque) bloque.style.display = this.value === 'usuario' ? '' : 'none';
     });
 
+    // Toggle visual para permisos
+    document.querySelectorAll('.perm-track').forEach(function(track) {
+        var chk   = document.getElementById(track.dataset.for);
+        var thumb = track.querySelector('.perm-thumb');
+
+        track.addEventListener('click', function() {
+            if (chk.disabled) return;
+            chk.checked = !chk.checked;
+            track.style.background = chk.checked ? '#2563eb' : '#6b7280';
+            thumb.style.left       = chk.checked ? '18px' : '3px';
+            chk.dispatchEvent(new Event('change'));
+        });
+    });
+
+    // Dependencia: aprobar_solicitudes obliga a tener solicitudes activo
     var chkAprobar     = document.querySelector('input[name="aprobar_solicitudes"]');
     var chkSolicitudes = document.querySelector('input[name="solicitudes"]');
 
+    function setDisabledSolicitudes(disabled) {
+        if (!chkSolicitudes) return;
+        var track = document.querySelector('.perm-track[data-for="' + chkSolicitudes.id + '"]');
+        chkSolicitudes.disabled = disabled;
+        track.style.opacity = disabled ? '0.5' : '1';
+        track.style.cursor  = disabled ? 'not-allowed' : 'pointer';
+    }
+
     if (chkAprobar && chkSolicitudes) {
-        // Al marcar aprobar_solicitudes → forzar solicitudes
         chkAprobar.addEventListener('change', function () {
             if (this.checked) {
-                chkSolicitudes.checked  = true;
-                chkSolicitudes.disabled = true;
+                var solTrack = document.querySelector('.perm-track[data-for="' + chkSolicitudes.id + '"]');
+                chkSolicitudes.checked = true;
+                solTrack.style.background = '#2563eb';
+                solTrack.querySelector('.perm-thumb').style.left = '18px';
+                setDisabledSolicitudes(true);
             } else {
-                chkSolicitudes.disabled = false;
+                setDisabledSolicitudes(false);
             }
         });
 
-        // Al cargar la página, si aprobar_solicitudes ya está marcado → deshabilitar solicitudes
         if (chkAprobar.checked) {
-            chkSolicitudes.checked  = true;
-            chkSolicitudes.disabled = true;
+            setDisabledSolicitudes(true);
         }
 
-        // Asegurar que el valor de solicitudes se envíe aunque esté disabled
         document.querySelector('form').addEventListener('submit', function () {
-            if (chkSolicitudes.disabled) {
-                chkSolicitudes.disabled = false;
-            }
+            chkSolicitudes.disabled = false;
         });
     }
 </script>
