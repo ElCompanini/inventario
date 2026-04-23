@@ -12,7 +12,7 @@
     <button type="button"
             onclick="var p=document.getElementById('cc-panel-wrap-{{ $selectId }}');var open=p.style.display==='block';p.style.display=open?'none':'block';this.querySelector('svg').style.transform=open?'':'rotate(45deg)';"
             id="cc-toggle-btn-{{ $selectId }}"
-            class="inline-flex items-center gap-1.5 w-full px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 rounded-lg transition-colors duration-150">
+            class="btn-ghost inline-flex items-center gap-1.5 w-full px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 rounded-lg">
         <svg class="w-3 h-3 flex-shrink-0" style="transition:transform 0.2s ease;"
              fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
@@ -32,7 +32,7 @@
                     id="cc-btn-{{ $selectId }}"
                     disabled
                     onclick="ccGuardar_{{ str_replace('-','_',$selectId) }}()"
-                    class="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition">
+                    class="btn-primary px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg">
                 Guardar
             </button>
         </div>

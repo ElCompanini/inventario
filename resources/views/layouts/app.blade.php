@@ -166,6 +166,13 @@
 
     /* ── Button animation templates ── */
 
+    button.btn-primary, a.btn-primary,
+    button.btn-secondary, a.btn-secondary,
+    button.btn-danger, a.btn-danger,
+    button.btn-ghost, a.btn-ghost {
+        cursor: pointer;
+    }
+
     /* Primary: indigo solid — press-down scale */
     button.btn-primary, a.btn-primary {
         transition: background-color .15s, transform .1s, box-shadow .15s;
@@ -196,6 +203,7 @@
     /* Ghost: dashed/outline only — subtle lift */
     button.btn-ghost, a.btn-ghost {
         transition: background-color .15s, border-color .15s, transform .12s;
+        cursor: pointer;
     }
     button.btn-ghost:active, a.btn-ghost:active {
         transform: scale(.96);

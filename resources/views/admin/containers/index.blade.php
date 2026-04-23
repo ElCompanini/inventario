@@ -294,10 +294,12 @@
     .dt-btn:hover { background:#1d4ed8; transform:translateY(-1px); animation:btn-breathe-blue 1.6s ease-in-out infinite; }
     .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s,transform .15s; }
     .dt-btn-pdf:hover { background:#b91c1c; transform:translateY(-1px); animation:btn-breathe-red 1.6s ease-in-out infinite; }
-    .btn-trasladar { background:#2563eb; transition: background .25s, box-shadow .25s, transform .25s; }
-    .btn-trasladar:hover { background:#93c5fd; box-shadow:0 0 14px 4px rgba(147,197,253,0.75); transform:scale(1.05); }
-    .btn-eliminar { background:#dc2626; transition: background .25s, box-shadow .25s, transform .25s; }
-    .btn-eliminar:hover { background:#fca5a5; box-shadow:0 0 14px 4px rgba(252,165,165,0.75); transform:scale(1.05); }
+    .btn-trasladar { cursor:pointer; background:#2563eb; transition: background .15s, box-shadow .15s, transform .1s; }
+    .btn-trasladar:hover { background:#1d4ed8; box-shadow:0 0 12px 3px rgba(37,99,235,0.45); transform:scale(1.04); }
+    .btn-trasladar:active { transform:scale(.95); box-shadow:none; filter:brightness(.88); }
+    .btn-eliminar { cursor:pointer; background:#dc2626; transition: background .15s, box-shadow .15s, transform .1s; }
+    .btn-eliminar:hover { background:#b91c1c; box-shadow:0 0 12px 3px rgba(220,38,38,0.45); transform:scale(1.04); }
+    .btn-eliminar:active { transform:scale(.95); box-shadow:none; filter:brightness(.88); }
     .fila-container { transition: background-color .6s ease; }
     .child-row-inner { animation: slideDown .5s cubic-bezier(.22,.61,.36,1); overflow:hidden; }
     .child-row-inner.closing { animation: slideUp .3s cubic-bezier(.22,.61,.36,1) forwards; }

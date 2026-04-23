@@ -121,7 +121,7 @@ if (strlen($limpio) < 2) return $rut;
                     @if($primero->documento_path)
                     <a href="{{ route('admin.gastos-menores.boleta', $primero->id) }}"
                         target="_blank"
-                        class="inline-flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg transition"
+                        class="gm-btn-boleta inline-flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg"
                         style="background:#dc2626;">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -134,7 +134,7 @@ if (strlen($limpio) < 2) return $rut;
 
                     <button type="button"
                         onclick="abrirEditarGm('{{ route('admin.gastos-menores.edit', urlencode($folio)) }}', '{{ addslashes($folio) }}')"
-                        class="inline-flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg transition"
+                        class="gm-btn-editar inline-flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg"
                         style="background:#ea580c;">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -347,6 +347,36 @@ if (strlen($limpio) < 2) return $rut;
         .gm-modal-inner,
         .gm-edit-modal-inner {
             animation: gmFadeUp 0.35s cubic-bezier(.22, .68, 0, 1.2) both;
+        }
+
+        /* Botón Ver Boleta PDF */
+        a.gm-btn-boleta, button.gm-btn-boleta {
+            cursor: pointer;
+            transition: transform .1s, box-shadow .15s, filter .15s;
+        }
+        a.gm-btn-boleta:hover, button.gm-btn-boleta:hover {
+            transform: scale(1.04);
+            box-shadow: 0 0 10px 2px rgba(220,38,38,0.45);
+        }
+        a.gm-btn-boleta:active, button.gm-btn-boleta:active {
+            transform: scale(.95);
+            box-shadow: none;
+            filter: brightness(.88);
+        }
+
+        /* Botón Editar */
+        button.gm-btn-editar {
+            cursor: pointer;
+            transition: transform .1s, box-shadow .15s, filter .15s;
+        }
+        button.gm-btn-editar:hover {
+            transform: scale(1.04);
+            box-shadow: 0 0 10px 2px rgba(234,88,12,0.45);
+        }
+        button.gm-btn-editar:active {
+            transform: scale(.95);
+            box-shadow: none;
+            filter: brightness(.88);
         }
     </style>
     @endpush

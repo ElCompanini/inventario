@@ -95,11 +95,11 @@
 
         <div class="flex justify-end gap-2 pt-1">
             <a href="{{ route('admin.usuarios.index') }}"
-               class="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+               class="btn-secondary px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
                 Cancelar
             </a>
             <button type="submit"
-                    class="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition">
+                    class="btn-primary px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
                 Guardar cambios
             </button>
         </div>
