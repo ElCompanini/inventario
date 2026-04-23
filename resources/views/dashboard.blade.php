@@ -338,7 +338,7 @@
                         @else
                         {{-- Usuario: solicitar salida --}}
                         <button type="button"
-                            onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'salida', {{ $producto->stock_actual }})"
+                            onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'salida', {{ $producto->stock_actual }}, {{ $producto->solicitudes->sum('cantidad') }})"
                             class="btn-accion-orange inline-flex items-center gap-1 text-white text-xs font-medium px-3 py-1.5 rounded-lg"
                             {{ $producto->stock_actual <= 0 ? 'disabled' : '' }}>
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -365,8 +365,8 @@
                 <h3 class="text-lg font-semibold text-gray-800" id="modal-titulo">Solicitar movimiento</h3>
                 <p class="text-sm text-gray-500" id="modal-subtitulo"></p>
             </div>
-            <button onclick="cerrarModal()" class="text-gray-400 hover:text-gray-600 transition">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <button onclick="cerrarModal()" class="text-gray-400 hover:text-gray-600 transition cursor-pointer">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
@@ -383,6 +383,9 @@
                     <span>Stock disponible:</span>
                     <span class="font-bold text-gray-800" id="modal-stock">—</span>
                 </div>
+
+                {{-- Advertencia pendientes --}}
+                <div id="modal-aviso-pendiente" style="display:none;"></div>
 
                 {{-- Cantidad --}}
                 <div>
@@ -407,15 +410,17 @@
                                      focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         placeholder="Describe el motivo de esta solicitud..."></textarea>
                 </div>
+
+                <p id="modal-error" class="hidden px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg"></p>
             </div>
 
             <div class="px-6 py-4 flex gap-3 justify-end" style="border-top:1px solid #f3f4f6;">
                 <button type="button" onclick="cerrarModal()"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                    class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
                     Cancelar
                 </button>
                 <button type="submit" id="modal-btn-submit"
-                    class="px-4 py-2 text-sm font-medium text-white rounded-lg transition">
+                    class="btn-primary px-4 py-2 text-sm font-medium text-white rounded-lg transition">
                     Enviar solicitud
                 </button>
             </div>
@@ -423,31 +428,147 @@
     </div>
 </div>
 
+{{-- Modal confirmación descarte --}}
+<div id="modal-descarte" style="display:none; position:fixed; inset:0; z-index:60; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 20px 60px rgba(0,0,0,0.25); width:100%; max-width:360px; animation: traslado-in .2s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="padding:1.5rem 1.5rem 1rem;">
+            <p style="font-size:0.9375rem; font-weight:600; color:#1f2937; margin:0 0 0.25rem;">¿Descartar cambios?</p>
+            <p style="font-size:0.875rem; color:#6b7280; margin:0;">Los datos ingresados se perderán.</p>
+        </div>
+        <div style="padding:0 1.5rem 1.25rem; display:flex; gap:0.5rem; justify-content:flex-end;">
+            <button type="button" onclick="cerrarDescarte()"
+                class="btn-secondary"
+                style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">
+                Seguir editando
+            </button>
+            <button type="button" onclick="confirmarDescarte()"
+                class="btn-danger"
+                style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; color:#fff; background:#ef4444; border:none; border-radius:0.5rem; cursor:pointer;">
+                Descartar
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- Modal confirmación pendientes --}}
+<div id="modal-confirmar-pendiente" style="display:none; position:fixed; inset:0; z-index:70; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 20px 60px rgba(0,0,0,0.25); width:100%; max-width:400px; animation: traslado-in .2s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="padding:1.5rem 1.5rem 0.75rem; display:flex; align-items:flex-start; gap:0.75rem;">
+            <div style="flex-shrink:0; width:2rem; height:2rem; border-radius:9999px; background:#fef3c7; display:flex; align-items:center; justify-content:center; margin-top:0.1rem;">
+                <svg style="width:1rem;height:1rem;color:#d97706;" fill="none" stroke="#d97706" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p style="font-size:0.9375rem; font-weight:600; color:#1f2937; margin:0 0 0.35rem;">Solicitudes pendientes sin confirmar</p>
+                <p style="font-size:0.8125rem; color:#6b7280; margin:0;" id="modal-confirmar-texto">
+                    Existen solicitudes pendientes para este producto. Sin un administrador disponible para verificar el stock real, la solicitud podría no ser atendida.
+                </p>
+            </div>
+        </div>
+        <div style="padding:1rem 1.5rem 1.25rem; display:flex; gap:0.5rem; justify-content:flex-end;">
+            <button type="button" onclick="cancelarConfirmarPendiente()"
+                class="btn-secondary"
+                style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">
+                Cancelar
+            </button>
+            <button type="button" onclick="confirmarPendiente()"
+                class="btn-primary"
+                style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; color:#fff; background:#f97316; border:none; border-radius:0.5rem; cursor:pointer;">
+                Enviar de todas formas
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
-    function abrirModal(productoId, nombre, tipo, stockActual) {
+    function mostrarErrorModal(msg) {
+        var el = document.getElementById('modal-error');
+        el.textContent = msg;
+        el.classList.remove('hidden');
+    }
+
+    function ocultarErrorModal() {
+        document.getElementById('modal-error').classList.add('hidden');
+    }
+
+    function tieneDatos() {
+        var cantidad = document.getElementById('modal-cantidad').value.trim();
+        var motivo   = document.getElementById('modal-motivo').value.trim();
+        return cantidad !== '' || motivo !== '';
+    }
+
+    function cerrarDescarte() {
+        document.getElementById('modal-descarte').style.display = 'none';
+    }
+
+    function confirmarDescarte() {
+        document.getElementById('modal-descarte').style.display = 'none';
+        document.getElementById('modal-solicitud').classList.add('hidden');
+        ocultarErrorModal();
+    }
+
+    var _pendienteActual = 0;
+    var _submitForzado   = false;
+
+    function cancelarConfirmarPendiente() {
+        document.getElementById('modal-confirmar-pendiente').style.display = 'none';
+    }
+
+    function confirmarPendiente() {
+        document.getElementById('modal-confirmar-pendiente').style.display = 'none';
+        _submitForzado = true;
+        document.getElementById('form-solicitud').requestSubmit();
+    }
+
+    function abrirModal(productoId, nombre, tipo, stockActual, pendiente) {
+        _pendienteActual = pendiente || 0;
+        _submitForzado   = false;
         document.getElementById('modal-producto-id').value = productoId;
         document.getElementById('modal-tipo').value = tipo;
         document.getElementById('modal-cantidad').value = '';
         document.getElementById('modal-motivo').value = '';
         document.getElementById('modal-stock').textContent = stockActual;
+        ocultarErrorModal();
+
+        var aviso = document.getElementById('modal-aviso-pendiente');
+        if (pendiente > 0) {
+            var critico = pendiente >= stockActual;
+            aviso.style.display = 'block';
+            aviso.innerHTML =
+                '<div style="display:flex; align-items:flex-start; gap:0.5rem; padding:0.6rem 0.75rem; border-radius:0.5rem; font-size:0.8125rem; font-weight:500;'
+                + (critico
+                    ? 'background:#fef2f2; border:1px solid #fca5a5; color:#b91c1c;'
+                    : 'background:#fffbeb; border:1px solid #fcd34d; color:#92400e;')
+                + '">'
+                + '<svg style="width:14px;height:14px;flex-shrink:0;margin-top:1px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">'
+                + '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'
+                + '</svg>'
+                + '<span>Hay <strong>' + pendiente + '</strong> unidad' + (pendiente !== 1 ? 'es' : '') + ' con solicitudes pendientes de aprobación'
+                + (critico ? ' — superan el stock disponible.' : '.') + '</span>'
+                + '</div>';
+        } else {
+            aviso.style.display = 'none';
+        }
 
         document.getElementById('modal-titulo').textContent = 'Solicitar Salida — ' + nombre;
         document.getElementById('modal-subtitulo').textContent = 'Retirar unidades del inventario';
         document.getElementById('modal-btn-submit').className =
-            'px-4 py-2 text-sm font-medium text-white rounded-lg transition bg-orange-500 hover:bg-orange-600';
+            'btn-primary px-4 py-2 text-sm font-medium text-white rounded-lg transition bg-orange-500 hover:bg-orange-600';
 
         document.getElementById('modal-solicitud').classList.remove('hidden');
         document.getElementById('modal-cantidad').focus();
     }
 
     function cerrarModal() {
+        if (tieneDatos()) {
+            document.getElementById('modal-descarte').style.display = 'flex';
+            return;
+        }
         document.getElementById('modal-solicitud').classList.add('hidden');
+        ocultarErrorModal();
     }
 
-    // Cerrar modal al hacer click fuera
-    document.getElementById('modal-solicitud').addEventListener('click', function(e) {
-        if (e.target === this) cerrarModal();
-    });
 
     // Validación del formulario antes de enviar
     document.getElementById('form-solicitud').addEventListener('submit', function(e) {
@@ -458,19 +579,31 @@
 
         if (!cantidad || cantidad < 1) {
             e.preventDefault();
-            alert('La cantidad debe ser mayor a 0.');
+            mostrarErrorModal('La cantidad debe ser mayor a 0.');
             return;
         }
         if (!motivo) {
             e.preventDefault();
-            alert('El motivo es obligatorio.');
+            mostrarErrorModal('El motivo es obligatorio.');
             return;
         }
         if (tipo === 'salida' && cantidad > stock) {
             e.preventDefault();
-            alert('La cantidad no puede superar el stock disponible (' + stock + ').');
+            mostrarErrorModal('La cantidad no puede superar el stock disponible.');
             return;
         }
+
+        // Si hay pendientes y no se ha confirmado, mostrar aviso
+        if (_pendienteActual > 0 && !_submitForzado) {
+            e.preventDefault();
+            var texto = 'Existen <strong>' + _pendienteActual + '</strong> unidad' + (_pendienteActual !== 1 ? 'es' : '')
+                + ' con solicitudes pendientes para este producto. Sin un administrador disponible para verificar el stock real, la solicitud podría no ser atendida. ¿Desea continuar de todas formas?';
+            document.getElementById('modal-confirmar-texto').innerHTML = texto;
+            document.getElementById('modal-confirmar-pendiente').style.display = 'flex';
+            return;
+        }
+
+        ocultarErrorModal();
     });
 </script>
 @endif

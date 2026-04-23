@@ -121,6 +121,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::put('/catalogo/categorias/{categoria}', [CatalogoController::class, 'updateCategoria'])->name('catalogo.categorias.update');
     Route::post('/catalogo/productos', [CatalogoController::class, 'storeProducto'])->name('catalogo.productos.store');
     Route::put('/catalogo/productos/{producto}', [CatalogoController::class, 'updateProducto'])->name('catalogo.productos.update');
+    Route::get('/catalogo/barcode', [CatalogoController::class, 'buscarBarcode'])->name('catalogo.barcode');
+    Route::patch('/catalogo/productos/{producto}/barcode', [CatalogoController::class, 'asociarBarcode'])->name('catalogo.productos.asociar-barcode');
 
     // Containers
     Route::get('/containers', [ContainerController::class, 'index'])->name('containers.index');

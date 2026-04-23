@@ -4,18 +4,59 @@
 @section('content')
 
 {{-- Header --}}
-<div class="mb-6 flex items-center justify-between">
+<div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
     <div>
         <h1 class="text-2xl font-bold text-gray-800">Catálogo de Productos</h1>
         <p class="text-sm text-gray-500 mt-1">Gestión de familias, categorías y productos</p>
     </div>
-    <button onclick="abrirModalFamilia()"
-            class="btn-primary inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-        </svg>
-        Nueva familia
-    </button>
+    <div class="flex items-center gap-2">
+        <button onclick="toggleScanner()"
+                id="btn-scanner"
+                class="btn-ghost inline-flex items-center gap-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-semibold px-4 py-2 rounded-lg">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5a1 1 0 011-1h2M4 17v2a1 1 0 001 1h2M17 4h2a1 1 0 011 1v2M17 20h2a1 1 0 001-1v-2M7 12h10"/>
+            </svg>
+            Scanner
+        </button>
+        <button onclick="abrirModalFamilia()"
+                class="btn-primary inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            Nueva familia
+        </button>
+    </div>
+</div>
+
+{{-- Panel Scanner --}}
+<div id="scanner-panel" style="display:none;" class="mb-6">
+    <div class="bg-white rounded-xl shadow border border-indigo-100 p-5">
+        <div class="flex items-center gap-2 mb-4">
+            <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5a1 1 0 011-1h2M4 17v2a1 1 0 001 1h2M17 4h2a1 1 0 011 1v2M17 20h2a1 1 0 001-1v-2M7 12h10"/>
+            </svg>
+            <h2 class="text-sm font-bold text-gray-700">Escanear código de barras</h2>
+            <span class="ml-auto text-xs text-gray-400">Escanea o escribe el código y presiona Enter</span>
+        </div>
+
+        <div class="flex gap-2">
+            <input type="text" id="barcode-input"
+                   placeholder="Apunta la pistola aquí..."
+                   autocomplete="off"
+                   class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                   onkeydown="if(event.key==='Enter') buscarBarcode()">
+            <button onclick="buscarBarcode()"
+                    class="btn-primary inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+                Buscar
+            </button>
+            <button onclick="limpiarScanner()"
+                    class="btn-ghost border border-gray-300 text-gray-500 hover:text-gray-700 text-sm px-3 py-2 rounded-lg">
+                ✕
+            </button>
+        </div>
+
+        <div id="scanner-resultado" class="mt-4" style="display:none;"></div>
+    </div>
 </div>
 
 @if(session('success'))
@@ -234,6 +275,140 @@
     </div>
 </div>
 
+{{-- Modal confirmación asociar barcode --}}
+<div id="modal-confirmar-asociar" style="display:none; position:fixed; inset:0; z-index:70; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 20px 60px rgba(0,0,0,0.25); width:440px; max-width:calc(100vw - 2rem); animation: cat-in .2s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="padding:1.5rem 1.5rem 1rem; display:flex; align-items:flex-start; gap:0.75rem;">
+            <div style="flex-shrink:0; width:2.25rem; height:2.25rem; border-radius:9999px; background:#e0e7ff; display:flex; align-items:center; justify-content:center;">
+                <svg style="width:1.1rem;height:1.1rem;" fill="none" stroke="#4338ca" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5a1 1 0 011-1h2M4 17v2a1 1 0 001 1h2M17 4h2a1 1 0 011 1v2M17 20h2a1 1 0 001-1v-2M7 12h10"/>
+                </svg>
+            </div>
+            <div style="flex:1;">
+                <p style="font-size:0.9375rem; font-weight:700; color:#1f2937; margin:0 0 0.4rem;">¿Asociar código de barras?</p>
+                <p id="confirmar-asociar-texto" style="font-size:0.8125rem; color:#6b7280; margin:0; line-height:1.5;"></p>
+                <div style="margin-top:0.75rem; padding:0.5rem 0.75rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:0.5rem;">
+                    <p style="font-size:0.7rem; color:#94a3b8; margin:0 0 0.2rem; text-transform:uppercase; letter-spacing:0.05em;">Se creará un nuevo producto</p>
+                    <p id="confirmar-asociar-detalle" style="font-size:0.8125rem; font-weight:600; color:#1e293b; margin:0;"></p>
+                </div>
+            </div>
+        </div>
+        <div style="padding:0.75rem 1.5rem 1.25rem; display:flex; gap:0.5rem; justify-content:flex-end;">
+            <button type="button" onclick="cancelarAsociar()"
+                    class="btn-secondary"
+                    style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">
+                Cancelar
+            </button>
+            <button type="button" id="btn-confirmar-asociar" onclick="confirmarAsociar()"
+                    class="btn-primary"
+                    style="padding:0.5rem 1.1rem; font-size:0.875rem; font-weight:600; color:#fff; background:#4f46e5; border:none; border-radius:0.5rem; cursor:pointer;">
+                Sí, asociar
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- Modal Wizard Barcode --}}
+<div id="modal-barcode" style="display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.5); overflow-y:auto;">
+    <div id="modal-barcode-inner" style="background:#fff; border-radius:1rem; box-shadow:0 20px 60px rgba(0,0,0,0.25); width:520px; max-width:calc(100vw - 2rem); margin:5vh auto; position:relative; animation: cat-in .25s cubic-bezier(.22,.68,0,1.2) both;">
+
+        {{-- Header --}}
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div>
+                <h3 class="text-base font-bold text-gray-800" id="bc-wizard-titulo">Nuevo producto</h3>
+                <p class="text-xs text-gray-500 mt-0.5" id="bc-wizard-subtitulo">Código: <span id="bc-codigo-display" class="font-mono font-semibold text-indigo-600"></span></p>
+            </div>
+            <button onclick="cerrarModalBarcode()" class="text-gray-400 hover:text-gray-600 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        {{-- Steps indicator --}}
+        <div class="px-6 pt-4 flex items-center gap-2">
+            @foreach(['Familia','Categoría','Producto'] as $i => $step)
+            <div class="flex items-center gap-2 {{ $loop->last ? '' : 'flex-1' }}">
+                <div id="bc-step-circle-{{ $i+1 }}" class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style="background:#e0e7ff; color:#4338ca;">{{ $i+1 }}</div>
+                <span id="bc-step-label-{{ $i+1 }}" class="text-xs font-medium text-gray-500 whitespace-nowrap">{{ $step }}</span>
+                @unless($loop->last)
+                <div class="flex-1 h-px bg-gray-200 mx-1"></div>
+                @endunless
+            </div>
+            @endforeach
+        </div>
+
+        {{-- Step 1: Familia --}}
+        <div id="bc-step-1" class="px-6 py-5">
+            <p class="text-sm font-medium text-gray-700 mb-3">Selecciona la familia:</p>
+            <div id="bc-familias-lista" class="grid grid-cols-2 gap-2"></div>
+            <div id="bc-step1-errors" class="hidden mt-3 text-xs text-red-600"></div>
+        </div>
+
+        {{-- Step 2: Categoría --}}
+        <div id="bc-step-2" class="px-6 py-5" style="display:none;">
+            <p class="text-sm font-medium text-gray-700 mb-3">Selecciona o crea la categoría:</p>
+            <div id="bc-categorias-lista" class="grid grid-cols-2 gap-2 mb-3"></div>
+            <div class="flex gap-2 mt-2">
+                <input type="text" id="bc-nueva-cat" placeholder="Nueva categoría..."
+                       class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <button onclick="bcCrearCategoria()"
+                        class="btn-primary text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg">
+                    Crear
+                </button>
+            </div>
+            <div id="bc-step2-errors" class="hidden mt-3 text-xs text-red-600"></div>
+        </div>
+
+        {{-- Step 3: Producto --}}
+        <div id="bc-step-3" class="px-6 py-5" style="display:none;">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Descripción <span class="text-red-500">*</span></label>
+                    <textarea id="bc-descripcion" rows="2" maxlength="500"
+                              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                              placeholder="Ej: Memoria RAM 16GB DDR5..."></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Stock mínimo</label>
+                        <input type="number" id="bc-stock-minimo" min="0" value="0"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Stock crítico</label>
+                        <input type="number" id="bc-stock-critico" min="0" value="0"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    </div>
+                </div>
+                <div id="bc-step3-errors" class="hidden text-xs text-red-600"></div>
+            </div>
+        </div>
+
+        {{-- Footer --}}
+        <div class="px-6 pb-5 flex justify-between gap-3" style="border-top:1px solid #f3f4f6; padding-top:1rem;">
+            <button id="bc-btn-atras" onclick="bcAtras()" style="display:none;"
+                    class="btn-secondary px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                ← Atrás
+            </button>
+            <div class="ml-auto flex gap-2">
+                <button onclick="cerrarModalBarcode()"
+                        class="btn-secondary px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                    Cancelar
+                </button>
+                <button id="bc-btn-siguiente" onclick="bcSiguiente()"
+                        class="btn-primary px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+                    Siguiente →
+                </button>
+                <button id="bc-btn-guardar" onclick="bcGuardar()" style="display:none;"
+                        class="btn-primary px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg">
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @push('head')
 <style>
     @keyframes cat-in {
@@ -245,12 +420,14 @@
 
 @push('scripts')
 <script>
-const CSRF           = '{{ csrf_token() }}';
+const CSRF             = '{{ csrf_token() }}';
 const ROUTE_FAM_STORE  = '{{ route('admin.catalogo.familias.store') }}';
 const ROUTE_CAT_STORE  = '{{ route('admin.catalogo.categorias.store') }}';
 const ROUTE_CAT_UPDATE = (id) => `{{ url('admin/catalogo/categorias') }}/${id}`;
 const ROUTE_PROD_STORE  = '{{ route('admin.catalogo.productos.store') }}';
 const ROUTE_PROD_UPDATE = (id) => `{{ url('admin/catalogo/productos') }}/${id}`;
+const ROUTE_BARCODE          = '{{ route('admin.catalogo.barcode') }}';
+const ROUTE_ASOCIAR_BARCODE  = (id) => `{{ url('admin/catalogo/productos') }}/${id}/barcode`;
 
 const catalogoData   = JSON.parse(document.getElementById('catalogo-data').textContent);
 const containersData = JSON.parse(document.getElementById('containers-data').textContent);
@@ -260,6 +437,308 @@ let catActualNombre = '';
 let catFamiliaId   = {{ $familiaActiva }};
 let editandoCatId  = null;
 let editandoProdId = null;
+
+// ── Scanner de código de barras ───────────────────────────────────────────────
+
+function toggleScanner() {
+    const panel = document.getElementById('scanner-panel');
+    const open  = panel.style.display !== 'none';
+    panel.style.display = open ? 'none' : 'block';
+    if (!open) setTimeout(() => document.getElementById('barcode-input').focus(), 80);
+}
+
+function limpiarScanner() {
+    document.getElementById('barcode-input').value = '';
+    document.getElementById('scanner-resultado').style.display = 'none';
+    document.getElementById('barcode-input').focus();
+}
+
+let _asociarProductoId  = null;
+let _asociarCodigo      = '';
+let _asociarDescripcion = '';
+
+function asociarBarcode(productoId, codigo, descripcion) {
+    _asociarProductoId  = productoId;
+    _asociarCodigo      = codigo;
+    _asociarDescripcion = descripcion;
+
+    document.getElementById('confirmar-asociar-texto').innerHTML =
+        'El código <span style="font-family:monospace;font-weight:700;color:#4338ca;">' + escHtml(codigo) + '</span> '
+        + 'se vinculará como una entrada independiente. El producto original no será modificado.';
+    document.getElementById('confirmar-asociar-detalle').textContent = descripcion;
+    document.getElementById('modal-confirmar-asociar').style.display = 'flex';
+}
+
+function cancelarAsociar() {
+    document.getElementById('modal-confirmar-asociar').style.display = 'none';
+}
+
+async function confirmarAsociar() {
+    const btn = document.getElementById('btn-confirmar-asociar');
+    btn.disabled = true;
+    btn.textContent = 'Asociando...';
+    try {
+        const body = new URLSearchParams({ _token: CSRF, codigo_barras: _asociarCodigo, _method: 'PATCH' });
+        const res  = await fetch(ROUTE_ASOCIAR_BARCODE(_asociarProductoId), {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+            body
+        });
+        const json = await res.json();
+        cancelarAsociar();
+        if (json.ok) {
+            const btnAsociar = document.getElementById('btn-asociar-' + _asociarProductoId);
+            if (btnAsociar) {
+                btnAsociar.textContent = '✓ Asociado';
+                btnAsociar.style.background = '#16a34a';
+                btnAsociar.disabled = true;
+            }
+            buscarBarcode();
+        }
+    } catch(e) {
+        cancelarAsociar();
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sí, asociar';
+    }
+}
+
+async function buscarBarcode() {
+    const codigo = document.getElementById('barcode-input').value.trim();
+    if (!codigo) return;
+
+    const resDiv = document.getElementById('scanner-resultado');
+    resDiv.style.display = 'block';
+    resDiv.innerHTML = '<p class="text-xs text-gray-400 flex items-center gap-1.5"><svg class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v3m6.364 1.636-2.121 2.121M21 12h-3"/></svg>Buscando...</p>';
+
+    try {
+        const r    = await fetch(ROUTE_BARCODE + '?codigo=' + encodeURIComponent(codigo));
+        const data = await r.json();
+
+        if (data.encontrado) {
+            const p = data.producto;
+            resDiv.innerHTML = `
+            <div class="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+                <div class="mt-0.5 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">Producto encontrado</p>
+                    <p class="text-sm font-semibold text-gray-800">${escHtml(p.descripcion)}</p>
+                    <p class="text-xs text-gray-500 mt-0.5">${escHtml(p.familia)} › ${escHtml(p.categoria)}</p>
+                    <p class="text-xs text-gray-400 mt-1 font-mono">Código: ${escHtml(p.codigo_barras)}</p>
+                </div>
+                <div class="text-right shrink-0">
+                    <p class="text-xs text-gray-500">Stock actual</p>
+                    <p class="text-2xl font-bold text-gray-800">${p.stock_actual}</p>
+                </div>
+            </div>`;
+        } else {
+            let html = `
+            <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-3">
+                <div class="flex items-center gap-2 mb-1">
+                    <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    <p class="text-sm font-bold text-amber-700">Producto nuevo</p>
+                </div>
+                <p class="text-xs text-amber-600">El código <span class="font-mono font-semibold">${escHtml(codigo)}</span> no existe en el catálogo.</p>
+                <button onclick="abrirWizardBarcode('${escHtml(codigo).replace(/'/g,"\\\'")}')"
+                        class="btn-primary mt-3 inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Agregar al catálogo
+                </button>
+            </div>`;
+
+            if (data.similares && data.similares.length > 0) {
+                html += `<p class="text-xs font-semibold text-gray-500 mb-2">Productos con código similar:</p>
+                <div class="space-y-2">`;
+                data.similares.forEach(s => {
+                    const pct   = s.similitud;
+                    const color = pct >= 80 ? '#16a34a' : pct >= 60 ? '#d97706' : '#6b7280';
+                    html += `
+                    <div class="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+                        <div class="shrink-0 text-center" style="min-width:42px;">
+                            <p class="text-base font-bold" style="color:${color};">${pct}%</p>
+                            <p class="text-xs text-gray-400">similar</p>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-800 truncate">${escHtml(s.descripcion)}</p>
+                            <p class="text-xs text-gray-400">${escHtml(s.familia)} › ${escHtml(s.categoria)}</p>
+                            <p class="text-xs font-mono text-gray-400">${escHtml(s.codigo_barras)}</p>
+                        </div>
+                        <button id="btn-asociar-${s.id}"
+                                onclick="asociarBarcode(${s.id}, '${escHtml(codigo).replace(/'/g,"\\'")}', '${escHtml(s.descripcion).replace(/'/g,"\\'")}')"
+                                class="btn-primary shrink-0 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg" style="cursor:pointer;">
+                            Asociar
+                        </button>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            resDiv.innerHTML = html;
+        }
+    } catch(e) {
+        resDiv.innerHTML = '<p class="text-xs text-red-500">Error de conexión.</p>';
+    }
+}
+
+// ── Wizard barcode ─────────────────────────────────────────────────────────────
+
+let bcCodigo        = '';
+let bcStep          = 1;
+let bcFamiliaId     = null;
+let bcFamiliaNombre = '';
+let bcCatId         = null;
+let bcCatNombre     = '';
+
+function abrirWizardBarcode(codigo) {
+    bcCodigo    = codigo;
+    bcStep      = 1;
+    bcFamiliaId = null;
+    bcCatId     = null;
+    document.getElementById('bc-codigo-display').textContent = codigo;
+    bcIrAStep(1);
+    document.getElementById('modal-barcode').style.display = 'block';
+    void document.getElementById('modal-barcode-inner').offsetHeight;
+    document.getElementById('modal-barcode-inner').style.animation = 'cat-in .25s cubic-bezier(.22,.68,0,1.2) both';
+}
+
+function cerrarModalBarcode() {
+    document.getElementById('modal-barcode').style.display = 'none';
+}
+
+function bcIrAStep(step) {
+    bcStep = step;
+    [1,2,3].forEach(n => {
+        document.getElementById('bc-step-' + n).style.display = n === step ? 'block' : 'none';
+        const circle = document.getElementById('bc-step-circle-' + n);
+        const label  = document.getElementById('bc-step-label-' + n);
+        if (n < step) {
+            circle.style.background = '#bbf7d0'; circle.style.color = '#166534';
+            circle.innerHTML = '✓';
+        } else if (n === step) {
+            circle.style.background = '#4338ca'; circle.style.color = '#fff';
+            circle.innerHTML = n;
+            label.style.color = '#4338ca'; label.style.fontWeight = '600';
+        } else {
+            circle.style.background = '#e0e7ff'; circle.style.color = '#4338ca';
+            circle.innerHTML = n;
+            label.style.color = '#9ca3af'; label.style.fontWeight = '500';
+        }
+    });
+    document.getElementById('bc-btn-atras').style.display    = step > 1 ? 'inline-flex' : 'none';
+    document.getElementById('bc-btn-siguiente').style.display = step < 3 ? 'inline-flex' : 'none';
+    document.getElementById('bc-btn-guardar').style.display   = step === 3 ? 'inline-flex' : 'none';
+
+    if (step === 1) bcRenderFamilias();
+    if (step === 2) bcRenderCategorias();
+    if (step === 3) setTimeout(() => document.getElementById('bc-descripcion').focus(), 50);
+}
+
+function bcRenderFamilias() {
+    const lista = document.getElementById('bc-familias-lista');
+    lista.innerHTML = '';
+    catalogoData.forEach(f => {
+        const sel = f.id === bcFamiliaId;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = f.nombre;
+        btn.className = 'text-sm font-medium px-4 py-3 rounded-xl border text-left transition ' +
+            (sel ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400 hover:text-indigo-600');
+        btn.onclick = () => { bcFamiliaId = f.id; bcFamiliaNombre = f.nombre; bcRenderFamilias(); };
+        lista.appendChild(btn);
+    });
+}
+
+function bcRenderCategorias() {
+    const familia = catalogoData.find(f => f.id === bcFamiliaId);
+    const lista   = document.getElementById('bc-categorias-lista');
+    lista.innerHTML = '';
+    if (!familia) return;
+    document.getElementById('bc-wizard-titulo').textContent = 'Nueva categoría — ' + bcFamiliaNombre;
+    familia.categorias.forEach(c => {
+        const sel = c.id === bcCatId;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = c.nombre;
+        btn.className = 'text-sm font-medium px-4 py-3 rounded-xl border text-left transition ' +
+            (sel ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400 hover:text-indigo-600');
+        btn.onclick = () => { bcCatId = c.id; bcCatNombre = c.nombre; bcRenderCategorias(); };
+        lista.appendChild(btn);
+    });
+    document.getElementById('bc-nueva-cat').value = '';
+}
+
+async function bcCrearCategoria() {
+    const nombre = document.getElementById('bc-nueva-cat').value.trim();
+    const errDiv = document.getElementById('bc-step2-errors');
+    if (!nombre) { errDiv.textContent = 'Escribe el nombre.'; errDiv.classList.remove('hidden'); return; }
+    errDiv.classList.add('hidden');
+    try {
+        const body = new URLSearchParams({ _token: CSRF, nombre, familia_id: bcFamiliaId });
+        const res  = await fetch(ROUTE_CAT_STORE, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        const json = await res.json();
+        if (!res.ok || !json.ok) { errDiv.textContent = json.errors?.nombre?.[0] ?? 'Error.'; errDiv.classList.remove('hidden'); return; }
+        // Agregar al catalogoData local
+        const familia = catalogoData.find(f => f.id === bcFamiliaId);
+        if (familia) familia.categorias.push({ id: json.id, nombre: json.nombre, productos: [] });
+        bcCatId = json.id; bcCatNombre = json.nombre;
+        bcRenderCategorias();
+    } catch(e) { errDiv.textContent = 'Error de conexión.'; errDiv.classList.remove('hidden'); }
+}
+
+function bcSiguiente() {
+    if (bcStep === 1) {
+        const errDiv = document.getElementById('bc-step1-errors');
+        if (!bcFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.classList.remove('hidden'); return; }
+        errDiv.classList.add('hidden');
+        document.getElementById('bc-wizard-titulo').textContent = 'Selecciona la categoría';
+        bcIrAStep(2);
+    } else if (bcStep === 2) {
+        const errDiv = document.getElementById('bc-step2-errors');
+        if (!bcCatId) { errDiv.textContent = 'Selecciona o crea una categoría.'; errDiv.classList.remove('hidden'); return; }
+        errDiv.classList.add('hidden');
+        document.getElementById('bc-wizard-titulo').textContent = 'Datos del producto';
+        document.getElementById('bc-descripcion').value  = '';
+        document.getElementById('bc-stock-minimo').value = '0';
+        document.getElementById('bc-stock-critico').value = '0';
+        document.getElementById('bc-step3-errors').classList.add('hidden');
+        bcIrAStep(3);
+    }
+}
+
+function bcAtras() {
+    if (bcStep === 2) { document.getElementById('bc-wizard-titulo').textContent = 'Nuevo producto'; bcIrAStep(1); }
+    else if (bcStep === 3) { document.getElementById('bc-wizard-titulo').textContent = 'Selecciona la categoría'; bcIrAStep(2); }
+}
+
+async function bcGuardar() {
+    const descripcion   = document.getElementById('bc-descripcion').value.trim();
+    const stock_minimo  = document.getElementById('bc-stock-minimo').value;
+    const stock_critico = document.getElementById('bc-stock-critico').value;
+    const errDiv        = document.getElementById('bc-step3-errors');
+    if (!descripcion) { errDiv.textContent = 'La descripción es obligatoria.'; errDiv.classList.remove('hidden'); return; }
+    errDiv.classList.add('hidden');
+    const btn = document.getElementById('bc-btn-guardar');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try {
+        const body = new URLSearchParams({ _token: CSRF, descripcion, stock_minimo, stock_critico, categoria_id: bcCatId, codigo_barras: bcCodigo });
+        const res  = await fetch(ROUTE_PROD_STORE, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        const json = await res.json();
+        if (!res.ok || !json.ok) { errDiv.textContent = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message ?? 'Error.'); errDiv.classList.remove('hidden'); }
+        else {
+            cerrarModalBarcode();
+            limpiarScanner();
+            location.reload();
+        }
+    } catch(e) { errDiv.textContent = 'Error de conexión.'; errDiv.classList.remove('hidden'); }
+    finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+}
 
 // ── Modal helpers ────────────────────────────────────────────────────────────
 
