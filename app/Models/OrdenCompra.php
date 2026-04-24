@@ -19,11 +19,45 @@ class OrdenCompra extends Model
         'procesado_por',
         'procesado_at',
         'usuario_id',
+        // Campos API Mercado Público
+        'api_codigo',
+        'api_licitacion_codigo',
+        'api_items',
+        'api_nombre',
+        'api_descripcion',
+        'api_tipo',
+        'api_tipo_moneda',
+        'api_estado_mp',
+        'api_fecha_envio',
+        'api_total',
+        'api_impuestos',
+        'api_proveedor_nombre',
+        'api_proveedor_rut',
+        'api_contacto',
+        'api_validado_at',
+        'api_error',
+        'api_intentos',
     ];
 
     protected $casts = [
-        'procesado_at' => 'datetime',
+        'procesado_at'    => 'datetime',
+        'api_validado_at' => 'datetime',
+        'api_total'       => 'integer',
+        'api_impuestos'   => 'integer',
+        'api_intentos'    => 'integer',
+        'api_items'       => 'array',
     ];
+
+    public function estaValidada(): bool
+    {
+        return $this->estado === 'validado' || $this->estado === 'recibido';
+    }
+
+    public function totalFormateado(): string
+    {
+        if ($this->api_total === null) return '—';
+        return '$' . number_format($this->api_total, 0, ',', '.');
+    }
 
     public function usuario()
     {

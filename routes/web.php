@@ -85,6 +85,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/ordenes/crear', [OrdenCompraController::class, 'create'])->name('ordenes.create');
     Route::post('/ordenes/subir-temp', [OrdenCompraController::class, 'subirArchivoTemp'])->name('ordenes.subir.temp');
     Route::post('/ordenes', [OrdenCompraController::class, 'store'])->name('ordenes.store');
+    Route::get('/ordenes/api-status', [OrdenCompraController::class, 'estadoApi'])->name('ordenes.api-status');
+    Route::post('/ordenes/buscar-mp', [OrdenCompraController::class, 'buscarEnMercadoPublico'])->name('ordenes.buscar-mp');
+    Route::post('/ordenes/{orden}/validar-mp', [OrdenCompraController::class, 'validarMercadoPublico'])->name('ordenes.validar-mp');
     Route::get('/ordenes/{id}', [OrdenCompraController::class, 'show'])->name('ordenes.show');
     Route::post('/ordenes/{id}/factura', [OrdenCompraController::class, 'subirFactura'])->name('ordenes.factura.subir');
     Route::post('/ordenes/{id}/guia', [OrdenCompraController::class, 'subirGuia'])->name('ordenes.guia.subir');

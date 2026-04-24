@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\MercadoPublicoException;
 use App\Models\Container;
 use App\Models\Factura;
 use App\Models\GuiaDespacho;
 use App\Models\HistorialCambio;
 use App\Models\OrdenCompra;
 use App\Models\Sicd;
+use App\Services\MercadoPublicoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
 class OrdenCompraController extends Controller
@@ -316,5 +320,215 @@ class OrdenCompraController extends Controller
             ]);
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    // ── Validación contra API Mercado Público ─────────────────────────────────
+
+    public function validarMercadoPublico(OrdenCompra $orden, MercadoPublicoService $mp)
+    {
+        abort_unless(auth()->user()->tienePermiso('ordenes'), 403);
+
+        if ($orden->estado === 'recibido') {
+            return response()->json([
+                'ok'      => false,
+                'mensaje' => 'Esta OC ya fue procesada y no puede re-validarse.',
+            ], 422);
+        }
+
+        $orden->increment('api_intentos');
+
+        try {
+            $data = $mp->consultarOC($orden->numero_oc);
+
+            if (!$data) {
+                $orden->update(['api_error' => 'OC no encontrada en Mercado Público.']);
+                return response()->json([
+                    'ok'      => false,
+                    'mensaje' => "La OC «{$orden->numero_oc}» no fue encontrada en Mercado Público.",
+                    'fila'    => $this->filaParaDataTable($orden->fresh()),
+                ]);
+            }
+
+            // Verificar que el código retornado coincide
+            if (!empty($data['codigo']) && strtoupper($data['codigo']) !== strtoupper($orden->numero_oc)) {
+                $msg = "Inconsistencia: la API devolvió el código «{$data['codigo']}» pero se consultó «{$orden->numero_oc}».";
+                $orden->update(['api_error' => $msg]);
+                return response()->json([
+                    'ok'      => false,
+                    'mensaje' => $msg,
+                    'fila'    => $this->filaParaDataTable($orden->fresh()),
+                ], 422);
+            }
+
+            $orden->update([
+                'estado'                => 'validado',
+                'api_codigo'            => $data['codigo'],
+                'api_licitacion_codigo' => $data['codigo_licitacion'] ?: null,
+                'api_items'             => $data['items'] ?: null,
+                'api_nombre'            => $data['nombre'],
+                'api_descripcion'       => $data['descripcion'],
+                'api_tipo'              => $data['tipo'],
+                'api_tipo_moneda'       => $data['tipo_moneda'],
+                'api_estado_mp'         => $data['estado'],
+                'api_fecha_envio'       => $data['fecha_envio'],
+                'api_total'             => $data['total'],
+                'api_impuestos'         => $data['impuestos'],
+                'api_proveedor_nombre'  => $data['proveedor_nombre'],
+                'api_proveedor_rut'     => $data['proveedor_rut'],
+                'api_contacto'          => $data['contacto'],
+                'api_validado_at'       => now(),
+                'api_error'             => null,
+            ]);
+
+            return response()->json([
+                'ok'      => true,
+                'mensaje' => "OC validada correctamente. Proveedor: {$data['proveedor_nombre']}",
+                'data'    => $data,
+                'fila'    => $this->filaParaDataTable($orden->fresh()),
+            ]);
+
+        } catch (MercadoPublicoException $e) {
+            $orden->update(['api_error' => $e->getMessage()]);
+            return response()->json([
+                'ok'      => false,
+                'mensaje' => $e->getMessage(),
+                'fila'    => $this->filaParaDataTable($orden->fresh()),
+            ], 422);
+        }
+    }
+
+    public function estadoApi()
+    {
+        abort_unless(auth()->user()->tienePermiso('ordenes'), 403);
+        $viva = app(MercadoPublicoService::class)->ping();
+        return response()->json(['activa' => $viva]);
+    }
+
+    // ── Búsqueda inteligente para el formulario de nueva OC ──────────────────
+
+    public function buscarEnMercadoPublico(Request $request, MercadoPublicoService $mp)
+    {
+        abort_unless(auth()->user()->tienePermiso('ordenes'), 403);
+        $request->validate(['codigo' => ['required', 'string', 'max:150']]);
+
+        $codigo  = strtoupper(trim($request->input('codigo')));
+        $sicdIds = array_filter((array) $request->input('sicd_ids', []), 'is_numeric');
+
+        // Cargar SICDs para comparación de montos (opcionales)
+        $sicdResumen = [];
+        $totalSicd   = 0;
+        $itemCount   = 0;
+
+        if (!empty($sicdIds)) {
+            $sicds = Sicd::with('detalles')->whereIn('id', $sicdIds)->get();
+            foreach ($sicds as $sicd) {
+                $parcial    = (float) $sicd->detalles->sum('total_neto');
+                $totalSicd += $parcial;
+                $itemCount += $sicd->detalles->count();
+                $sicdResumen[] = [
+                    'codigo'    => $sicd->codigo_sicd,
+                    'productos' => $sicd->detalles->count(),
+                    'total'     => $parcial,
+                ];
+            }
+        }
+
+        try {
+            $resultado    = $mp->consultarCualquierCodigo($codigo);
+            $encontrado   = $resultado['encontrado'];
+            $tipoBusqueda = $resultado['tipo_busqueda']; // 'oc' | 'licitacion' | null
+
+            if (!$encontrado) {
+                return response()->json([
+                    'encontrado'   => false,
+                    'mensaje'      => "«{$codigo}» no fue encontrado en Mercado Público (ni como OC ni como licitación).",
+                    'sicd_resumen' => $sicdResumen,
+                    'total_sicd'   => $totalSicd,
+                    'item_count'   => $itemCount,
+                ]);
+            }
+
+            $data     = $resultado['data'];
+            $tipoInfo = $mp->detectarTipoProceso($data['tipo'] ?? '');
+
+            // Clasificación basada en UTM actual (solo para OC con total neto)
+            if ($tipoBusqueda === 'oc' && !empty($data['total_neto'])) {
+                $utm = $this->getUTMActual();
+                if ($utm) {
+                    if ($data['total_neto'] < $utm * 100) {
+                        $tipoInfo = ['label' => 'Compra Ágil', 'icono' => '⚡', 'clase' => 'bg-green-100 text-green-800 border-green-200'];
+                    } else {
+                        $tipoInfo = ['label' => 'Orden de Compra', 'icono' => '📋', 'clase' => 'bg-indigo-100 text-indigo-800 border-indigo-200'];
+                    }
+                }
+            }
+
+            // Para comparación usamos el total disponible según tipo
+            $apiTotal = $tipoBusqueda === 'oc'
+                ? ($data['total']            ?? null)
+                : ($data['total_adjudicado'] ?? null);
+
+            $coincide = $apiTotal && $totalSicd > 0
+                && abs($totalSicd - $apiTotal) <= ($apiTotal * 0.05);
+
+            return response()->json([
+                'encontrado'    => true,
+                'tipo_busqueda' => $tipoBusqueda,
+                'codigo_oc'     => $resultado['codigo_oc'],
+                'codigo_lic'    => $resultado['codigo_lic'],
+                'tipo_info'     => $tipoInfo,
+                'api_data'      => $data,
+                'sicd_resumen'  => $sicdResumen,
+                'total_sicd'    => $totalSicd,
+                'item_count'    => $itemCount,
+                'comparacion'   => [
+                    'total_mp'   => $apiTotal,
+                    'total_sicd' => $totalSicd,
+                    'coincide'   => $coincide,
+                ],
+            ]);
+
+        } catch (MercadoPublicoException $e) {
+            return response()->json([
+                'encontrado'   => false,
+                'error'        => true,
+                'mensaje'      => $e->getMessage(),
+                'sicd_resumen' => $sicdResumen,
+                'total_sicd'   => $totalSicd,
+                'item_count'   => $itemCount,
+            ], 422);
+        }
+    }
+
+    private function getUTMActual(): ?float
+    {
+        return Cache::remember('utm_actual', now()->addHours(6), function () {
+            try {
+                $r = Http::withOptions(['verify' => false])->timeout(6)->get('https://mindicador.cl/api/utm');
+                if ($r->ok()) {
+                    $serie = $r->json('serie', []);
+                    if (!empty($serie[0]['valor'])) {
+                        return (float) $serie[0]['valor'];
+                    }
+                }
+            } catch (\Exception) {}
+            return null;
+        });
+    }
+
+    private function filaParaDataTable(OrdenCompra $oc): array
+    {
+        return [
+            'id'                    => $oc->id,
+            'numero_oc'             => $oc->numero_oc,
+            'estado'                => $oc->estado,
+            'api_proveedor_nombre'  => $oc->api_proveedor_nombre,
+            'api_estado_mp'         => $oc->api_estado_mp,
+            'api_total_fmt'         => $oc->totalFormateado(),
+            'api_validado_at'       => $oc->api_validado_at?->format('d/m/Y H:i'),
+            'api_error'             => $oc->api_error,
+            'api_intentos'          => $oc->api_intentos,
+            'api_licitacion_codigo' => $oc->api_licitacion_codigo,
+        ];
     }
 }

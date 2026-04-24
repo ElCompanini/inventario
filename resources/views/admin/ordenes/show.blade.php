@@ -223,6 +223,100 @@
             </div>
         </div>
 
+        {{-- MERCADO PÚBLICO --}}
+        <div class="bg-white rounded-xl shadow overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-700">Mercado Público</h2>
+                    <p id="mp-api-badge" class="text-xs text-gray-400 mt-0.5">Verificando API…</p>
+                </div>
+                @if($oc->api_validado_at)
+                    <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                @elseif($oc->api_error)
+                    <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
+                @else
+                    <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
+                @endif
+            </div>
+            <div class="px-5 py-4 space-y-3">
+
+                @if($oc->api_validado_at)
+                    <div class="space-y-2 text-xs">
+                        <div>
+                            <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Proveedor</p>
+                            <p class="text-gray-800 font-semibold mt-0.5">{{ $oc->api_proveedor_nombre ?? '—' }}</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-x-3 gap-y-2">
+                            <div>
+                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">RUT</p>
+                                <p class="text-gray-700 mt-0.5">{{ $oc->api_proveedor_rut ?? '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Estado</p>
+                                <p class="text-gray-700 mt-0.5">{{ $oc->api_estado_mp ?? '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Tipo</p>
+                                <p class="text-gray-700 mt-0.5">{{ $oc->api_tipo ?? '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Moneda</p>
+                                <p class="text-gray-700 mt-0.5">{{ $oc->api_tipo_moneda ?? '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Fecha envío</p>
+                                <p class="text-gray-700 mt-0.5">{{ $oc->api_fecha_envio ?? '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Total</p>
+                                <p class="text-green-700 font-bold mt-0.5">{{ $oc->totalFormateado() }}</p>
+                            </div>
+                        </div>
+                        @if($oc->api_licitacion_codigo)
+                        <div>
+                            <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Licitación</p>
+                            <p class="font-mono font-semibold text-indigo-600 mt-0.5">{{ $oc->api_licitacion_codigo }}</p>
+                        </div>
+                        @endif
+                        @if($oc->api_contacto)
+                        <div>
+                            <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Contacto</p>
+                            <p class="text-gray-700 mt-0.5">{{ $oc->api_contacto }}</p>
+                        </div>
+                        @endif
+                    </div>
+                    <p class="text-[10px] text-gray-400">
+                        Validado {{ $oc->api_validado_at->format('d/m/Y H:i') }}
+                        @if($oc->api_intentos > 1) · {{ $oc->api_intentos }} intentos @endif
+                    </p>
+                @elseif($oc->api_error)
+                    <div class="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+                        <p class="font-semibold mb-0.5">Error en última validación:</p>
+                        <p>{{ $oc->api_error }}</p>
+                        @if($oc->api_intentos)
+                            <p class="mt-1 text-red-400">Intentos: {{ $oc->api_intentos }}</p>
+                        @endif
+                    </div>
+                @else
+                    <p class="text-sm text-gray-400">Esta OC aún no ha sido validada contra Mercado Público.</p>
+                @endif
+
+                <div id="mp-show-error" style="display:none;"
+                     class="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700"></div>
+
+                @if($oc->estado !== 'recibido')
+                    <button id="btn-validar-mp-show"
+                            onclick="validarMPShow()"
+                            style="width:100%; padding:0.5rem; font-size:0.75rem; font-weight:600;
+                                   color:#fff; background:#4f46e5; border:none; border-radius:0.5rem; cursor:pointer;"
+                            onmouseover="this.style.background='#4338ca'"
+                            onmouseout="this.style.background='#4f46e5'">
+                        {{ $oc->api_validado_at ? 'Re-validar en Mercado Público' : 'Validar en Mercado Público' }}
+                    </button>
+                @endif
+            </div>
+        </div>
+
         {{-- BOTÓN RECEPCIÓN --}}
         @if($oc->estado === 'pendiente')
             <div class="bg-white rounded-xl shadow p-5">
@@ -254,5 +348,151 @@
     </div>
 
 </div>
+
+{{-- ── Detalle de ítems Mercado Público (solo si está validada y tiene ítems) ── --}}
+@if($oc->api_validado_at && !empty($oc->api_items))
+<div class="mt-6 bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div>
+            <h2 class="text-base font-semibold text-gray-700">Detalle de ítems — Mercado Público</h2>
+            @if($oc->api_nombre)
+                <p class="text-xs text-gray-400 italic mt-0.5">"{{ $oc->api_nombre }}"</p>
+            @endif
+        </div>
+        <span class="text-xs text-gray-400">{{ count($oc->api_items) }} ítem(s)</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-xs divide-y divide-gray-100">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-3 py-2.5 text-left font-semibold text-gray-600 whitespace-nowrap">Código</th>
+                    <th class="px-3 py-2.5 text-left font-semibold text-gray-600">Producto</th>
+                    <th class="px-3 py-2.5 text-center font-semibold text-gray-600">Cantidad</th>
+                    <th class="px-3 py-2.5 text-left font-semibold text-gray-600">Especificaciones Comprador</th>
+                    <th class="px-3 py-2.5 text-left font-semibold text-gray-600">Especificaciones Proveedor</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-gray-600 whitespace-nowrap">Precio Unitario</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-gray-600">Descuento</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-gray-600">Cargos</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-gray-600 whitespace-nowrap">Valor Total</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @foreach($oc->api_items as $item)
+                <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2.5 font-mono text-gray-500 whitespace-nowrap">{{ $item['codigo'] ?? '—' }}</td>
+                    <td class="px-3 py-2.5 text-gray-800">{{ $item['nombre'] ?? '—' }}</td>
+                    <td class="px-3 py-2.5 text-center font-semibold text-gray-800 whitespace-nowrap">{{ $item['cantidad'] ?? '—' }}</td>
+                    <td class="px-3 py-2.5 text-gray-600">{{ $item['especificacion_comprador'] ?? '—' }}</td>
+                    <td class="px-3 py-2.5 text-gray-600">{{ $item['especificacion_proveedor'] ?? '—' }}</td>
+                    <td class="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">
+                        {{ isset($item['precio_unitario']) ? '$&nbsp;' . number_format($item['precio_unitario'], 0, ',', '.') : '—' }}
+                    </td>
+                    <td class="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">
+                        {{ number_format($item['descuento'] ?? 0, 2, ',', '.') }}
+                    </td>
+                    <td class="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">
+                        {{ number_format($item['cargo'] ?? 0, 2, ',', '.') }}
+                    </td>
+                    <td class="px-3 py-2.5 text-right font-semibold text-gray-800 whitespace-nowrap">
+                        {{ isset($item['total']) ? '$&nbsp;' . number_format($item['total'], 0, ',', '.') : '—' }}
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+
+    {{-- Resumen financiero --}}
+    @php
+        $total     = $oc->api_total     ?? 0;
+        $impuestos = $oc->api_impuestos ?? 0;
+        $neto      = $total - $impuestos;
+        $dcto      = collect($oc->api_items)->sum(fn($i) => $i['descuento'] ?? 0);
+        $cargos    = collect($oc->api_items)->sum(fn($i) => $i['cargo'] ?? 0);
+    @endphp
+    <div class="flex justify-end px-5 py-4 border-t border-gray-100">
+        <table class="text-xs border border-gray-200 rounded-lg overflow-hidden" style="min-width:220px;">
+            <tr class="border-b border-gray-100">
+                <td class="px-4 py-1.5 text-gray-500">Neto</td>
+                <td class="px-4 py-1.5 text-right font-semibold text-gray-700">$ {{ number_format($neto, 0, ',', '.') }}</td>
+            </tr>
+            <tr class="border-b border-gray-100">
+                <td class="px-4 py-1.5 text-gray-500">Dcto.</td>
+                <td class="px-4 py-1.5 text-right text-gray-700">$ {{ number_format($dcto, 0, ',', '.') }}</td>
+            </tr>
+            <tr class="border-b border-gray-100">
+                <td class="px-4 py-1.5 text-gray-500">Cargos</td>
+                <td class="px-4 py-1.5 text-right text-gray-700">$ {{ number_format($cargos, 0, ',', '.') }}</td>
+            </tr>
+            <tr class="border-b border-gray-200 bg-gray-50">
+                <td class="px-4 py-1.5 font-semibold text-gray-700">Subtotal</td>
+                <td class="px-4 py-1.5 text-right font-semibold text-gray-700">$ {{ number_format($neto, 0, ',', '.') }}</td>
+            </tr>
+            <tr class="border-b border-gray-100">
+                <td class="px-4 py-1.5 text-gray-500">19% IVA</td>
+                <td class="px-4 py-1.5 text-right text-gray-700">$ {{ number_format($impuestos, 0, ',', '.') }}</td>
+            </tr>
+            <tr class="bg-gray-50">
+                <td class="px-4 py-2 font-bold text-gray-800">Total</td>
+                <td class="px-4 py-2 text-right font-bold text-green-700">$ {{ number_format($total, 0, ',', '.') }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+@endif
+
+@push('scripts')
+<script>
+const RUTA_VALIDAR_MP = '{{ route("admin.ordenes.validar-mp", $oc->id) }}';
+const RUTA_API_STATUS = '{{ route("admin.ordenes.api-status") }}';
+const CSRF = '{{ csrf_token() }}';
+
+// Verificar estado API al cargar
+fetch(RUTA_API_STATUS, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(r => r.json())
+    .then(data => {
+        const badge = document.getElementById('mp-api-badge');
+        if (badge) {
+            badge.textContent = data.activa ? '● API activa' : '● API inactiva';
+            badge.style.color = data.activa ? '#15803d' : '#dc2626';
+        }
+    })
+    .catch(() => {});
+
+function validarMPShow() {
+    const btn    = document.getElementById('btn-validar-mp-show');
+    const errDiv = document.getElementById('mp-show-error');
+    errDiv.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Validando…';
+
+    fetch(RUTA_VALIDAR_MP, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': CSRF,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+        },
+    })
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+        if (ok && data.ok) {
+            window.location.reload();
+        } else {
+            errDiv.style.display = 'block';
+            errDiv.textContent = data.mensaje || 'Error al validar.';
+            btn.disabled = false;
+            btn.textContent = 'Reintentar validación';
+        }
+    })
+    .catch(() => {
+        errDiv.style.display = 'block';
+        errDiv.textContent = 'Error de conexión.';
+        btn.disabled = false;
+        btn.textContent = 'Validar en Mercado Público';
+    });
+}
+</script>
+@endpush
 
 @endsection
