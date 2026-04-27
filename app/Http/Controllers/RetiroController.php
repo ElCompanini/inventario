@@ -27,10 +27,9 @@ class RetiroController extends Controller
             return response()->json([]);
         }
 
-        $productos = Producto::where('descripcion', 'like', "%{$q}%")
-            ->orWhere('nombre', 'like', "%{$q}%")
-            ->select('id', 'nombre', 'descripcion', 'stock_actual')
-            ->orderBy('descripcion')
+        $productos = Producto::where('nombre', 'like', "%{$q}%")
+            ->select('id', 'nombre', 'stock_actual')
+            ->orderBy('nombre')
             ->limit(12)
             ->get();
 
@@ -69,7 +68,7 @@ class RetiroController extends Controller
 
                     if ($producto->stock_actual < (int) $item['cantidad']) {
                         throw new \Exception(
-                            "Stock insuficiente para \"{$producto->descripcion}\". " .
+                            "Stock insuficiente para \"{$producto->nombre}\". " .
                             "Disponible: {$producto->stock_actual}, solicitado: {$item['cantidad']}."
                         );
                     }

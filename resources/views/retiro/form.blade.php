@@ -95,7 +95,7 @@
 @push('scripts')
 <script>
     // ── Estado del carrito ────────────────────────────────────────────────────
-    let carrito = {}; // { id: { id, nombre, descripcion, stock_actual, cantidad } }
+    let carrito = {}; // { id: { id, nombre, stock_actual, cantidad } }
     let timerBusqueda;
 
     // ── Buscador con debounce ─────────────────────────────────────────────────
@@ -140,10 +140,9 @@
         cont.innerHTML = productos.map(p => `
             <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-gray-200
                         hover:bg-indigo-50 hover:border-indigo-300 cursor-pointer transition"
-                 onclick="agregarAlCarrito(${p.id}, '${escHtml(p.nombre)}', '${escHtml(p.descripcion)}', ${p.stock_actual})">
+                 onclick="agregarAlCarrito(${p.id}, '${escHtml(p.nombre)}', ${p.stock_actual})">
                 <div class="min-w-0">
                     <p class="text-xs font-semibold text-indigo-700 truncate">${escHtml(p.nombre)}</p>
-                    <p class="text-xs text-gray-600 truncate">${escHtml(p.descripcion)}</p>
                 </div>
                 <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full
                     ${p.stock_actual <= 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}">
@@ -154,7 +153,7 @@
     }
 
     // ── Carrito ───────────────────────────────────────────────────────────────
-    function agregarAlCarrito(id, nombre, descripcion, stockActual) {
+    function agregarAlCarrito(id, nombre, stockActual) {
         if (carrito[id]) {
             carrito[id].cantidad = Math.min(carrito[id].cantidad + 1, stockActual);
         } else {
@@ -165,7 +164,6 @@
             carrito[id] = {
                 id,
                 nombre,
-                descripcion,
                 stockActual,
                 cantidad: 1
             };
@@ -215,8 +213,7 @@
         lista.innerHTML = items.map((item, idx) => `
             <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
                 <div class="flex-1 min-w-0">
-                    <p class="text-xs font-semibold text-gray-700 truncate">${escHtml(item.descripcion)}</p>
-                    <p class="text-xs text-indigo-600">${escHtml(item.nombre)}</p>
+                    <p class="text-xs font-semibold text-gray-700 truncate">${escHtml(item.nombre)}</p>
                 </div>
                 <input type="number" min="1" max="${item.stockActual}" value="${item.cantidad}"
                        onchange="cambiarCantidad(${item.id}, this.value)"

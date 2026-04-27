@@ -66,7 +66,7 @@ class OrdenCompra extends Model
 
     public function sicds()
     {
-        return $this->belongsToMany(Sicd::class, 'orden_compra_sicd');
+        return $this->belongsToMany(Sicd::class, 'oc_sicds');
     }
 
     public function factura()

@@ -31,12 +31,6 @@
                 <span class="text-gray-500">Contenedor</span>
                 <span class="font-semibold text-gray-800">{{ $producto->container->nombre ?? 'Sin container' }}</span>
             </div>
-            @if($producto->descripcion)
-            <div>
-                <span class="text-gray-500">Descripción</span>
-                <p class="text-gray-800 mt-1">{{ $producto->descripcion }}</p>
-            </div>
-            @endif
 
             <div class="pt-3 border-t space-y-2">
                 <div class="flex justify-between items-center">

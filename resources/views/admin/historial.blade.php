@@ -37,8 +37,8 @@
                 $color = '#2563eb'; $signo = '';
             }
             $contNombre = $r->container?->nombre ?? ($r->contenedor_id ? 'C'.$r->contenedor_id : '—');
-            $prodDesc = $r->producto?->descripcion ?? $r->producto?->nombre ?? '—';
-            $prodNom  = ($r->producto?->descripcion && $r->producto?->nombre) ? '<br><span style="font-size:0.7rem;color:#9ca3af;">' . e($r->producto->nombre) . '</span>' : '';
+            $prodDesc = $r->producto?->nombre ?? '—';
+            $prodNom  = '';
             $h .= '<tr style="border-top:1px solid #f1f5f9;">';
             $h .= '<td style="padding:6px 16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#111827;" title="' . e($prodDesc) . '">' . e($prodDesc) . $prodNom . '</td>';
             $h .= '<td style="padding:6px 16px;"><span style="font-size:0.72rem;background:#e5e7eb;color:#374151;padding:2px 8px;border-radius:999px;">' . e($contNombre) . '</span></td>';
@@ -171,10 +171,7 @@
                     {{ $registro->created_at->format('d/m/Y H:i') }}
                 </td>
                 <td class="px-4 py-3" style="max-width:200px;">
-                    <p class="font-medium text-gray-900 truncate" title="{{ $registro->producto->descripcion ?? $registro->producto->nombre }}">{{ $registro->producto->descripcion ?? $registro->producto->nombre }}</p>
-                    @if($registro->producto->descripcion)
-                        <p class="text-xs text-gray-400 mt-0.5 truncate" title="{{ $registro->producto->nombre }}">{{ $registro->producto->nombre }}</p>
-                    @endif
+                    <p class="font-medium text-gray-900 truncate" title="{{ $registro->producto->nombre }}">{{ $registro->producto->nombre }}</p>
                 </td>
                 <td class="px-4 py-3">
                     @php

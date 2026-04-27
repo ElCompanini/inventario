@@ -44,14 +44,16 @@
             <label class="block text-sm font-semibold text-gray-700 mb-1">Rol</label>
             <select name="rol" required
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                <option value="usuario" {{ old('rol') === 'usuario' ? 'selected' : '' }}>Usuario</option>
-                <option value="admin"   {{ old('rol') === 'admin'   ? 'selected' : '' }}>Admin</option>
+                <option value="0" {{ old('rol', '0') == '0' ? 'selected' : '' }}>Usuario</option>
+                <option value="1" {{ old('rol') == '1' ? 'selected' : '' }}>Admin</option>
+                @if(auth()->user()->esDev())
+                <option value="2" {{ old('rol') == '2' ? 'selected' : '' }}>Dev</option>
+                @endif
             </select>
             @error('rol') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
         </div>
 
-        @php $rolAuth = auth()->user()->rol; @endphp
-        @if($rolAuth === 'dev' || $rolAuth === 'admin')
+        @if(auth()->user()->esAdmin())
         <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Centro de Costo</label>
             <select name="centro_costo" id="cc-select-crear"
@@ -63,7 +65,7 @@
             </select>
             @error('centro_costo') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
 
-            @if($rolAuth === 'dev')
+            @if(auth()->user()->esDev())
             @include('admin.usuarios._nuevo-cc-panel', ['selectId' => 'cc-select-crear'])
             @endif
         </div>

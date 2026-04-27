@@ -99,9 +99,9 @@
 @php
     $productosMapData = $containers->mapWithKeys(fn($c) => [
         $c->id => $c->productos->map(fn($p) => [
-            'descripcion' => $p->descripcion ?? $p->nombre,
-            'categoria'   => $p->nombre,
-            'stock'       => $p->stock_actual,
+            'nombre'    => $p->nombre,
+            'categoria' => $p->nombre,
+            'stock'     => $p->stock_actual,
         ])->values()
     ]);
 @endphp
@@ -161,7 +161,7 @@
                     productos.forEach(function (p, i) {
                         const bg = i % 2 === 0 ? '#fff' : '#f1f5ff';
                         html += '<tr style="background:' + bg + ';">'
-                              + '<td style="padding:6px 12px;color:#374151;">'       + (p.descripcion || '—') + '</td>'
+                              + '<td style="padding:6px 12px;color:#374151;">'       + (p.nombre || '—') + '</td>'
                               + '<td style="padding:6px 12px;color:#4f46e5;font-weight:600;">' + p.categoria + '</td>'
                               + '<td style="padding:6px 12px;text-align:center;font-weight:700;color:#166534;">' + p.stock + '</td>'
                               + '</tr>';
@@ -202,7 +202,7 @@
                             productos.forEach(function(p, i) {
                                 const bg = i % 2 === 0 ? '#fff' : '#f1f5ff';
                                 html += '<tr style="background:' + bg + ';">'
-                                      + '<td style="padding:6px 12px;color:#374151;">' + (p.descripcion || '—') + '</td>'
+                                      + '<td style="padding:6px 12px;color:#374151;">' + (p.nombre || '—') + '</td>'
                                       + '<td style="padding:6px 12px;color:#4f46e5;font-weight:600;">' + p.categoria + '</td>'
                                       + '<td style="padding:6px 12px;text-align:center;font-weight:700;color:#166534;">' + p.stock + '</td>'
                                       + '</tr>';

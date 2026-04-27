@@ -91,7 +91,7 @@
                         @foreach($productos as $p)
                             <option value="{{ $p->id }}"
                                 {{ $c['sugerencia_id'] == $p->id ? 'selected' : '' }}>
-                                {{ $p->descripcion }} ({{ $p->nombre }})
+                                {{ $p->nombre }}
                             </option>
                         @endforeach
                     </select>

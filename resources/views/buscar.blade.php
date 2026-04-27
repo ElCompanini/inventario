@@ -55,7 +55,7 @@
                             <p class="text-xs text-gray-400 mt-0.5">
                                 ID #{{ $p->id }} ·
                                 {{ $p->container->nombre ?? '—' }} ·
-                                {{ $p->descripcion ?? 'Sin descripción' }}
+                                {{ $p->categoria->nombre ?? '—' }}
                             </p>
                         </div>
                         <div class="text-right shrink-0 ml-4">

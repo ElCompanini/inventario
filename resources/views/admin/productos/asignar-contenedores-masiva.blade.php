@@ -31,15 +31,10 @@
                 @foreach($pendiente['items'] as $i => $item)
                 @php
                     $esNuevo   = ($item['accion'] ?? '') === 'nuevo';
-                    // Para el nombre mostrado usar la descripcion del producto en BDD (más específica)
                     $nombre    = $esNuevo
-                        ? ($item['nuevo_descripcion'] ?? $item['descripcion'])
-                        : ($item['producto_descripcion'] ?? $item['producto_nombre'] ?? $item['descripcion']);
-                    // Categoría (familia)
-                    $categoria = $esNuevo
-                        ? ($item['nuevo_nombre'] ?? '')
-                        : ($item['producto_nombre'] ?? '');
-                    // Hay error de tipeo cuando la descripcion del Excel difiere de la BDD
+                        ? ($item['nuevo_nombre'] ?? $item['descripcion'])
+                        : ($item['producto_nombre'] ?? $item['descripcion']);
+                    $categoria = '';
                     $tieneError = !$esNuevo && ($item['descripcion'] ?? '') !== $nombre;
                     // Si no hay contenedor pre-asignado, usar el primero de la lista como default
                     $preselect = $item['contenedor_id'] ?? $containers->first()?->id;
@@ -48,7 +43,7 @@
                     <td class="px-5 py-3">
                         <div class="flex items-center gap-2">
                             @if($esNuevo)
-                                <span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">NUEVO</span>
+                                <span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500 text-white">NUEVO</span>
                             @endif
                             <div>
                                 @if($categoria)

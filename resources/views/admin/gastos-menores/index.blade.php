@@ -75,8 +75,7 @@ if (strlen($limpio) < 2) return $rut;
         'gm-' . str_pad($primero->id_gm ?? 0, 4, '0', STR_PAD_LEFT) . ' ' .
         $folio . ' ' .
         $primero->rut_proveedor . ' ' .
-        $items->pluck('producto.nombre')->implode(' ') . ' ' .
-        $items->pluck('producto.descripcion')->implode(' ')
+        $items->pluck('producto.nombre')->implode(' ')
         );
         @endphp
         <div class="bg-white rounded-xl shadow overflow-hidden gm-card" data-search="{{ $searchText }}">
@@ -170,9 +169,6 @@ if (strlen($limpio) < 2) return $rut;
                         <td class="px-4 py-2.5 text-xs text-gray-400 font-mono">#{{ $item->id }}</td>
                         <td class="px-4 py-2.5 font-medium text-gray-800" style="overflow:hidden;">
                             <p class="truncate">{{ $item->producto->nombre ?? '—' }}</p>
-                            @if($item->producto?->descripcion)
-                            <p class="text-xs text-gray-400 font-normal truncate">{{ $item->producto->descripcion }}</p>
-                            @endif
                         </td>
                         <td class="px-4 py-2.5 text-center text-gray-700">{{ $item->cantidad }}</td>
                         <td class="px-4 py-2.5 text-right text-gray-700">${{ number_format($item->monto, 0, ',', '.') }}</td>
@@ -384,7 +380,7 @@ if (strlen($limpio) < 2) return $rut;
 @push('scripts')
 @php
 $gmProductosJson = json_encode(
-    $productos->map(fn($p) => ['id'=>$p->id,'nombre'=>$p->nombre,'descripcion'=>$p->descripcion,'stock'=>$p->stock_actual])->values(),
+    $productos->map(fn($p) => ['id'=>$p->id,'nombre'=>$p->nombre,'stock'=>$p->stock_actual])->values(),
     JSON_HEX_TAG | JSON_HEX_AMP
 );
 @endphp
@@ -418,7 +414,7 @@ document.getElementById('gm-buscador').addEventListener('input', function() {
     var res = document.getElementById('gm-resultados');
     if (q.length < 1) { res.style.display = 'none'; return; }
     var matches = gmProductos.filter(function(p) {
-        return p.nombre.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q);
+        return p.nombre.toLowerCase().includes(q);
     }).slice(0, 10);
     if (!matches.length) { res.style.display = 'none'; return; }
     res.innerHTML = matches.map(function(p) {
@@ -426,7 +422,7 @@ document.getElementById('gm-buscador').addEventListener('input', function() {
             + 'style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;" '
             + 'onmouseover="this.style.background=\'#fef3c7\'" onmouseout="this.style.background=\'\'">'
             + '<p style="font-size:0.8rem;font-weight:600;color:#1f2937;">' + escHtmlGm(p.nombre) + '</p>'
-            + '<p style="font-size:0.72rem;color:#6b7280;">' + escHtmlGm(p.descripcion || '') + ' · Stock: ' + p.stock + '</p>'
+            + '<p style="font-size:0.72rem;color:#6b7280;">Stock: ' + p.stock + '</p>'
             + '</div>';
     }).join('');
     res.style.display = 'block';

@@ -60,6 +60,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/productos/carga-masiva/contenedores', [AdminController::class, 'asignarContenedoresMasiva'])->name('productos.carga.masiva.contenedores');
     Route::post('/productos/carga-masiva/contenedores/confirmar', [AdminController::class, 'confirmarContenedoresMasiva'])->name('productos.carga.masiva.contenedores.confirmar');
     Route::post('/productos/carga-manual', [AdminController::class, 'cargaManual'])->name('productos.carga.manual');
+    Route::post('/productos/crear-rapido', [AdminController::class, 'crearProductoRapido'])->name('productos.crear.rapido');
 
     // SICD
     Route::get('/sicd/validar', [SicdController::class, 'validarCodigo'])->name('sicd.validar');

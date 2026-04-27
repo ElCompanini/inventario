@@ -31,22 +31,25 @@
         <div class="grid grid-cols-2 gap-3">
             <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Rol</label>
+                @php $rolLabels = [0 => 'Usuario', 1 => 'Admin', 2 => 'Dev']; @endphp
                 @if(auth()->id() === $usuario->id)
                     <input type="hidden" name="rol" value="{{ $usuario->rol }}">
                     <div class="w-full border border-gray-200 bg-gray-50 rounded-lg px-2.5 py-1.5 text-sm text-gray-400 select-none">
-                        {{ ucfirst($usuario->rol) }} <span class="text-xs">(no modificable)</span>
+                        {{ $rolLabels[$usuario->rol] ?? 'Usuario' }} <span class="text-xs">(no modificable)</span>
                     </div>
                 @else
                     <select name="rol" required
                             class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                        <option value="usuario" {{ old('rol', $usuario->rol) === 'usuario' ? 'selected' : '' }}>Usuario</option>
-                        <option value="admin"   {{ old('rol', $usuario->rol) === 'admin'   ? 'selected' : '' }}>Admin</option>
+                        <option value="0" {{ old('rol', $usuario->rol) == 0 ? 'selected' : '' }}>Usuario</option>
+                        <option value="1" {{ old('rol', $usuario->rol) == 1 ? 'selected' : '' }}>Admin</option>
+                        @if(auth()->user()->esDev())
+                        <option value="2" {{ old('rol', $usuario->rol) == 2 ? 'selected' : '' }}>Dev</option>
+                        @endif
                     </select>
                 @endif
                 @error('rol') <p class="text-red-500 text-xs mt-0.5">{{ $message }}</p> @enderror
             </div>
-            @php $rolAuth = auth()->user()->rol; @endphp
-            @if($rolAuth === 'dev' || $rolAuth === 'admin')
+            @if(auth()->user()->esAdmin())
             <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Centro de Costo</label>
                 <select name="centro_costo" id="cc-select-editar"
@@ -58,7 +61,7 @@
                 </select>
                 @error('centro_costo') <p class="text-red-500 text-xs mt-0.5">{{ $message }}</p> @enderror
 
-                @if($rolAuth === 'dev')
+                @if(auth()->user()->esDev())
                 @include('admin.usuarios._nuevo-cc-panel', ['selectId' => 'cc-select-editar'])
                 @endif
             </div>
@@ -67,7 +70,7 @@
 
         {{-- Permisos: solo visibles para Super Administrador --}}
         @if(auth()->user()->esDev())
-        <div id="bloque-permisos" style="border-top:1px solid #e5e7eb; padding-top:0.75rem; {{ old('rol', $usuario->rol) === 'admin' ? 'display:none;' : '' }}">
+        <div id="bloque-permisos" style="border-top:1px solid #e5e7eb; padding-top:0.75rem; {{ old('rol', $usuario->rol) != 0 ? 'display:none;' : '' }}">
             <p class="text-xs font-semibold text-gray-600 mb-2">Permisos</p>
             <div class="grid grid-cols-2 gap-2">
                 @foreach(\App\Models\User::PERMISOS_DISPONIBLES as $key => $label)
@@ -110,7 +113,7 @@
 <script>
     document.querySelector('select[name="rol"]').addEventListener('change', function () {
         var bloque = document.getElementById('bloque-permisos');
-        if (bloque) bloque.style.display = this.value === 'usuario' ? '' : 'none';
+        if (bloque) bloque.style.display = this.value == '0' ? '' : 'none';
     });
 
     // Toggle visual para permisos

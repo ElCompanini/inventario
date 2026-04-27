@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Categoria;
+use App\Models\Familia;
 use App\Models\Solicitud;
 use App\Models\Producto;
 use App\Models\Container;
@@ -109,8 +111,8 @@ class AdminController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $productosAgrupados = Producto::orderBy('nombre')->orderBy('descripcion')
-            ->get(['id', 'nombre', 'descripcion'])
+        $productosAgrupados = Producto::orderBy('nombre')
+            ->get(['id', 'nombre'])
             ->groupBy('nombre');
 
         $fSolicitantes = $solicitudes->pluck('usuario.name')->filter()->unique()->sort()->values();
@@ -321,7 +323,7 @@ class AdminController extends Controller
         }
         $descripcion = $request->input('descripcion');
 
-        $productosDB = Producto::whereNotNull('descripcion')->get(['id', 'nombre', 'descripcion', 'contenedor']);
+        $productosDB = Producto::get(['id', 'nombre', 'contenedor']);
         $exactos     = [];
         $conflictos  = [];
 
@@ -342,13 +344,12 @@ class AdminController extends Controller
                 'totalNeto'   => $totalNeto,
             ];
 
-            // Coincidencia exacta: solo por descripcion
-            $producto = Producto::where('descripcion', $desc)->first();
+            // Coincidencia exacta: por nombre
+            $producto = Producto::where('nombre', $desc)->first();
             if ($producto) {
-                $item['producto_id']          = $producto->id;
-                $item['producto_nombre']      = $producto->nombre;
-                $item['producto_descripcion'] = $producto->descripcion;
-                $item['contenedor_id']        = $producto->contenedor;
+                $item['producto_id']     = $producto->id;
+                $item['producto_nombre'] = $producto->nombre;
+                $item['contenedor_id']   = $producto->contenedor;
                 $exactos[] = $item;
                 continue;
             }
@@ -358,15 +359,15 @@ class AdminController extends Controller
             $mejorPct  = 0;
             $mejorProd = null;
             foreach ($productosDB as $p) {
-                $dist   = levenshtein($descNorm, strtolower($p->descripcion));
-                $maxLen = max(strlen($descNorm), strlen($p->descripcion));
+                $dist   = levenshtein($descNorm, strtolower($p->nombre));
+                $maxLen = max(strlen($descNorm), strlen($p->nombre));
                 $pct    = $maxLen > 0 ? (1 - $dist / $maxLen) * 100 : 0;
                 if ($pct > $mejorPct) { $mejorPct = $pct; $mejorProd = $p; }
             }
 
             $item['similitud']         = round(min($mejorPct, 100), 1);
             $item['sugerencia_id']     = $mejorProd?->id;
-            $item['sugerencia_nombre'] = $mejorProd?->descripcion;
+            $item['sugerencia_nombre'] = $mejorProd?->nombre;
             $conflictos[] = $item;
         }
 
@@ -409,8 +410,8 @@ class AdminController extends Controller
         if (!$pendiente) {
             return redirect()->route('dashboard')->with('error', 'Sesión expirada. Vuelve a cargar el Excel.');
         }
-        $productos  = Producto::whereNotNull('descripcion')->orderBy('descripcion')->get(['id', 'nombre', 'descripcion']);
-        $familias   = Producto::select('nombre')->distinct()->orderBy('nombre')->pluck('nombre');
+        $productos  = Producto::orderBy('nombre')->get(['id', 'nombre']);
+        $familias   = Familia::with('categorias')->where('activo', true)->orderBy('nombre')->get();
         $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
         return view('admin.productos.resolver-carga-masiva', compact('pendiente', 'productos', 'familias', 'containers'));
     }
@@ -432,16 +433,16 @@ class AdminController extends Controller
 
             if ($accion === 'enlazar' && !empty($res['producto_id'])) {
                 $linked = Producto::find((int) $res['producto_id']);
-                $conflicto['producto_id']          = (int) $res['producto_id'];
-                $conflicto['producto_nombre']      = $linked?->nombre;
-                $conflicto['producto_descripcion'] = $linked?->descripcion;
-                $conflicto['contenedor_id']        = $linked?->contenedor;
+                $conflicto['producto_id']     = (int) $res['producto_id'];
+                $conflicto['producto_nombre'] = $linked?->nombre;
+                $conflicto['contenedor_id']   = $linked?->contenedor;
             } elseif ($accion === 'nuevo') {
+                $categoria = Categoria::find((int) ($res['nuevo_categoria_id'] ?? 0));
                 $conflicto['producto_id']       = null;
                 $conflicto['accion']            = 'nuevo';
-                $conflicto['nuevo_nombre']      = trim($res['nuevo_nombre'] ?? '');
-                $conflicto['nuevo_descripcion'] = trim($res['nuevo_descripcion'] ?? $conflicto['descripcion']);
-                $conflicto['contenedor_id']     = null; // se elige en el paso siguiente
+                $conflicto['nuevo_nombre']      = $conflicto['descripcion'];
+                $conflicto['nuevo_categoria_id']= $categoria?->id;
+                $conflicto['contenedor_id']     = null;
             } else {
                 $conflicto['producto_id'] = null;
             }
@@ -522,13 +523,29 @@ class AdminController extends Controller
                 $boletaId = $boleta->id;
             }
 
-            $sicd = Sicd::create([
-                'codigo_sicd' => $codigoSicd,
-                'boleta_id'   => $boletaId,
-                'descripcion' => $descripcion,
-                'estado'      => $vincularOc ? 'pendiente' : 'recibido',
-                'usuario_id'  => Auth::id(),
-            ]);
+            // Reutilizar SICD pre-enlazado (usuario hizo clic en "Enlazar PDF" antes de confirmar)
+            $sicd = Sicd::where('codigo_sicd', $codigoSicd)
+                ->whereNotNull('documento_blob')
+                ->whereDoesntHave('detalles')
+                ->latest()
+                ->first();
+
+            if ($sicd) {
+                $sicd->fill([
+                    'boleta_id'   => $boletaId,
+                    'descripcion' => $descripcion,
+                    'estado'      => $vincularOc ? 'pendiente' : 'recibido',
+                    'usuario_id'  => Auth::id(),
+                ])->save();
+            } else {
+                $sicd = Sicd::create([
+                    'codigo_sicd' => $codigoSicd,
+                    'boleta_id'   => $boletaId,
+                    'descripcion' => $descripcion,
+                    'estado'      => $vincularOc ? 'pendiente' : 'recibido',
+                    'usuario_id'  => Auth::id(),
+                ]);
+            }
         }
 
         DB::transaction(function () use ($items, $motivo, $sicd, $vincularOc, &$actualizados) {
@@ -539,7 +556,7 @@ class AdminController extends Controller
                 if (!$productoId && ($item['accion'] ?? '') === 'nuevo' && !empty($item['nuevo_nombre'])) {
                     $nuevo = Producto::create([
                         'nombre'        => $item['nuevo_nombre'],
-                        'descripcion'   => $item['nuevo_descripcion'] ?? $item['descripcion'],
+                        'categoria_id'  => $item['nuevo_categoria_id'] ?? null,
                         'stock_actual'  => 0,
                         'stock_minimo'  => 0,
                         'stock_critico' => 0,
@@ -553,7 +570,7 @@ class AdminController extends Controller
                 if ($productoId && !empty($item['contenedor_id'])) {
                     $prod = Producto::find($productoId);
                     if ($prod && $prod->contenedor != $item['contenedor_id']) {
-                        $enDestino = Producto::where('descripcion', $prod->descripcion)
+                        $enDestino = Producto::where('nombre', $prod->nombre)
                             ->where('contenedor', $item['contenedor_id'])
                             ->first();
                         if ($enDestino) {
@@ -561,7 +578,6 @@ class AdminController extends Controller
                         } else {
                             $copia = Producto::create([
                                 'nombre'        => $prod->nombre,
-                                'descripcion'   => $prod->descripcion,
                                 'stock_actual'  => 0,
                                 'stock_minimo'  => $prod->stock_minimo,
                                 'stock_critico' => $prod->stock_critico,
@@ -631,6 +647,7 @@ class AdminController extends Controller
             'items_manual.*.cantidad'       => ['required', 'integer', 'min:1'],
             'items_manual.*.contenedor_id'  => ['nullable', 'integer', 'exists:containers,id'],
             'items_manual.*.motivo'         => ['nullable', 'string', 'max:500'],
+            'items_manual.*.precio_total'   => ['nullable', 'numeric', 'min:0'],
         ], [
             'items_manual.required'              => 'Agrega al menos un producto.',
             'items_manual.*.producto_id.required' => 'Cada fila debe tener un producto.',
@@ -655,13 +672,29 @@ class AdminController extends Controller
                 ]);
                 $boletaId = $boleta->id;
             }
-            $sicd = Sicd::create([
-                'codigo_sicd' => $codigoSicd,
-                'boleta_id'   => $boletaId,
-                'descripcion' => $descripcion,
-                'estado'      => $vincularOc ? 'pendiente' : 'recibido',
-                'usuario_id'  => Auth::id(),
-            ]);
+            // Reutilizar SICD pre-enlazado (usuario hizo clic en "Enlazar PDF" antes de confirmar)
+            $sicd = Sicd::where('codigo_sicd', $codigoSicd)
+                ->whereNotNull('documento_blob')
+                ->whereDoesntHave('detalles')
+                ->latest()
+                ->first();
+
+            if ($sicd) {
+                $sicd->fill([
+                    'boleta_id'   => $boletaId,
+                    'descripcion' => $descripcion,
+                    'estado'      => $vincularOc ? 'pendiente' : 'recibido',
+                    'usuario_id'  => Auth::id(),
+                ])->save();
+            } else {
+                $sicd = Sicd::create([
+                    'codigo_sicd' => $codigoSicd,
+                    'boleta_id'   => $boletaId,
+                    'descripcion' => $descripcion,
+                    'estado'      => $vincularOc ? 'pendiente' : 'recibido',
+                    'usuario_id'  => Auth::id(),
+                ]);
+            }
         }
 
         DB::transaction(function () use ($request, $sicd, $codigoSicd) {
@@ -672,7 +705,7 @@ class AdminController extends Controller
                 $contenedorId = isset($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
 
                 if ($contenedorId && $contenedorId !== $producto->contenedor) {
-                    $enDestino = Producto::where('descripcion', $producto->descripcion)
+                    $enDestino = Producto::where('nombre', $producto->nombre)
                         ->where('contenedor', $contenedorId)
                         ->first();
                     if ($enDestino) {
@@ -680,7 +713,6 @@ class AdminController extends Controller
                     } else {
                         $producto = Producto::create([
                             'nombre'        => $producto->nombre,
-                            'descripcion'   => $producto->descripcion,
                             'stock_actual'  => 0,
                             'stock_minimo'  => $producto->stock_minimo,
                             'stock_critico' => $producto->stock_critico,
@@ -690,12 +722,16 @@ class AdminController extends Controller
                 }
 
                 if ($sicd) {
+                    $precioTotal = isset($item['precio_total']) && $item['precio_total'] !== '' ? (float) $item['precio_total'] : null;
+                    $precioNeto  = ($precioTotal !== null && $cantidad > 0) ? round($precioTotal / $cantidad, 2) : null;
                     $sicd->detalles()->create([
                         'producto_id'           => $producto->id,
-                        'nombre_producto_excel' => $producto->descripcion ?? $producto->nombre,
+                        'nombre_producto_excel' => $producto->nombre,
                         'unidad'                => null,
                         'cantidad_solicitada'   => $cantidad,
                         'cantidad_recibida'     => $cantidad,
+                        'precio_neto'           => $precioNeto,
+                        'total_neto'            => $precioTotal,
                     ]);
                 }
 
@@ -724,5 +760,34 @@ class AdminController extends Controller
 
         return redirect()->route('dashboard')
             ->with('success', 'Stock actualizado correctamente.');
+    }
+
+    public function crearProductoRapido(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $request->validate([
+            'categoria_id' => ['required', 'integer', 'exists:categorias,id'],
+            'nombre'       => ['required', 'string', 'max:500'],
+        ]);
+
+        $categoria = Categoria::findOrFail($request->categoria_id);
+
+        $producto = \App\Models\Producto::create([
+            'nombre'        => trim($request->nombre),
+            'stock_actual'  => 0,
+            'stock_minimo'  => 0,
+            'stock_critico' => 0,
+            'contenedor'    => null,
+            'categoria_id'  => $categoria->id,
+        ]);
+
+        return response()->json([
+            'id'               => $producto->id,
+            'nombre'           => $producto->nombre,
+            'contenedor_id'    => null,
+            'contenedor_nombre'=> '',
+            'stock'            => 0,
+        ]);
     }
 }

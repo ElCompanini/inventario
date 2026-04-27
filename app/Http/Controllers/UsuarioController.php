@@ -24,11 +24,12 @@ class UsuarioController extends Controller
 
     public function store(Request $request)
     {
+        $maxRol = auth()->user()->esDev() ? '0,1,2' : '0,1';
         $data = $request->validate([
             'name'         => 'required|string|max:255',
             'email'        => 'required|string|max:255|unique:users,email',
             'password'     => 'required|string|min:6|confirmed',
-            'rol'          => 'required|in:admin,usuario',
+            'rol'          => "required|integer|in:{$maxRol}",
             'centro_costo' => 'nullable|string|max:100',
         ]);
 
@@ -64,10 +65,11 @@ class UsuarioController extends Controller
         abort_unless(auth()->user()->esAdmin(), 403);
         $usuario = User::findOrFail($id);
 
+        $maxRol = auth()->user()->esDev() ? '0,1,2' : '0,1';
         $data = $request->validate([
             'name'         => 'required|string|max:255',
             'email'        => 'required|string|max:255|unique:users,email,' . $id,
-            'rol'          => 'required|in:admin,usuario',
+            'rol'          => "required|integer|in:{$maxRol}",
             'centro_costo' => 'nullable|string|max:100',
         ]);
 
@@ -89,7 +91,7 @@ class UsuarioController extends Controller
 
         // Permisos: solo dev puede modificarlos
         if ($authUser->esDev()) {
-            if ($data['rol'] === 'usuario') {
+            if ((int) $data['rol'] === 0) {
                 $permisos = array_keys(array_filter(
                     $request->only(array_keys(User::PERMISOS_DISPONIBLES))
                 ));

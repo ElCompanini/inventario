@@ -163,7 +163,7 @@ class SicdController extends Controller
 
         // Parsear Excel
         $rows        = Excel::toCollection(new SicdDetallesImport, $request->file('archivo_excel'))->first();
-        $productosDB = Producto::whereNotNull('descripcion')->get(['id', 'nombre', 'descripcion']);
+        $productosDB = Producto::get(['id', 'nombre']);
 
         $exactos    = [];
         $conflictos = [];
@@ -185,8 +185,8 @@ class SicdController extends Controller
             $mejorProd = null;
 
             foreach ($productosDB as $p) {
-                $dist   = levenshtein($descNorm, strtolower($p->descripcion));
-                $maxLen = max(strlen($descNorm), strlen($p->descripcion));
+                $dist   = levenshtein($descNorm, strtolower($p->nombre));
+                $maxLen = max(strlen($descNorm), strlen($p->nombre));
                 $pct    = $maxLen > 0 ? (1 - $dist / $maxLen) * 100 : 0;
                 if ($pct > $mejorPct) { $mejorPct = $pct; $mejorProd = $p; }
             }
@@ -197,7 +197,7 @@ class SicdController extends Controller
             } else {
                 $item['similitud']         = round($mejorPct, 1);
                 $item['sugerencia_id']     = $mejorProd?->id;
-                $item['sugerencia_nombre'] = $mejorProd?->descripcion;
+                $item['sugerencia_nombre'] = $mejorProd?->nombre;
                 $conflictos[] = $item;
             }
         }
@@ -236,9 +236,7 @@ class SicdController extends Controller
                 ->with('error', 'Sesión expirada. Vuelve a cargar el SICD.');
         }
 
-        $productos = Producto::whereNotNull('descripcion')
-            ->orderBy('descripcion')
-            ->get(['id', 'nombre', 'descripcion']);
+        $productos = Producto::orderBy('nombre')->get(['id', 'nombre']);
 
         return view('admin.sicd.resolver', compact('pendiente', 'productos'));
     }
@@ -406,7 +404,7 @@ class SicdController extends Controller
 
         // Parsear Excel
         $rows        = Excel::toCollection(new SicdDetallesImport, $request->file('archivo_excel'))->first();
-        $productosDB = Producto::whereNotNull('descripcion')->get(['id', 'nombre', 'descripcion']);
+        $productosDB = Producto::get(['id', 'nombre']);
 
         $items = [];
         foreach ($rows as $row) {
@@ -425,8 +423,8 @@ class SicdController extends Controller
             $mejorPct  = 0;
             $mejorProd = null;
             foreach ($productosDB as $p) {
-                $dist   = levenshtein($descNorm, strtolower($p->descripcion));
-                $maxLen = max(strlen($descNorm), strlen($p->descripcion));
+                $dist   = levenshtein($descNorm, strtolower($p->nombre));
+                $maxLen = max(strlen($descNorm), strlen($p->nombre));
                 $pct    = $maxLen > 0 ? (1 - $dist / $maxLen) * 100 : 0;
                 if ($pct > $mejorPct) { $mejorPct = $pct; $mejorProd = $p; }
             }

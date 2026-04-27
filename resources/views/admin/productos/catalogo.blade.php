@@ -169,7 +169,7 @@
         'familia_id'=> $c->familia_id,
         'productos' => $c->productos->map(fn($p) => [
             'id'           => $p->id,
-            'descripcion'  => $p->descripcion,
+            'nombre'       => $p->nombre,
             'stock_actual' => $p->stock_actual,
             'stock_minimo' => $p->stock_minimo,
             'stock_critico'=> $p->stock_critico,
@@ -235,19 +235,27 @@
 
 {{-- Modal: nuevo/editar producto --}}
 <div id="modal-producto" style="display:none; position:fixed; inset:0; z-index:9000; align-items:center; justify-content:center; background:rgba(0,0,0,.5);">
-    <div id="modal-producto-inner" class="bg-white rounded-xl shadow-xl w-full mx-4" style="max-width:500px; padding:1.5rem; animation:cat-in .25s cubic-bezier(.22,.68,0,1.2) both;">
+    <div id="modal-producto-inner" class="bg-white rounded-xl shadow-xl w-full mx-4" style="max-width:520px; padding:1.5rem; animation:cat-in .25s cubic-bezier(.22,.68,0,1.2) both; max-height:90vh; overflow-y:auto;">
         <h2 class="text-lg font-bold text-gray-800 mb-1" id="modal-prod-titulo">Nuevo producto</h2>
         <p class="text-sm text-gray-500 mb-4" id="modal-prod-subtitulo"></p>
 
         <div id="modal-prod-errors" class="hidden mb-3 bg-red-50 border border-red-300 text-red-700 rounded-lg px-3 py-2 text-sm"></div>
+        <div id="modal-prod-success" class="hidden mb-3 bg-green-50 border border-green-300 text-green-700 rounded-lg px-3 py-2 text-sm"></div>
+
+        {{-- Selectores familia/categoría (solo al crear) --}}
+        <div id="prod-selector-wrapper" class="space-y-3 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Familia <span class="text-red-500">*</span></label>
+                <div id="prod-familias-btns" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div id="prod-cat-wrapper" style="display:none;">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Categoría <span class="text-red-500">*</span></label>
+                <div id="prod-categorias-btns" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div style="border-top:1px solid #f3f4f6; margin-top:0.25rem;"></div>
+        </div>
 
         <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Descripción del producto <span class="text-red-500">*</span></label>
-                <textarea id="prod-descripcion" rows="3" maxlength="500"
-                          placeholder="Ej: Memoria RAM 16GB DDR5 4800MHz SO-DIMM"
-                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-            </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Stock mínimo <span class="text-red-500">*</span></label>
@@ -265,7 +273,7 @@
         <div class="flex justify-end gap-3 mt-5" style="border-top:1px solid #f3f4f6; padding-top:1rem;">
             <button onclick="cerrarModalProducto()"
                     class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
-                Cancelar
+                Cerrar
             </button>
             <button id="btn-guardar-prod" onclick="guardarProducto()"
                     class="btn-primary px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
@@ -363,12 +371,6 @@
         {{-- Step 3: Producto --}}
         <div id="bc-step-3" class="px-6 py-5" style="display:none;">
             <div class="space-y-3">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Descripción <span class="text-red-500">*</span></label>
-                    <textarea id="bc-descripcion" rows="2" maxlength="500"
-                              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                              placeholder="Ej: Memoria RAM 16GB DDR5..."></textarea>
-                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 mb-1">Stock mínimo</label>
@@ -526,7 +528,7 @@ async function buscarBarcode() {
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">Producto encontrado</p>
-                    <p class="text-sm font-semibold text-gray-800">${escHtml(p.descripcion)}</p>
+                    <p class="text-sm font-semibold text-gray-800">${escHtml(p.nombre)}</p>
                     <p class="text-xs text-gray-500 mt-0.5">${escHtml(p.familia)} › ${escHtml(p.categoria)}</p>
                     <p class="text-xs text-gray-400 mt-1 font-mono">Código: ${escHtml(p.codigo_barras)}</p>
                 </div>
@@ -567,12 +569,12 @@ async function buscarBarcode() {
                             <p class="text-xs text-gray-400">similar</p>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-gray-800 truncate">${escHtml(s.descripcion)}</p>
+                            <p class="text-sm font-medium text-gray-800 truncate">${escHtml(s.nombre)}</p>
                             <p class="text-xs text-gray-400">${escHtml(s.familia)} › ${escHtml(s.categoria)}</p>
                             <p class="text-xs font-mono text-gray-400">${escHtml(s.codigo_barras)}</p>
                         </div>
                         <button id="btn-asociar-${s.id}"
-                                onclick="asociarBarcode(${s.id}, '${escHtml(codigo).replace(/'/g,"\\'")}', '${escHtml(s.descripcion).replace(/'/g,"\\'")}')"
+                                onclick="asociarBarcode(${s.id}, '${escHtml(codigo).replace(/'/g,"\\'")}', '${escHtml(s.nombre).replace(/'/g,"\\'")}')"
                                 class="btn-primary shrink-0 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg" style="cursor:pointer;">
                             Asociar
                         </button>
@@ -637,7 +639,7 @@ function bcIrAStep(step) {
 
     if (step === 1) bcRenderFamilias();
     if (step === 2) bcRenderCategorias();
-    if (step === 3) setTimeout(() => document.getElementById('bc-descripcion').focus(), 50);
+    if (step === 3) setTimeout(() => document.getElementById('bc-stock-minimo').focus(), 50);
 }
 
 function bcRenderFamilias() {
@@ -704,7 +706,6 @@ function bcSiguiente() {
         if (!bcCatId) { errDiv.textContent = 'Selecciona o crea una categoría.'; errDiv.classList.remove('hidden'); return; }
         errDiv.classList.add('hidden');
         document.getElementById('bc-wizard-titulo').textContent = 'Datos del producto';
-        document.getElementById('bc-descripcion').value  = '';
         document.getElementById('bc-stock-minimo').value = '0';
         document.getElementById('bc-stock-critico').value = '0';
         document.getElementById('bc-step3-errors').classList.add('hidden');
@@ -718,16 +719,14 @@ function bcAtras() {
 }
 
 async function bcGuardar() {
-    const descripcion   = document.getElementById('bc-descripcion').value.trim();
     const stock_minimo  = document.getElementById('bc-stock-minimo').value;
     const stock_critico = document.getElementById('bc-stock-critico').value;
     const errDiv        = document.getElementById('bc-step3-errors');
-    if (!descripcion) { errDiv.textContent = 'La descripción es obligatoria.'; errDiv.classList.remove('hidden'); return; }
     errDiv.classList.add('hidden');
     const btn = document.getElementById('bc-btn-guardar');
     btn.disabled = true; btn.textContent = 'Guardando...';
     try {
-        const body = new URLSearchParams({ _token: CSRF, descripcion, stock_minimo, stock_critico, categoria_id: bcCatId, codigo_barras: bcCodigo });
+        const body = new URLSearchParams({ _token: CSRF, stock_minimo, stock_critico, categoria_id: bcCatId, codigo_barras: bcCodigo });
         const res  = await fetch(ROUTE_PROD_STORE, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
         const json = await res.json();
         if (!res.ok || !json.ok) { errDiv.textContent = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message ?? 'Error.'); errDiv.classList.remove('hidden'); }
@@ -820,7 +819,7 @@ function renderProductos(productos) {
         html += `
         <div class="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition">
             <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-800 leading-snug">${escHtml(p.descripcion)}</p>
+                <p class="text-sm font-medium text-gray-800 leading-snug">${escHtml(p.nombre)}</p>
                 <p class="text-xs mt-1 flex items-center gap-1.5">
                     <span class="inline-flex items-center gap-1 bg-yellow-50 border border-yellow-200 text-yellow-700 font-medium px-2 py-0.5 rounded-md">Mín: <strong>${p.stock_minimo}</strong></span>
                     <span class="inline-flex items-center gap-1 bg-red-50 border border-red-200 text-red-600 font-medium px-2 py-0.5 rounded-md">Crít: <strong>${p.stock_critico}</strong></span>
@@ -882,59 +881,137 @@ document.getElementById('cat-nombre-input').addEventListener('keydown', e => { i
 
 // ── Modal Producto ───────────────────────────────────────────────────────────
 
+let prodFamiliaId = null;
+let prodCatId     = null;
+
+function prodRenderFamilias() {
+    const cont = document.getElementById('prod-familias-btns');
+    cont.innerHTML = '';
+    catalogoData.forEach(function(f) {
+        var sel = f.id === prodFamiliaId;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = f.nombre;
+        btn.className = 'text-xs font-semibold px-3 py-1.5 rounded-lg border transition ' +
+            (sel ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400 hover:text-indigo-600');
+        btn.onclick = function() { prodFamiliaId = f.id; prodCatId = null; prodRenderFamilias(); prodRenderCategorias(); };
+        cont.appendChild(btn);
+    });
+}
+
+function prodRenderCategorias() {
+    var wrapper = document.getElementById('prod-cat-wrapper');
+    var cont    = document.getElementById('prod-categorias-btns');
+    if (!prodFamiliaId) { wrapper.style.display = 'none'; return; }
+    var familia = catalogoData.find(function(f) { return f.id === prodFamiliaId; });
+    cont.innerHTML = '';
+    (familia ? familia.categorias : []).forEach(function(c) {
+        var sel = c.id === prodCatId;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = c.nombre;
+        btn.className = 'text-xs font-semibold px-3 py-1.5 rounded-lg border transition ' +
+            (sel ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400 hover:text-indigo-600');
+        btn.onclick = function() { prodCatId = c.id; prodRenderCategorias(); };
+        cont.appendChild(btn);
+    });
+    wrapper.style.display = 'block';
+}
+
 function abrirModalProducto() {
-    if (!catActualId) return;
     editandoProdId = null;
+    // Pre-seleccionar familia y categoría si hay una activa
+    if (catActualId) {
+        var familia = catalogoData.find(function(f) { return f.categorias.some(function(c) { return c.id === catActualId; }); });
+        prodFamiliaId = familia ? familia.id : null;
+        prodCatId     = catActualId;
+    } else {
+        prodFamiliaId = null;
+        prodCatId     = null;
+    }
+    document.getElementById('prod-selector-wrapper').style.display = 'block';
     document.getElementById('modal-prod-titulo').textContent    = 'Nuevo producto';
-    document.getElementById('modal-prod-subtitulo').textContent = catActualNombre;
-    document.getElementById('prod-descripcion').value           = '';
+    document.getElementById('modal-prod-subtitulo').textContent = 'Selecciona familia y categoría';
     document.getElementById('prod-stock-minimo').value          = '0';
     document.getElementById('prod-stock-critico').value         = '0';
     document.getElementById('modal-prod-errors').classList.add('hidden');
+    document.getElementById('modal-prod-success').classList.add('hidden');
+    prodRenderFamilias();
+    prodRenderCategorias();
     abrirModal('modal-producto');
-    setTimeout(() => document.getElementById('prod-descripcion').focus(), 50);
+    setTimeout(function() { document.getElementById('prod-stock-minimo').focus(); }, 50);
 }
 
 function editarProducto(prodId) {
-    const cat  = catalogoData.flatMap(f => f.categorias).find(c => c.id === catActualId);
-    const prod = cat?.productos?.find(p => p.id === prodId);
+    var cat  = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
+    var prod = cat ? cat.productos.find(function(p) { return p.id === prodId; }) : null;
     if (!prod) return;
     editandoProdId = prodId;
+    document.getElementById('prod-selector-wrapper').style.display = 'none';
     document.getElementById('modal-prod-titulo').textContent    = 'Editar producto';
     document.getElementById('modal-prod-subtitulo').textContent = catActualNombre;
-    document.getElementById('prod-descripcion').value           = prod.descripcion;
     document.getElementById('prod-stock-minimo').value          = prod.stock_minimo;
     document.getElementById('prod-stock-critico').value         = prod.stock_critico;
     document.getElementById('modal-prod-errors').classList.add('hidden');
+    document.getElementById('modal-prod-success').classList.add('hidden');
     abrirModal('modal-producto');
-    setTimeout(() => document.getElementById('prod-descripcion').focus(), 50);
+    setTimeout(function() { document.getElementById('prod-stock-minimo').focus(); }, 50);
 }
 
 function cerrarModalProducto() { cerrarModal('modal-producto'); }
 
 async function guardarProducto() {
-    const descripcion   = document.getElementById('prod-descripcion').value.trim();
-    const stock_minimo  = document.getElementById('prod-stock-minimo').value;
-    const stock_critico = document.getElementById('prod-stock-critico').value;
-    const errDiv        = document.getElementById('modal-prod-errors');
-    if (!descripcion) { errDiv.textContent = 'La descripción es obligatoria.'; errDiv.classList.remove('hidden'); return; }
+    var stock_minimo  = document.getElementById('prod-stock-minimo').value;
+    var stock_critico = document.getElementById('prod-stock-critico').value;
+    var errDiv        = document.getElementById('modal-prod-errors');
+    var sucDiv        = document.getElementById('modal-prod-success');
     errDiv.classList.add('hidden');
-    const btn = document.getElementById('btn-guardar-prod');
+    sucDiv.classList.add('hidden');
+
+    if (!editandoProdId && !prodFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.classList.remove('hidden'); return; }
+    if (!editandoProdId && !prodCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.classList.remove('hidden'); return; }
+
+    var btn = document.getElementById('btn-guardar-prod');
     btn.disabled = true; btn.textContent = 'Guardando...';
     try {
-        const url    = editandoProdId ? ROUTE_PROD_UPDATE(editandoProdId) : ROUTE_PROD_STORE;
-        const method = editandoProdId ? 'PUT' : 'POST';
-        const body   = new URLSearchParams({ _token: CSRF, descripcion, stock_minimo, stock_critico });
-        if (!editandoProdId) body.append('categoria_id', catActualId);
-        const res  = await fetch(url, { method, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-        const json = await res.json();
-        if (!res.ok || !json.ok) { errDiv.textContent = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message ?? 'Error al guardar.'); errDiv.classList.remove('hidden'); }
-        else { cerrarModalProducto(); location.reload(); }
+        var url    = editandoProdId ? ROUTE_PROD_UPDATE(editandoProdId) : ROUTE_PROD_STORE;
+        var method = editandoProdId ? 'PUT' : 'POST';
+        var body   = new URLSearchParams({ _token: CSRF, stock_minimo, stock_critico });
+        if (!editandoProdId) body.append('categoria_id', prodCatId);
+        var res  = await fetch(url, { method, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        var json = await res.json();
+        if (!res.ok || !json.ok) {
+            errDiv.textContent = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message ?? 'Error al guardar.');
+            errDiv.classList.remove('hidden');
+        } else if (editandoProdId) {
+            var cat = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
+            var prod = cat ? cat.productos.find(function(p) { return p.id === editandoProdId; }) : null;
+            if (prod) { prod.stock_minimo = parseInt(stock_minimo); prod.stock_critico = parseInt(stock_critico); }
+            renderProductos(cat ? cat.productos : []);
+            cerrarModalProducto();
+        } else {
+            var familia = catalogoData.find(function(f) { return f.categorias.some(function(c) { return c.id === prodCatId; }); });
+            var cat     = familia ? familia.categorias.find(function(c) { return c.id === prodCatId; }) : null;
+            if (cat) {
+                cat.productos.push({ id: json.id, nombre: json.nombre, stock_actual: 0, stock_minimo: parseInt(stock_minimo), stock_critico: parseInt(stock_critico), contenedor_id: null });
+                if (catActualId === prodCatId) {
+                    document.getElementById('subtitulo-categoria').textContent = cat.productos.length + ' producto' + (cat.productos.length !== 1 ? 's' : '');
+                    renderProductos(cat.productos);
+                }
+                var spanCont = document.querySelector('[data-cat-id="' + prodCatId + '"] + span, #cat-btn-' + prodCatId + ' span.text-xs');
+                if (spanCont) spanCont.textContent = cat.productos.length;
+            }
+            sucDiv.textContent = '✓ Producto "' + (json.nombre || '') + '" guardado. Puedes agregar otro.';
+            sucDiv.classList.remove('hidden');
+            document.getElementById('prod-stock-minimo').value = '0';
+            document.getElementById('prod-stock-critico').value = '0';
+            document.getElementById('prod-stock-minimo').focus();
+        }
     } catch (e) { errDiv.textContent = 'Error de conexión.'; errDiv.classList.remove('hidden'); }
     finally { btn.disabled = false; btn.textContent = 'Guardar'; }
 }
 
-document.getElementById('modal-producto').addEventListener('click', e => { if (e.target === e.currentTarget) cerrarModalProducto(); });
+document.getElementById('modal-producto').addEventListener('click', function(e) { if (e.target === e.currentTarget) cerrarModalProducto(); });
 
 // Auto-select first category on load
 window.addEventListener('DOMContentLoaded', function() {

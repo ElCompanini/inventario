@@ -158,7 +158,7 @@
                             <label class="flex items-center gap-2 cursor-pointer hover:bg-indigo-50 px-1.5 py-0.5 rounded-md transition">
                                 <input type="checkbox" class="fil-prod-desc w-3.5 h-3.5 accent-indigo-600 shrink-0"
                                        value="{{ $p->id }}">
-                                <span class="text-xs text-gray-500 leading-tight">{{ $p->descripcion }}</span>
+                                <span class="text-xs text-gray-500 leading-tight">{{ $p->nombre }}</span>
                             </label>
                             @endforeach
                         </div>
@@ -179,7 +179,8 @@
         <thead class="bg-gray-50 text-left">
             <tr>
                 <th class="px-4 py-3 font-semibold text-gray-600">Producto</th>
-                <th class="px-4 py-3 font-semibold text-gray-600">Descripción</th>
+                <th class="px-4 py-3 font-semibold text-gray-600">Familia</th>
+                <th class="px-4 py-3 font-semibold text-gray-600">Categoría</th>
                 <th class="px-4 py-3 font-semibold text-gray-600" style="text-align:center;">Contenedor</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Stock Actual</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Mínimo</th>
@@ -241,7 +242,8 @@
                         <span>{{ $producto->nombre }}</span>
                     </div>
                 </td>
-                <td class="px-4 py-3 text-gray-500">{{ $producto->descripcion ?? '—' }}</td>
+                <td class="px-4 py-3 text-gray-500">{{ $producto->categoria->familia->nombre ?? '—' }}</td>
+                <td class="px-4 py-3 text-gray-500">{{ $producto->categoria->nombre ?? '—' }}</td>
                 <td class="px-4 py-3" style="text-align:center; vertical-align:middle;">
                     @if($producto->container)
                         @if(auth()->user()->esAdmin())
@@ -872,7 +874,7 @@
 @push('scripts')
 <script>
 // ── Datos de productos y contenedores (JSON) ──────────────────────────────────
-const gmProductos    = {!! json_encode($productos->map(fn($p) => ['id' => $p->id, 'nombre' => $p->nombre, 'descripcion' => $p->descripcion, 'stock' => $p->stock_actual])->values(), JSON_HEX_TAG | JSON_HEX_AMP) !!};
+const gmProductos    = {!! json_encode($productos->map(fn($p) => ['id' => $p->id, 'nombre' => $p->nombre, 'stock' => $p->stock_actual])->values(), JSON_HEX_TAG | JSON_HEX_AMP) !!};
 const gmContainers   = {!! json_encode($containers->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values(), JSON_HEX_TAG | JSON_HEX_AMP) !!};
 
 let gmItems   = [];   // { idx, id, nombre }
@@ -904,7 +906,7 @@ document.getElementById('gm-buscador').addEventListener('input', function() {
     if (q.length < 1) { res.style.display = 'none'; return; }
 
     const matches = gmProductos.filter(p =>
-        p.nombre.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q)
+        p.nombre.toLowerCase().includes(q)
     ).slice(0, 10);
 
     if (!matches.length) { res.style.display = 'none'; return; }
@@ -914,7 +916,7 @@ document.getElementById('gm-buscador').addEventListener('input', function() {
              style="padding:0.5rem 0.75rem; cursor:pointer; border-bottom:1px solid #f3f4f6; transition:background .1s;"
              onmouseover="this.style.background='#fef3c7'" onmouseout="this.style.background=''">
             <p style="font-size:0.8rem; font-weight:600; color:#1f2937;">${escHtmlGm(p.nombre)}</p>
-            <p style="font-size:0.72rem; color:#6b7280;">${escHtmlGm(p.descripcion || '')} · Stock: ${p.stock}</p>
+            <p style="font-size:0.72rem; color:#6b7280;">Stock: ${p.stock}</p>
         </div>
     `).join('');
     res.style.display = 'block';
@@ -1195,13 +1197,6 @@ function escHtmlGm(str) {
                                 <input type="file" name="boleta_sicd" id="ai-boleta-masiva-input" accept=".pdf,.jpg,.jpeg,.png"
                                     style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
                             </div>
-                            <div>
-                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                    Motivo general <span style="font-weight:400; color:#9ca3af;">(opcional)</span>
-                                </label>
-                                <input type="text" name="motivo_masivo" id="ai-motivo-masivo" placeholder="Ej: Reabastecimiento mensual"
-                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
-                            </div>
                             <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; padding:0.5rem 0.65rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.5rem;">
                                 <input type="checkbox" name="vincular_oc" id="ai-vincular-oc" value="1"
                                     onchange="aiToggleBoleta('masiva')"
@@ -1236,8 +1231,9 @@ function escHtmlGm(str) {
                                     <thead>
                                         <tr style="background:#f3e8ff; color:#6b21a8;">
                                             <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Producto</th>
-                                            <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:90px;">Cantidad</th>
-                                            <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; width:160px;">Contenedor</th>
+                                            <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:80px;">Cantidad</th>
+                                            <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">Precio Total ($)</th>
+                                            <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; width:150px;">Contenedor</th>
                                             <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Motivo</th>
                                             <th style="padding:0.4rem 0.6rem; width:36px;"></th>
                                         </tr>
@@ -1543,6 +1539,41 @@ function escHtmlGm(str) {
 </style>
 @endpush
 
+{{-- Modal: crear producto rápido --}}
+<div id="ai-modal-crear-producto" style="display:none; position:fixed; inset:0; z-index:99999; align-items:center; justify-content:center; background:rgba(0,0,0,.55);">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 64px rgba(0,0,0,.3); width:480px; max-width:calc(100vw - 2rem); padding:1.5rem; max-height:88vh; overflow-y:auto; position:relative;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.1rem;">
+            <div>
+                <h3 style="font-size:1rem; font-weight:700; color:#1f2937; margin:0 0 0.25rem;">Nuevo producto</h3>
+                <p id="ai-crear-nombre-display" style="font-size:0.8rem; color:#374151; margin:0; font-weight:500; word-break:break-word;"></p>
+            </div>
+            <button type="button" onclick="aiCerrarModalCrear()" style="flex-shrink:0; color:#9ca3af; background:none; border:none; cursor:pointer; font-size:1.25rem; line-height:1; padding:0.1rem;">✕</button>
+        </div>
+
+        <div style="margin-bottom:0.85rem;">
+            <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.5rem;">Familia <span style="color:#ef4444;">*</span></label>
+            <div id="ai-crear-familias" style="display:flex; flex-wrap:wrap; gap:0.4rem; min-height:1.5rem;"></div>
+        </div>
+
+        <div id="ai-crear-cat-wrapper" style="display:none; margin-bottom:0.85rem;">
+            <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.5rem;">Categoría <span style="color:#ef4444;">*</span></label>
+            <div id="ai-crear-categorias-btns" style="display:flex; flex-wrap:wrap; gap:0.4rem;"></div>
+        </div>
+
+        <div id="ai-crear-error" style="display:none; font-size:0.8rem; color:#dc2626; margin-bottom:0.75rem; padding:0.4rem 0.6rem; background:#fef2f2; border-radius:0.375rem;"></div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px solid #f3f4f6; padding-top:1rem; margin-top:0.5rem;">
+            <button type="button" onclick="aiCerrarModalCrear()" style="padding:0.45rem 1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:0.5rem; cursor:pointer;">
+                Cancelar
+            </button>
+            <button type="button" id="ai-crear-btn-guardar" onclick="aiConfirmarCrearProducto()"
+                style="padding:0.45rem 1.1rem; font-size:0.875rem; font-weight:600; color:#fff; background:#7c3aed; border:none; border-radius:0.5rem; cursor:pointer;">
+                Crear producto
+            </button>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -1551,7 +1582,6 @@ $aiProductosJson = json_encode(
     $productos->map(fn($p) => [
         'id'             => $p->id,
         'nombre'         => $p->nombre,
-        'descripcion'    => $p->descripcion,
         'stock'          => $p->stock_actual,
         'contenedor_id'  => $p->contenedor,
         'contenedor_nombre' => $p->container?->nombre ?? '—',
@@ -1562,13 +1592,23 @@ $aiContainersJson = json_encode(
     $containers->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values(),
     JSON_HEX_TAG | JSON_HEX_AMP
 );
+$aiFamiliasJson = json_encode(
+    ($familias ?? collect())->map(fn($f) => [
+        'id'         => $f->id,
+        'nombre'     => $f->nombre,
+        'categorias' => $f->categorias->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values(),
+    ])->values(),
+    JSON_HEX_TAG | JSON_HEX_AMP
+);
 @endphp
 <script type="application/json" id="ai-data">{!! $aiProductosJson !!}</script>
 <script type="application/json" id="ai-containers-data">{!! $aiContainersJson !!}</script>
+<script type="application/json" id="ai-familias-data">{!! $aiFamiliasJson !!}</script>
 <script>
 if (document.getElementById('btn-agregar-inventario')) {
 var aiProductos  = JSON.parse(document.getElementById('ai-data').textContent);
 var aiContainers = JSON.parse(document.getElementById('ai-containers-data').textContent);
+var aiFamilias   = JSON.parse(document.getElementById('ai-familias-data').textContent);
 var aiItems = [];
 var aiCounter = 0;
 var aiForm = document.getElementById('form-agregar-inv');
@@ -1576,6 +1616,10 @@ var aiUrlLocal   = aiForm.dataset.urlLocal;
 var aiUrlExterna = aiForm.dataset.urlExterna;
 var aiUrlMasiva  = aiForm.dataset.urlMasiva;
 var aiUrlManual  = aiForm.dataset.urlManual;
+var AI_IS_DEV    = {{ auth()->user()->esDev() ? 'true' : 'false' }};
+var AI_IS_ADMIN  = {{ auth()->user()->esAdmin() ? 'true' : 'false' }};
+var AI_URL_CREAR = '{{ route('admin.productos.crear.rapido') }}';
+var AI_CSRF      = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 var aiMetodoCargaActual = 'masiva';
 var aiItemsManual = [];
 var aiCounterManual = 0;
@@ -2064,7 +2108,7 @@ document.getElementById('ai-buscador').addEventListener('input', function() {
     var res = document.getElementById('ai-resultados');
     if (q.length < 1) { res.style.display = 'none'; return; }
     var matches = aiProductos.filter(function(p) {
-        return p.nombre.toLowerCase().indexOf(q) >= 0 || (p.descripcion || '').toLowerCase().indexOf(q) >= 0;
+        return p.nombre.toLowerCase().indexOf(q) >= 0;
     }).slice(0, 10);
     if (!matches.length) { res.style.display = 'none'; return; }
     res.innerHTML = matches.map(function(p) {
@@ -2072,7 +2116,7 @@ document.getElementById('ai-buscador').addEventListener('input', function() {
             + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;"'
             + ' onmouseover="this.style.background=\'#fef3c7\'" onmouseout="this.style.background=\'\'">'
             + '<p style="font-size:0.8rem;font-weight:600;color:#1f2937;">' + escHtmlAi(p.nombre) + '</p>'
-            + '<p style="font-size:0.72rem;color:#6b7280;">' + escHtmlAi(p.descripcion || '') + ' &middot; Stock: ' + p.stock + '</p>'
+            + '<p style="font-size:0.72rem;color:#6b7280;">Stock: ' + p.stock + '</p>'
             + '</div>';
     }).join('');
     res.style.display = 'block';
@@ -2094,17 +2138,33 @@ document.getElementById('ai-buscador-manual').addEventListener('input', function
     var res = document.getElementById('ai-resultados-manual');
     if (q.length < 1) { res.style.display = 'none'; return; }
     var matches = aiProductos.filter(function(p) {
-        return p.nombre.toLowerCase().indexOf(q) >= 0 || (p.descripcion || '').toLowerCase().indexOf(q) >= 0;
+        return p.nombre.toLowerCase().indexOf(q) >= 0;
     }).slice(0, 10);
-    if (!matches.length) { res.style.display = 'none'; return; }
-    res.innerHTML = matches.map(function(p) {
-        return '<div onclick="aiAgregarManual(' + p.id + ',\'' + p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\',' + p.contenedor_id + ')"'
+
+    var html = matches.map(function(p) {
+        return '<div data-pid="' + p.id + '" data-pnombre="' + escHtmlAi(p.nombre) + '" data-pcid="' + (p.contenedor_id || '') + '"'
+            + ' onclick="aiAgregarManualDesdeDato(this)"'
             + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;"'
             + ' onmouseover="this.style.background=\'#f3e8ff\'" onmouseout="this.style.background=\'\'">'
             + '<p style="font-size:0.8rem;font-weight:600;color:#1f2937;">' + escHtmlAi(p.nombre) + '</p>'
-            + '<p style="font-size:0.72rem;color:#6b7280;">' + escHtmlAi(p.descripcion || '') + ' &middot; ' + escHtmlAi(p.contenedor_nombre || '') + ' &middot; Stock: ' + p.stock + '</p>'
+            + '<p style="font-size:0.72rem;color:#6b7280;">' + escHtmlAi(p.contenedor_nombre || '') + ' &middot; Stock: ' + p.stock + '</p>'
             + '</div>';
     }).join('');
+
+    if (AI_IS_ADMIN) {
+        var qEsc = q.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        html += '<div data-crear-nombre="' + qEsc + '" onclick="aiAbrirModalCrear(this.dataset.crearNombre)"'
+            + ' style="padding:0.5rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;border-top:1px solid #e5e7eb;background:#f0fdf4;"'
+            + ' onmouseover="this.style.background=\'#dcfce7\'" onmouseout="this.style.background=\'#f0fdf4\'">'
+            + '<span style="font-size:1rem;line-height:1;">➕</span>'
+            + '<div>'
+            + '<p style="font-size:0.8rem;font-weight:700;color:#16a34a;">Crear producto «' + qEsc + '»</p>'
+            + '</div>'
+            + '</div>';
+    }
+
+    if (!html) { res.style.display = 'none'; return; }
+    res.innerHTML = html;
     res.style.display = 'block';
 });
 
@@ -2120,6 +2180,10 @@ function aiAgregarManual(id, nombre, contenedorId) {
     document.getElementById('ai-buscador-manual').value = '';
     document.getElementById('ai-resultados-manual').style.display = 'none';
     aiActualizarTablaManual();
+}
+
+function aiAgregarManualDesdeDato(el) {
+    aiAgregarManual(parseInt(el.dataset.pid), el.dataset.pnombre, parseInt(el.dataset.pcid) || null);
 }
 
 function aiRenderFilaManual(idx, id, nombre, contenedorId) {
@@ -2140,7 +2204,11 @@ function aiRenderFilaManual(idx, id, nombre, contenedorId) {
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
         + '<input type="number" name="items_manual[' + idx + '][cantidad]" value="1" min="1"'
-        + ' style="width:68px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + ' style="width:62px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
+        + '<input type="number" name="items_manual[' + idx + '][precio_total]" placeholder="0" min="0" step="1"'
+        + ' style="width:100%;text-align:right;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;">'
         + '<select name="items_manual[' + idx + '][contenedor_id]"'
@@ -2240,5 +2308,116 @@ function escHtmlAi(str) {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 } // end if btn-agregar-inventario
+
+// ── Modal crear producto rápido (dev) — fuera del if para ser global ──────────
+
+var aiCrearFamiliaId = null;
+var aiCrearCatId     = null;
+var aiCrearNombre    = '';
+
+function aiAbrirModalCrear(nombre) {
+    if (!AI_IS_ADMIN) return;
+    aiCrearFamiliaId = null;
+    aiCrearCatId     = null;
+    aiCrearNombre    = nombre;
+    document.getElementById('ai-crear-error').style.display = 'none';
+    document.getElementById('ai-crear-cat-wrapper').style.display = 'none';
+    var nombreEl = document.getElementById('ai-crear-nombre-display');
+    if (nombreEl) nombreEl.textContent = nombre;
+    var res = document.getElementById('ai-resultados-manual');
+    if (res) res.style.display = 'none';
+    aiRenderCrearFamilias();
+    document.getElementById('ai-modal-crear-producto').style.display = 'flex';
+}
+
+function aiCerrarModalCrear() {
+    document.getElementById('ai-modal-crear-producto').style.display = 'none';
+}
+
+function aiRenderCrearFamilias() {
+    var cont = document.getElementById('ai-crear-familias');
+    if (!cont) return;
+    cont.innerHTML = '';
+    var lista = (typeof aiFamilias !== 'undefined') ? aiFamilias : [];
+    lista.forEach(function(f) {
+        var sel = f.id === aiCrearFamiliaId;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = f.nombre;
+        btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;margin:0;'
+            + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : 'background:#fff;color:#374151;border-color:#d1d5db;');
+        btn.onclick = function() {
+            aiCrearFamiliaId = f.id;
+            aiCrearCatId     = null;
+            aiRenderCrearFamilias();
+            aiRenderCrearCategorias();
+        };
+        cont.appendChild(btn);
+    });
+}
+
+function aiRenderCrearCategorias() {
+    var wrapper = document.getElementById('ai-crear-cat-wrapper');
+    var cont    = document.getElementById('ai-crear-categorias-btns');
+    if (!wrapper || !cont) return;
+    if (!aiCrearFamiliaId) { wrapper.style.display = 'none'; return; }
+    var lista   = (typeof aiFamilias !== 'undefined') ? aiFamilias : [];
+    var familia = lista.find(function(f) { return f.id === aiCrearFamiliaId; });
+    cont.innerHTML = '';
+    (familia ? familia.categorias : []).forEach(function(c) {
+        var sel = c.id === aiCrearCatId;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = c.nombre;
+        btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;'
+            + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : 'background:#fff;color:#374151;border-color:#d1d5db;');
+        btn.onclick = function() { aiCrearCatId = c.id; aiRenderCrearCategorias(); };
+        cont.appendChild(btn);
+    });
+    wrapper.style.display = 'block';
+}
+
+function aiConfirmarCrearProducto() {
+    var errDiv = document.getElementById('ai-crear-error');
+    errDiv.style.display = 'none';
+    if (!aiCrearFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.style.display = 'block'; return; }
+    if (!aiCrearCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.style.display = 'block'; return; }
+
+    var btn = document.getElementById('ai-crear-btn-guardar');
+    btn.disabled = true; btn.textContent = 'Creando…';
+
+    fetch(AI_URL_CREAR, {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': AI_CSRF, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoria_id: aiCrearCatId, nombre: aiCrearNombre }),
+    })
+    .then(function(res) { return res.json().then(function(p) { return { ok: res.ok, p: p }; }); })
+    .then(function(data) {
+        if (!data.ok) {
+            errDiv.textContent = (data.p.errors ? Object.values(data.p.errors).flat().join(' ') : null) || data.p.message || 'Error al crear el producto.';
+            errDiv.style.display = 'block';
+        } else {
+            var p = data.p;
+            if (typeof aiProductos !== 'undefined') {
+                aiProductos.push({ id: p.id, nombre: p.nombre, contenedor_id: null, contenedor_nombre: '', stock: 0 });
+            }
+            if (typeof aiAgregarManual === 'function') aiAgregarManual(p.id, p.nombre, null);
+            aiCerrarModalCrear();
+            var buscador = document.getElementById('ai-buscador-manual');
+            if (buscador) buscador.value = '';
+        }
+    })
+    .catch(function() {
+        errDiv.textContent = 'Error de conexión.';
+        errDiv.style.display = 'block';
+    })
+    .finally(function() {
+        btn.disabled = false; btn.textContent = 'Crear producto';
+    });
+}
+
+document.getElementById('ai-modal-crear-producto').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) aiCerrarModalCrear();
+});
 </script>
 @endpush

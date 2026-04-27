@@ -83,6 +83,37 @@ class OrdenCompraController extends Controller
 
         $oc = OrdenCompra::where('numero_oc', strtoupper(trim($data['numero_oc'])))->first();
 
+        // Auto-validar contra Mercado Público al crear
+        try {
+            $mp   = app(MercadoPublicoService::class);
+            $mpData = $mp->consultarOC($oc->numero_oc);
+
+            if ($mpData && (empty($mpData['codigo']) || strtoupper($mpData['codigo']) === strtoupper($oc->numero_oc))) {
+                $oc->increment('api_intentos');
+                $oc->update([
+                    'estado'                => 'validado',
+                    'api_codigo'            => $mpData['codigo'],
+                    'api_licitacion_codigo' => $mpData['codigo_licitacion'] ?: null,
+                    'api_items'             => $mpData['items'] ?: null,
+                    'api_nombre'            => $mpData['nombre'],
+                    'api_descripcion'       => $mpData['descripcion'],
+                    'api_tipo'              => $mpData['tipo'],
+                    'api_tipo_moneda'       => $mpData['tipo_moneda'],
+                    'api_estado_mp'         => $mpData['estado'],
+                    'api_fecha_envio'       => $mpData['fecha_envio'],
+                    'api_total'             => $mpData['total'],
+                    'api_impuestos'         => $mpData['impuestos'],
+                    'api_proveedor_nombre'  => $mpData['proveedor_nombre'],
+                    'api_proveedor_rut'     => $mpData['proveedor_rut'],
+                    'api_contacto'          => $mpData['contacto'],
+                    'api_validado_at'       => now(),
+                    'api_error'             => null,
+                ]);
+            }
+        } catch (\Throwable) {
+            // Si la API falla, la OC queda pendiente y se puede validar manualmente
+        }
+
         return redirect()->route('admin.ordenes.show', $oc->id)
             ->with('success', "OC {$oc->numero_oc} creada con " . count($data['sicd_ids']) . " SICD(s).");
     }

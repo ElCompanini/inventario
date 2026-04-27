@@ -103,7 +103,7 @@ class CatalogoController extends Controller
                 'encontrado' => true,
                 'producto'   => [
                     'id'            => $producto->id,
-                    'descripcion'   => $producto->descripcion,
+                    'nombre'        => $producto->nombre,
                     'codigo_barras' => $producto->codigo_barras,
                     'categoria'     => $producto->categoria->nombre,
                     'familia'       => $producto->categoria->familia->nombre,
@@ -121,7 +121,7 @@ class CatalogoController extends Controller
             if ($pct >= 40) {
                 $similares[] = [
                     'id'            => $p->id,
-                    'descripcion'   => $p->descripcion,
+                    'nombre'        => $p->nombre,
                     'codigo_barras' => $p->codigo_barras,
                     'categoria'     => $p->categoria->nombre,
                     'familia'       => $p->categoria->familia->nombre,
@@ -143,7 +143,6 @@ class CatalogoController extends Controller
         abort_unless(auth()->user()->esAdmin(), 403);
 
         $data = $request->validate([
-            'descripcion'   => ['required', 'string', 'max:500'],
             'categoria_id'  => ['required', 'integer', 'exists:categorias,id'],
             'stock_minimo'  => ['required', 'integer', 'min:0'],
             'stock_critico' => ['required', 'integer', 'min:0'],
@@ -157,7 +156,6 @@ class CatalogoController extends Controller
 
         $producto = Producto::create([
             'nombre'        => $categoria->nombre,
-            'descripcion'   => $data['descripcion'],
             'codigo_barras' => $data['codigo_barras'] ?? null,
             'stock_actual'  => 0,
             'stock_minimo'  => $data['stock_minimo'],
@@ -168,9 +166,9 @@ class CatalogoController extends Controller
 
         if ($request->ajax()) {
             return response()->json([
-                'ok'  => true,
-                'id'  => $producto->id,
-                'descripcion'  => $producto->descripcion,
+                'ok'           => true,
+                'id'           => $producto->id,
+                'nombre'       => $producto->nombre,
                 'stock_minimo' => $producto->stock_minimo,
                 'stock_critico'=> $producto->stock_critico,
             ]);
@@ -192,7 +190,6 @@ class CatalogoController extends Controller
         // Crear nuevo producto con los mismos datos pero distinto código de barras
         $nuevo = Producto::create([
             'nombre'        => $producto->nombre,
-            'descripcion'   => $producto->descripcion,
             'codigo_barras' => $data['codigo_barras'],
             'stock_actual'  => 0,
             'stock_minimo'  => $producto->stock_minimo,
@@ -201,7 +198,7 @@ class CatalogoController extends Controller
             'categoria_id'  => $producto->categoria_id,
         ]);
 
-        return response()->json(['ok' => true, 'id' => $nuevo->id, 'descripcion' => $nuevo->descripcion]);
+        return response()->json(['ok' => true, 'id' => $nuevo->id, 'nombre' => $nuevo->nombre]);
     }
 
     public function updateProducto(Request $request, Producto $producto)
@@ -209,14 +206,12 @@ class CatalogoController extends Controller
         abort_unless(auth()->user()->esAdmin(), 403);
 
         $data = $request->validate([
-            'descripcion'  => ['required', 'string', 'max:500'],
             'stock_minimo' => ['required', 'integer', 'min:0'],
             'stock_critico'=> ['required', 'integer', 'min:0'],
             'contenedor'   => ['nullable', 'integer', 'exists:containers,id'],
         ]);
 
         $producto->update([
-            'descripcion'  => $data['descripcion'],
             'stock_minimo' => $data['stock_minimo'],
             'stock_critico'=> $data['stock_critico'],
             'contenedor'   => $data['contenedor'] ?? null,

@@ -59,7 +59,7 @@
                         <label class="flex items-center gap-2 cursor-pointer hover:bg-indigo-50 px-1.5 py-1 rounded-md transition">
                             <input type="checkbox" class="fil-rech-producto w-3.5 h-3.5 accent-indigo-600 shrink-0"
                                    value="{{ $p->id }}">
-                            <span class="text-xs text-gray-700 leading-tight">{{ $p->descripcion }}</span>
+                            <span class="text-xs text-gray-700 leading-tight">{{ $p->nombre }}</span>
                         </label>
                         @endforeach
                     </div>

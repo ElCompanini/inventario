@@ -86,9 +86,6 @@
                         <input type="hidden" name="items[{{ $i }}][id]" value="{{ $item->id }}">
                         <td class="px-3 py-2 font-medium text-gray-800">
                             {{ $item->producto->nombre ?? '—' }}
-                            @if($item->producto?->descripcion)
-                            <p class="text-xs text-gray-400 font-normal">{{ $item->producto->descripcion }}</p>
-                            @endif
                         </td>
                         <td class="px-2 py-2 text-center">
                             <input type="number" name="items[{{ $i }}][cantidad]"

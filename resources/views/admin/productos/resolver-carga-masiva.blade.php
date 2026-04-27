@@ -68,7 +68,7 @@
             <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-indigo-50
                           hover:border-indigo-300 cursor-pointer transition mb-2">
                 <input type="radio" name="resoluciones[{{ $i }}][accion]" value="enlazar"
-                       class="mt-0.5" data-idx="{{ $i }}" data-tipo="sugerencia"
+                       class="mt-0.5 accent-indigo-600" data-idx="{{ $i }}" data-tipo="sugerencia"
                        data-pid="{{ $c['sugerencia_id'] }}"
                        {{ $autoEnlazar ? 'checked' : '' }}
                        onchange="onRadioChange({{ $i }}, 'sugerencia', {{ $c['sugerencia_id'] }})">
@@ -84,7 +84,7 @@
             <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-blue-50
                           hover:border-blue-300 cursor-pointer transition mb-2">
                 <input type="radio" name="resoluciones[{{ $i }}][accion]" value="enlazar"
-                       class="mt-0.5" data-idx="{{ $i }}" data-tipo="otro"
+                       class="mt-0.5 accent-indigo-600" data-idx="{{ $i }}" data-tipo="otro"
                        onchange="onRadioChange({{ $i }}, 'otro', 0)">
                 <div class="flex-1">
                     <p class="text-sm font-semibold text-blue-700">Enlazar a otro producto</p>
@@ -94,9 +94,7 @@
                             onchange="onSelectOtro({{ $i }}, this.value)">
                         <option value="">— Selecciona un producto —</option>
                         @foreach($productos as $p)
-                            <option value="{{ $p->id }}">
-                                {{ $p->descripcion }} ({{ $p->nombre }})
-                            </option>
+                            <option value="{{ $p->id }}">{{ $p->nombre }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -106,7 +104,7 @@
             <div class="rounded-lg border border-gray-200 mb-1 overflow-hidden">
                 <label class="flex items-center gap-3 p-3 hover:bg-emerald-50 hover:border-emerald-300 cursor-pointer transition">
                     <input type="radio" name="resoluciones[{{ $i }}][accion]" value="nuevo"
-                           data-idx="{{ $i }}" data-tipo="nuevo"
+                           class="accent-indigo-600" data-idx="{{ $i }}" data-tipo="nuevo"
                            {{ $autoNuevo ? 'checked' : '' }}
                            onchange="onRadioChange({{ $i }}, 'nuevo', 0)">
                     <div>
@@ -116,30 +114,30 @@
                 </label>
 
                 <div id="panel-nuevo-{{ $i }}"
-                     class="{{ $autoNuevo ? '' : 'hidden' }} border-t border-gray-100 bg-emerald-50 p-3 space-y-2">
+                     class="{{ $autoNuevo ? '' : 'hidden' }} border-t border-gray-100 bg-indigo-50 p-3 space-y-2">
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">
-                            Categoría (familia) <span class="text-red-500">*</span>
-                        </label>
-                        <select name="resoluciones[{{ $i }}][nuevo_nombre]"
-                                class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                            <option value="">— Selecciona —</option>
-                            @foreach($familias as $f)
-                                <option value="{{ $f }}">{{ $f }}</option>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Familia <span class="text-red-500">*</span></label>
+                        <select id="resolver-fam-select-{{ $i }}"
+                                class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                onchange="resolverOnFamilia({{ $i }}, this.value)">
+                            <option value="">— Selecciona una familia —</option>
+                            @foreach($familias as $fam)
+                                <option value="{{ $fam->id }}">{{ $fam->nombre }}</option>
                             @endforeach
                         </select>
                     </div>
+                    <div id="resolver-cat-wrap-{{ $i }}" style="display:none;">
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Categoría <span class="text-red-500">*</span></label>
+                        <select id="resolver-cat-select-{{ $i }}"
+                                class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                onchange="document.getElementById('resolver-cat-hidden-{{ $i }}').value = this.value">
+                            <option value="">— Selecciona una categoría —</option>
+                        </select>
+                        <input type="hidden" name="resoluciones[{{ $i }}][nuevo_categoria_id]" id="resolver-cat-hidden-{{ $i }}" value="">
+                    </div>
                     <p class="text-xs text-gray-400">El contenedor se elige en el paso siguiente.</p>
 
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">
-                            Descripción del producto
-                        </label>
-                        <input type="text" name="resoluciones[{{ $i }}][nuevo_descripcion]"
-                               value="{{ $c['descripcion'] }}"
-                               class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                    </div>
                 </div>
             </div>
 
@@ -161,6 +159,31 @@
 
 @push('scripts')
 <script>
+var resolverFamilias = {!! json_encode($familias->map(fn($f) => [
+    'id'         => $f->id,
+    'nombre'     => $f->nombre,
+    'categorias' => $f->categorias->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values(),
+])->values(), JSON_HEX_TAG | JSON_HEX_AMP) !!};
+
+function resolverOnFamilia(idx, familiaId) {
+    var wrap   = document.getElementById('resolver-cat-wrap-' + idx);
+    var select = document.getElementById('resolver-cat-select-' + idx);
+    var hidden = document.getElementById('resolver-cat-hidden-' + idx);
+    hidden.value = '';
+    select.innerHTML = '<option value="">— Selecciona una categoría —</option>';
+
+    var fam = resolverFamilias.find(function(f) { return f.id == familiaId; });
+    if (!fam || !fam.categorias.length) { wrap.style.display = 'none'; return; }
+
+    fam.categorias.forEach(function(c) {
+        var opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.nombre;
+        select.appendChild(opt);
+    });
+    wrap.style.display = 'block';
+}
+
     function onRadioChange(idx, tipo, pid) {
         // Actualizar el único hidden de producto_id
         document.getElementById('input-pid-' + idx).value = (tipo === 'sugerencia') ? pid : '';

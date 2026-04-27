@@ -15,7 +15,7 @@ class ContainerController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('containers'), 403);
         $containers = Container::withCount('productos')
-            ->with('productos:id,nombre,descripcion,stock_actual,contenedor')
+            ->with('productos:id,nombre,stock_actual,contenedor')
             ->orderBy('id')->get();
         return view('admin.containers.index', compact('containers'));
     }

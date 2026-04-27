@@ -45,13 +45,12 @@ class User extends Authenticatable
 
     public function esAdmin(): bool
     {
-        // dev tiene todos los permisos de admin y más
-        return $this->rol === 'admin' || $this->rol === 'dev';
+        return $this->rol >= 1;
     }
 
     public function esDev(): bool
     {
-        return $this->rol === 'dev';
+        return $this->rol >= 2;
     }
 
     /**
@@ -119,6 +118,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
             'permisos'          => 'array',
+            'rol'               => 'integer',
         ];
     }
 }
