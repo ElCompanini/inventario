@@ -11,12 +11,30 @@ use Illuminate\Validation\Rule;
 
 class CatalogoController extends Controller
 {
+    private function ccId(): ?int
+    {
+        $user = auth()->user();
+        return $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+    }
+
     public function index(Request $request)
     {
         abort_unless(auth()->user()->esAdmin(), 403);
 
-        $familias   = Familia::with(['categorias.productos'])->where('activo', true)->get();
-        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+        $ccId = $this->ccId();
+
+        $familias = Familia::with([
+            'categorias' => fn($q) => $q->with([
+                'productos' => fn($q2) => $q2->when($ccId, fn($q3) => $q3->where('centro_costo_id', $ccId)),
+            ]),
+        ])->where('activo', true)
+            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+            ->get();
+
+        $containers = Container::orderBy('nombre')
+            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+            ->get(['id', 'nombre']);
+
         $familiaActiva = (int) $request->get('familia', $familias->first()?->id ?? 0);
 
         return view('admin.productos.catalogo', compact('familias', 'containers', 'familiaActiva'));
@@ -26,13 +44,21 @@ class CatalogoController extends Controller
     {
         abort_unless(auth()->user()->esAdmin(), 403);
 
+        $ccId = $this->ccId();
+
         $data = $request->validate([
-            'nombre' => ['required', 'string', 'max:100', 'unique:familias,nombre'],
+            'nombre' => [
+                'required', 'string', 'max:100',
+                Rule::unique('familias', 'nombre')->where('centro_costo_id', $ccId),
+            ],
         ], [
-            'nombre.unique' => 'Ya existe una familia con ese nombre.',
+            'nombre.unique' => 'Ya existe una familia con ese nombre en tu centro de costo.',
         ]);
 
-        $familia = Familia::create($data);
+        $familia = Familia::create([
+            'nombre'          => $data['nombre'],
+            'centro_costo_id' => $ccId,
+        ]);
 
         if ($request->ajax()) {
             return response()->json(['ok' => true, 'id' => $familia->id, 'nombre' => $familia->nombre]);
@@ -74,7 +100,6 @@ class CatalogoController extends Controller
         ]);
 
         $categoria->update($data);
-        // Keep productos.nombre in sync
         Producto::where('categoria_id', $categoria->id)->update(['nombre' => $data['nombre']]);
 
         if ($request->ajax()) {
@@ -84,19 +109,43 @@ class CatalogoController extends Controller
         return back()->with('success', 'Categoría actualizada.');
     }
 
+    public function asignarCCFamilia(Request $request, Familia $familia)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $data = $request->validate([
+            'centro_costo_id' => ['nullable', 'integer', 'exists:centros_costo,id'],
+        ]);
+
+        $ccId = $data['centro_costo_id'] ?? null;
+        $familia->update(['centro_costo_id' => $ccId]);
+
+        // Propagar a todos los productos de las categorías de esta familia
+        $categoriaIds = $familia->categorias()->pluck('id');
+        Producto::whereIn('categoria_id', $categoriaIds)
+            ->update(['centro_costo_id' => $ccId]);
+
+        if ($request->ajax()) {
+            return response()->json(['ok' => true]);
+        }
+
+        return back()->with('success', "Centro de costo asignado a la familia y sus productos.");
+    }
+
     public function buscarBarcode(Request $request)
     {
         abort_unless(auth()->user()->esAdmin(), 403);
 
+        $ccId   = $this->ccId();
         $codigo = trim($request->get('codigo', ''));
         if (!$codigo) {
             return response()->json(['encontrado' => false, 'similares' => []]);
         }
 
-        // Búsqueda exacta
-        $producto = Producto::with(['categoria.familia'])
-            ->where('codigo_barras', $codigo)
-            ->first();
+        $query = Producto::with(['categoria.familia'])
+            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId));
+
+        $producto = (clone $query)->where('codigo_barras', $codigo)->first();
 
         if ($producto) {
             return response()->json([
@@ -112,8 +161,7 @@ class CatalogoController extends Controller
             ]);
         }
 
-        // No encontrado → calcular similitud contra productos con código de barras
-        $todos     = Producto::with(['categoria.familia'])->whereNotNull('codigo_barras')->get();
+        $todos     = (clone $query)->whereNotNull('codigo_barras')->get();
         $similares = [];
 
         foreach ($todos as $p) {
@@ -153,24 +201,26 @@ class CatalogoController extends Controller
         ]);
 
         $categoria = Categoria::findOrFail($data['categoria_id']);
+        $ccId      = $this->ccId();
 
         $producto = Producto::create([
-            'nombre'        => $categoria->nombre,
-            'codigo_barras' => $data['codigo_barras'] ?? null,
-            'stock_actual'  => 0,
-            'stock_minimo'  => $data['stock_minimo'],
-            'stock_critico' => $data['stock_critico'],
-            'contenedor'    => $data['contenedor'] ?? null,
-            'categoria_id'  => $data['categoria_id'],
+            'nombre'          => $categoria->nombre,
+            'codigo_barras'   => $data['codigo_barras'] ?? null,
+            'stock_actual'    => 0,
+            'stock_minimo'    => $data['stock_minimo'],
+            'stock_critico'   => $data['stock_critico'],
+            'contenedor'      => $data['contenedor'] ?? null,
+            'categoria_id'    => $data['categoria_id'],
+            'centro_costo_id' => $ccId,
         ]);
 
         if ($request->ajax()) {
             return response()->json([
-                'ok'           => true,
-                'id'           => $producto->id,
-                'nombre'       => $producto->nombre,
-                'stock_minimo' => $producto->stock_minimo,
-                'stock_critico'=> $producto->stock_critico,
+                'ok'            => true,
+                'id'            => $producto->id,
+                'nombre'        => $producto->nombre,
+                'stock_minimo'  => $producto->stock_minimo,
+                'stock_critico' => $producto->stock_critico,
             ]);
         }
 
@@ -187,15 +237,15 @@ class CatalogoController extends Controller
             'codigo_barras.unique' => 'Ese código ya está asignado a otro producto.',
         ]);
 
-        // Crear nuevo producto con los mismos datos pero distinto código de barras
         $nuevo = Producto::create([
-            'nombre'        => $producto->nombre,
-            'codigo_barras' => $data['codigo_barras'],
-            'stock_actual'  => 0,
-            'stock_minimo'  => $producto->stock_minimo,
-            'stock_critico' => $producto->stock_critico,
-            'contenedor'    => $producto->contenedor,
-            'categoria_id'  => $producto->categoria_id,
+            'nombre'          => $producto->nombre,
+            'codigo_barras'   => $data['codigo_barras'],
+            'stock_actual'    => 0,
+            'stock_minimo'    => $producto->stock_minimo,
+            'stock_critico'   => $producto->stock_critico,
+            'contenedor'      => $producto->contenedor,
+            'categoria_id'    => $producto->categoria_id,
+            'centro_costo_id' => $producto->centro_costo_id,
         ]);
 
         return response()->json(['ok' => true, 'id' => $nuevo->id, 'nombre' => $nuevo->nombre]);
@@ -206,15 +256,15 @@ class CatalogoController extends Controller
         abort_unless(auth()->user()->esAdmin(), 403);
 
         $data = $request->validate([
-            'stock_minimo' => ['required', 'integer', 'min:0'],
-            'stock_critico'=> ['required', 'integer', 'min:0'],
-            'contenedor'   => ['nullable', 'integer', 'exists:containers,id'],
+            'stock_minimo'  => ['required', 'integer', 'min:0'],
+            'stock_critico' => ['required', 'integer', 'min:0'],
+            'contenedor'    => ['nullable', 'integer', 'exists:containers,id'],
         ]);
 
         $producto->update([
-            'stock_minimo' => $data['stock_minimo'],
-            'stock_critico'=> $data['stock_critico'],
-            'contenedor'   => $data['contenedor'] ?? null,
+            'stock_minimo'  => $data['stock_minimo'],
+            'stock_critico' => $data['stock_critico'],
+            'contenedor'    => $data['contenedor'] ?? null,
         ]);
 
         if ($request->ajax()) {

@@ -22,9 +22,19 @@ class OrdenCompraController extends Controller
     public function index()
     {
         abort_unless(auth()->user()->tienePermiso('ordenes'), 403);
-        $ordenes = OrdenCompra::with(['usuario', 'sicds', 'factura', 'guia'])
-            ->orderByDesc('created_at')
-            ->paginate(20);
+
+        $user  = auth()->user();
+        $query = OrdenCompra::with(['usuario', 'sicds', 'factura', 'guia'])
+            ->orderByDesc('created_at');
+
+        if ($user->tieneFiltroCC()) {
+            $prefix = strtoupper($user->centroCostoPrefix());
+            $query->whereHas('sicds', function ($q) use ($prefix) {
+                $q->whereRaw("REGEXP_REPLACE(codigo_sicd, '[^A-Za-z].*', '') = ?", [$prefix]);
+            });
+        }
+
+        $ordenes = $query->paginate(20);
 
         return view('admin.ordenes.index', compact('ordenes'));
     }

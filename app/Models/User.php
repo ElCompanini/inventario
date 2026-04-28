@@ -33,7 +33,7 @@ class User extends Authenticatable
         'email',
         'password',
         'rol',
-        'centro_costo',
+        'centro_costo_id',
         'permisos',
     ];
 
@@ -53,24 +53,30 @@ class User extends Authenticatable
         return $this->rol >= 2;
     }
 
+    public function centroCosto()
+    {
+        return $this->belongsTo(\App\Models\CentroCosto::class, 'centro_costo_id');
+    }
+
     /**
-     * Retorna solo las letras iniciales del centro de costo.
+     * Retorna solo las letras iniciales del acrónimo del centro de costo.
      * "TIC(RAMO)" → "TIC", "TIC/83" → "TIC", "TIC" → "TIC", null → null
      */
     public function centroCostoPrefix(): ?string
     {
-        if (empty($this->centro_costo)) return null;
-        return trim(preg_replace('/[^A-Za-z].*$/u', '', $this->centro_costo));
+        $acronimo = $this->centroCosto?->acronimo;
+        if (empty($acronimo)) return null;
+        return trim(preg_replace('/[^A-Za-z].*$/u', '', $acronimo));
     }
 
     /**
      * True si el usuario tiene restricción de centro de costo.
-     * Aplica a cualquier usuario con centro_costo asignado, excepto dev.
+     * Aplica a cualquier usuario con centro_costo_id asignado, excepto dev.
      */
     public function tieneFiltroCC(): bool
     {
         if ($this->esDev()) return false;
-        return !empty($this->centro_costo);
+        return $this->centro_costo_id !== null;
     }
 
     public function tienePermiso(string $permiso): bool

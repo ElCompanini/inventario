@@ -7,7 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 class Familia extends Model
 {
     protected $table = 'familias';
-    protected $fillable = ['nombre', 'activo'];
+    protected $fillable = ['nombre', 'activo', 'centro_costo_id'];
+
+    public function centroCosto()
+    {
+        return $this->belongsTo(\App\Models\CentroCosto::class, 'centro_costo_id');
+    }
 
     public function categorias()
     {

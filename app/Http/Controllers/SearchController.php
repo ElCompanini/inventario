@@ -12,10 +12,13 @@ class SearchController extends Controller
 {
     private function query(string $q): array
     {
-        $like = "%{$q}%";
+        $like  = "%{$q}%";
+        $user  = auth()->user();
+        $ccId  = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
 
         $productos = Producto::with('container')
             ->where(fn($w) => $w->where('id', $q)->orWhere('nombre', 'LIKE', $like)->orWhere('descripcion', 'LIKE', $like))
+            ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId))
             ->orderBy('nombre')->limit(20)->get();
 
         $sicds = Sicd::with('usuario')
@@ -30,6 +33,7 @@ class SearchController extends Controller
             ->where(fn($w) => $w->where('id', $q)->orWhere('motivo', 'LIKE', $like)->orWhere('aprobado_por', 'LIKE', $like)
                 ->orWhereHas('producto', fn($p) => $p->where('nombre', 'LIKE', $like))
                 ->orWhereHas('usuario',  fn($u) => $u->where('name',  'LIKE', $like)))
+            ->when($ccId, fn($q2) => $q2->whereHas('producto', fn($p) => $p->where('centro_costo_id', $ccId)))
             ->orderByDesc('created_at')->limit(20)->get();
 
         return compact('productos', 'sicds', 'ordenes', 'historial');

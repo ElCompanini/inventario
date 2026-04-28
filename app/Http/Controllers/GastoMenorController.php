@@ -17,13 +17,19 @@ class GastoMenorController extends Controller
     {
         abort_unless(auth()->user()->esAdmin(), 403);
 
-        $registros = GastoMenor::with(['producto', 'user', 'historialCambio.container'])
-            ->orderByDesc('created_at')
-            ->get()
-            ->groupBy('folio');
+        $user  = auth()->user();
+        $query = GastoMenor::with(['producto', 'user', 'historialCambio.container'])
+            ->orderByDesc('created_at');
 
-        $productos  = Producto::orderBy('nombre')->get();
-        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+        if ($user->tieneFiltroCC()) {
+            $ccId = $user->centro_costo_id;
+            $query->whereHas('user', fn($q) => $q->where('centro_costo_id', $ccId));
+        }
+
+        $registros  = $query->get()->groupBy('folio');
+        $ccId       = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+        $productos  = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get();
+        $containers = Container::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
 
         return view('admin.gastos-menores.index', compact('registros', 'productos', 'containers'));
     }

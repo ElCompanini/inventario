@@ -17,6 +17,7 @@ class Producto extends Model
         'stock_critico',
         'contenedor',
         'categoria_id',
+        'centro_costo_id',
         'stock_minimo_desde',
         'stock_critico_desde',
     ];
@@ -25,6 +26,11 @@ class Producto extends Model
         'stock_minimo_desde'  => 'datetime',
         'stock_critico_desde' => 'datetime',
     ];
+
+    public function centroCosto()
+    {
+        return $this->belongsTo(\App\Models\CentroCosto::class, 'centro_costo_id');
+    }
 
     public function container()
     {

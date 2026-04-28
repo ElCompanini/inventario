@@ -134,4 +134,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/containers', [ContainerController::class, 'store'])->name('containers.store');
     Route::delete('/containers/{id}', [ContainerController::class, 'destroy'])->name('containers.destroy');
     Route::post('/containers/{id}/trasladar', [ContainerController::class, 'trasladar'])->name('containers.trasladar');
+    Route::patch('/containers/{id}/cc', [ContainerController::class, 'asignarCC'])->name('containers.asignar-cc');
+
+    // Catálogo: asignar CC a familia existente
+    Route::patch('/catalogo/familias/{familia}/cc', [CatalogoController::class, 'asignarCCFamilia'])->name('catalogo.familias.asignar-cc');
 });

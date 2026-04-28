@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CentroCosto;
 use App\Models\Container;
 use App\Models\HistorialCambio;
 use App\Models\Producto;
@@ -14,24 +15,34 @@ class ContainerController extends Controller
     public function index()
     {
         abort_unless(auth()->user()->tienePermiso('containers'), 403);
-        $containers = Container::withCount('productos')
-            ->with('productos:id,nombre,stock_actual,contenedor')
-            ->orderBy('id')->get();
+
+        $user  = auth()->user();
+        $query = Container::withCount('productos')
+            ->with(['productos:id,nombre,stock_actual,contenedor', 'centroCosto'])
+            ->orderBy('id');
+
+        if ($user->tieneFiltroCC()) {
+            $query->where('centro_costo_id', $user->centro_costo_id);
+        }
+
+        $containers = $query->get();
         return view('admin.containers.index', compact('containers'));
     }
 
     public function create()
     {
         abort_unless(auth()->user()->esAdmin(), 403);
-        return view('admin.containers.create');
+        $centrosCosto = CentroCosto::orderBy('acronimo')->get(['id', 'acronimo']);
+        return view('admin.containers.create', compact('centrosCosto'));
     }
 
     public function store(Request $request)
     {
         abort_unless(auth()->user()->esAdmin(), 403);
         $data = $request->validate([
-            'nombre'      => ['required', 'string', 'max:100'],
-            'descripcion' => ['nullable', 'string', 'max:500'],
+            'nombre'          => ['required', 'string', 'max:100'],
+            'descripcion'     => ['nullable', 'string', 'max:500'],
+            'centro_costo_id' => ['nullable', 'integer', 'exists:centros_costo,id'],
         ]);
 
         Container::create($data);
@@ -54,6 +65,28 @@ class ContainerController extends Controller
         $container->save();
 
         return back()->with('success', "Container \"{$container->nombre}\" desactivado correctamente.");
+    }
+
+    public function asignarCC(int $id, Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $data = $request->validate([
+            'centro_costo_id' => ['nullable', 'integer', 'exists:centros_costo,id'],
+        ]);
+
+        $container = Container::findOrFail($id);
+        $container->update(['centro_costo_id' => $data['centro_costo_id'] ?? null]);
+
+        // Propagar el CC a todos los productos de este container
+        Producto::where('contenedor', $id)
+            ->update(['centro_costo_id' => $data['centro_costo_id'] ?? null]);
+
+        if ($request->ajax()) {
+            return response()->json(['ok' => true]);
+        }
+
+        return back()->with('success', "Centro de costo asignado al container y sus productos.");
     }
 
     public function trasladar(int $id, Request $request)

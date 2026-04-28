@@ -92,11 +92,88 @@
     </div>
 </form>
 
+{{-- ── Modal alerta ── --}}
+<div id="retiro-alert-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.45); align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:16px; padding:2rem 2rem 1.5rem; max-width:380px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.18); animation:fadeInUp .18s ease;">
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.6rem;">
+            <svg style="width:20px;height:20px;color:#ef4444;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+            <h3 style="font-size:0.95rem;font-weight:700;color:#1e293b;margin:0;">Atención</h3>
+        </div>
+        <p id="retiro-alert-msg" style="font-size:0.875rem;color:#64748b;margin:0 0 1.25rem;line-height:1.5;"></p>
+        <div style="display:flex;justify-content:flex-end;">
+            <button onclick="cerrarAlertaRetiro()" style="padding:0.45rem 1.25rem;background:#4f46e5;color:#fff;border:none;border-radius:8px;font-size:0.875rem;font-weight:600;cursor:pointer;">Aceptar</button>
+        </div>
+    </div>
+</div>
+
+{{-- ── Modal confirmación retiro ── --}}
+<div id="retiro-confirm-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.45); align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:16px; padding:2rem 2rem 1.5rem; max-width:400px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.18); animation:fadeInUp .18s ease;">
+        <h3 style="font-size:1rem;font-weight:700;color:#1e293b;margin:0 0 0.5rem;">Confirmar retiro</h3>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 1rem;">
+        <p style="font-size:0.875rem;color:#475569;margin:0 0 0.35rem;font-weight:600;">¿Confirmar el retiro de las piezas seleccionadas?</p>
+        <p id="retiro-confirm-resumen" style="font-size:0.8125rem;color:#94a3b8;margin:0 0 1.4rem;"></p>
+        <div style="display:flex;justify-content:flex-end;gap:0.6rem;">
+            <button onclick="cerrarConfirmRetiro()" style="padding:0.45rem 1.1rem;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:0.875rem;font-weight:600;cursor:pointer;">Cancelar</button>
+            <button onclick="submitRetiro()" style="padding:0.45rem 1.25rem;background:#4f46e5;color:#fff;border:none;border-radius:8px;font-size:0.875rem;font-weight:600;cursor:pointer;">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes fadeInUp {
+    from { opacity:0; transform:translateY(12px); }
+    to   { opacity:1; transform:translateY(0); }
+}
+</style>
+
 @push('scripts')
 <script>
     // ── Estado del carrito ────────────────────────────────────────────────────
     let carrito = {}; // { id: { id, nombre, stock_actual, cantidad } }
     let timerBusqueda;
+
+    // ── Modales personalizados ────────────────────────────────────────────────
+    function mostrarAlertaRetiro(msg) {
+        document.getElementById('retiro-alert-msg').textContent = msg;
+        document.getElementById('retiro-alert-modal').style.display = 'flex';
+    }
+    function cerrarAlertaRetiro() {
+        document.getElementById('retiro-alert-modal').style.display = 'none';
+    }
+    function mostrarConfirmRetiro() {
+        const items = Object.values(carrito);
+        const totalPiezas = items.reduce((acc, i) => acc + i.cantidad, 0);
+        const lista = items.map(i => {
+            const meta = [i.familia, i.categoria].filter(Boolean).join(' › ');
+            return `<div style="padding:0.4rem 0; border-bottom:1px solid #f1f5f9;">
+                <span style="font-size:0.8125rem;font-weight:600;color:#1e293b;">${escHtml(i.nombre)}</span>
+                ${meta ? `<span style="font-size:0.75rem;color:#94a3b8;margin-left:0.4rem;">${escHtml(meta)}</span>` : ''}
+                <span style="float:right;font-size:0.8125rem;font-weight:600;color:#4f46e5;">${i.cantidad} u.</span>
+            </div>`;
+        }).join('');
+        document.getElementById('retiro-confirm-resumen').innerHTML =
+            lista + `<p style="font-size:0.8125rem;color:#94a3b8;margin:0.6rem 0 0;text-align:right;">${items.length} producto(s) — ${totalPiezas} pieza(s) en total</p>`;
+        document.getElementById('retiro-confirm-modal').style.display = 'flex';
+    }
+    function cerrarConfirmRetiro() {
+        document.getElementById('retiro-confirm-modal').style.display = 'none';
+    }
+    function submitRetiro() {
+        cerrarConfirmRetiro();
+        document.getElementById('form-retiro').submit();
+    }
+
+    // Cerrar modales al hacer clic en el backdrop
+    ['retiro-alert-modal', 'retiro-confirm-modal'].forEach(id => {
+        document.getElementById(id).addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        });
+    });
 
     // ── Buscador con debounce ─────────────────────────────────────────────────
     document.getElementById('buscador-retiro').addEventListener('input', function() {
@@ -140,9 +217,10 @@
         cont.innerHTML = productos.map(p => `
             <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-gray-200
                         hover:bg-indigo-50 hover:border-indigo-300 cursor-pointer transition"
-                 onclick="agregarAlCarrito(${p.id}, '${escHtml(p.nombre)}', ${p.stock_actual})">
+                 onclick="agregarAlCarrito(${p.id}, '${escHtml(p.nombre)}', ${p.stock_actual}, '${escHtml(p.categoria)}', '${escHtml(p.familia)}')">
                 <div class="min-w-0">
                     <p class="text-xs font-semibold text-indigo-700 truncate">${escHtml(p.nombre)}</p>
+                    ${p.familia || p.categoria ? `<p class="text-[10px] text-gray-400 truncate">${escHtml(p.familia)}${p.familia && p.categoria ? ' › ' : ''}${escHtml(p.categoria)}</p>` : ''}
                 </div>
                 <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full
                     ${p.stock_actual <= 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}">
@@ -153,19 +231,21 @@
     }
 
     // ── Carrito ───────────────────────────────────────────────────────────────
-    function agregarAlCarrito(id, nombre, stockActual) {
+    function agregarAlCarrito(id, nombre, stockActual, categoria, familia) {
         if (carrito[id]) {
             carrito[id].cantidad = Math.min(carrito[id].cantidad + 1, stockActual);
         } else {
             if (stockActual <= 0) {
-                alert('Este producto no tiene stock disponible.');
+                mostrarAlertaRetiro('Este producto no tiene stock disponible.');
                 return;
             }
             carrito[id] = {
                 id,
                 nombre,
                 stockActual,
-                cantidad: 1
+                cantidad: 1,
+                categoria: categoria || '',
+                familia: familia || '',
             };
         }
         renderCarrito();
@@ -214,6 +294,7 @@
             <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
                 <div class="flex-1 min-w-0">
                     <p class="text-xs font-semibold text-gray-700 truncate">${escHtml(item.nombre)}</p>
+                    ${(item.familia || item.categoria) ? `<p class="text-[10px] text-gray-400 truncate">${escHtml([item.familia, item.categoria].filter(Boolean).join(' › '))}</p>` : ''}
                 </div>
                 <input type="number" min="1" max="${item.stockActual}" value="${item.cantidad}"
                        onchange="cambiarCantidad(${item.id}, this.value)"
@@ -242,15 +323,16 @@
     function confirmarRetiro() {
         const motivo = document.getElementById('motivo_retiro').value.trim();
         if (!motivo || motivo.length < 5) {
-            alert('El motivo de retiro es obligatorio (mínimo 5 caracteres).');
+            mostrarAlertaRetiro('El motivo de retiro es obligatorio (mínimo 5 caracteres).');
             document.getElementById('motivo_retiro').focus();
             return false;
         }
         if (!Object.keys(carrito).length) {
-            alert('El carrito está vacío.');
+            mostrarAlertaRetiro('El carrito está vacío.');
             return false;
         }
-        return confirm('¿Confirmar el retiro de las piezas seleccionadas?');
+        mostrarConfirmRetiro();
+        return false;
     }
 
     // Escapa HTML para evitar XSS en el template literal

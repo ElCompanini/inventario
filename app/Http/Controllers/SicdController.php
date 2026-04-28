@@ -236,7 +236,8 @@ class SicdController extends Controller
                 ->with('error', 'Sesión expirada. Vuelve a cargar el SICD.');
         }
 
-        $productos = Producto::orderBy('nombre')->get(['id', 'nombre']);
+        $ccId      = auth()->user()->tieneFiltroCC() ? auth()->user()->centro_costo_id : null;
+        $productos = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
 
         return view('admin.sicd.resolver', compact('pendiente', 'productos'));
     }

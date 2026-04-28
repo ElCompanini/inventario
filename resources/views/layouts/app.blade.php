@@ -298,7 +298,11 @@
             </p>
 
             @if($u->tienePermiso('solicitudes') || $u->tienePermiso('aprobar_solicitudes'))
-                @php $pendientes = \App\Models\Solicitud::where('estado','pendiente')->count(); @endphp
+                @php
+                    $pendientes = \App\Models\Solicitud::where('estado','pendiente')
+                        ->when($u->tieneFiltroCC(), fn($q) => $q->whereHas('producto', fn($q2) => $q2->where('centro_costo_id', $u->centro_costo_id)))
+                        ->count();
+                @endphp
                 <a href="{{ route('admin.solicitudes') }}" data-tip="Solicitudes de Retiro"
                    class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                           {{ request()->routeIs('admin.solicitudes') && !request()->routeIs('admin.solicitudes.rechazadas') ? 'bg-indigo-600 text-white' : 'text-slate-300 text-slate-300' }}">

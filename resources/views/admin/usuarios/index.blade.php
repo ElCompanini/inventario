@@ -104,9 +104,9 @@
                         @endif
                     </td>
                     <td class="px-5 py-3 text-center">
-                        @if($u->centro_costo)
+                        @if($u->centroCosto)
                             <span style="display:inline-block; background:#fef9c3; color:#854d0e; font-size:0.8rem; font-weight:700; padding:2px 12px; border-radius:9999px; font-family:monospace;">
-                                {{ $u->centro_costo }}
+                                {{ $u->centroCosto->acronimo }}
                             </span>
                         @else
                             <span class="text-gray-400 text-xs">Sin asignar</span>

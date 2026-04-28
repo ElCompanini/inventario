@@ -4,6 +4,8 @@
 
 @section('content')
 
+@php $centrosCosto = \App\Models\CentroCosto::orderBy('acronimo')->get(['id','acronimo']); @endphp
+
 <div class="mb-6 flex items-center justify-between">
     <div>
         <h1 class="text-2xl font-bold text-gray-800">Containers</h1>
@@ -37,6 +39,7 @@
                     <th class="px-6 py-3 font-semibold text-gray-600">ID</th>
                     <th class="px-6 py-3 font-semibold text-gray-600">Nombre</th>
                     <th class="px-6 py-3 font-semibold text-gray-600">Descripción</th>
+                    <th class="px-6 py-3 font-semibold text-gray-600">Centro de Costo</th>
                     <th class="px-6 py-3 font-semibold text-gray-600">Productos</th>
                     <th class="px-6 py-3 font-semibold text-gray-600 text-right">Acciones</th>
                 </tr>
@@ -55,6 +58,25 @@
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $container->id }}</td>
                         <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $container->nombre }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $container->descripcion ?? '—' }}</td>
+                        <td class="px-6 py-4 text-sm">
+                            @if(auth()->user()->esAdmin())
+                            <div class="flex items-center gap-1.5">
+                                <select class="select-cc-container text-xs border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                        data-id="{{ $container->id }}"
+                                        data-url="{{ route('admin.containers.asignar-cc', $container->id) }}">
+                                    <option value="">— Sin CC —</option>
+                                    @foreach($centrosCosto as $cc)
+                                        <option value="{{ $cc->id }}" {{ $container->centro_costo_id == $cc->id ? 'selected' : '' }}>
+                                            {{ $cc->acronimo }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <span class="badge-cc-guardado-{{ $container->id }} text-green-600 text-xs hidden">✓</span>
+                            </div>
+                            @else
+                                <span class="text-xs text-gray-500">{{ $container->centroCosto?->acronimo ?? '—' }}</span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4 text-sm text-gray-600">
                             <span class="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-full">
                                 {{ $container->productos_count }} producto(s)
@@ -364,6 +386,33 @@
 
     document.getElementById('modalEliminar').addEventListener('click', function(e) {
         if (e.target === this) cerrarModalEliminar();
+    });
+
+    // ── Asignación de CC inline ──
+    document.querySelectorAll('.select-cc-container').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+            const id    = this.dataset.id;
+            const url   = this.dataset.url;
+            const ccId  = this.value;
+            const badge = document.querySelector('.badge-cc-guardado-' + id);
+
+            fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ centro_costo_id: ccId || null }),
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.ok && badge) {
+                    badge.classList.remove('hidden');
+                    setTimeout(() => badge.classList.add('hidden'), 2000);
+                }
+            });
+        });
     });
 </script>
 @endpush

@@ -12,13 +12,13 @@ class UsuarioController extends Controller
     public function index()
     {
         abort_unless(auth()->user()->esAdmin(), 403);
-        $usuarios = User::orderBy('name')->get();
+        $usuarios = User::with('centroCosto')->orderBy('name')->get();
         return view('admin.usuarios.index', compact('usuarios'));
     }
 
     public function create()
     {
-        $centrosCosto = CentroCosto::orderBy('nombre')->pluck('nombre');
+        $centrosCosto = CentroCosto::orderBy('acronimo')->get(['id', 'acronimo']);
         return view('admin.usuarios.crear', compact('centrosCosto'));
     }
 
@@ -26,27 +26,24 @@ class UsuarioController extends Controller
     {
         $maxRol = auth()->user()->esDev() ? '0,1,2' : '0,1';
         $data = $request->validate([
-            'name'         => 'required|string|max:255',
-            'email'        => 'required|string|max:255|unique:users,email',
-            'password'     => 'required|string|min:6|confirmed',
-            'rol'          => "required|integer|in:{$maxRol}",
-            'centro_costo' => 'nullable|string|max:100',
+            'name'            => 'required|string|max:255',
+            'email'           => 'required|string|max:255|unique:users,email',
+            'password'        => 'required|string|min:6|confirmed',
+            'rol'             => "required|integer|in:{$maxRol}",
+            'centro_costo_id' => 'nullable|integer|exists:centros_costo,id',
         ]);
 
         $authUser = auth()->user();
-        $cc = ($authUser->esDev() || $authUser->esAdmin()) ? (trim($data['centro_costo'] ?? '') ?: null) : null;
-
-        // Si dev escribe un centro de costo nuevo, guardarlo en la tabla
-        if ($cc && $authUser->esDev()) {
-            CentroCosto::firstOrCreate(['nombre' => strtoupper($cc)]);
-        }
+        $ccId = ($authUser->esDev() || $authUser->esAdmin())
+            ? ($data['centro_costo_id'] ?: null)
+            : null;
 
         User::create([
-            'name'         => $data['name'],
-            'email'        => $data['email'],
-            'password'     => Hash::make($data['password']),
-            'rol'          => $data['rol'],
-            'centro_costo' => $cc,
+            'name'            => $data['name'],
+            'email'           => $data['email'],
+            'password'        => Hash::make($data['password']),
+            'rol'             => $data['rol'],
+            'centro_costo_id' => $ccId,
         ]);
 
         return redirect()->route('admin.usuarios.index')
@@ -56,7 +53,7 @@ class UsuarioController extends Controller
     public function edit(int $id)
     {
         $usuario      = User::findOrFail($id);
-        $centrosCosto = CentroCosto::orderBy('nombre')->pluck('nombre');
+        $centrosCosto = CentroCosto::orderBy('acronimo')->get(['id', 'acronimo']);
         return view('admin.usuarios.editar', compact('usuario', 'centrosCosto'));
     }
 
@@ -67,10 +64,10 @@ class UsuarioController extends Controller
 
         $maxRol = auth()->user()->esDev() ? '0,1,2' : '0,1';
         $data = $request->validate([
-            'name'         => 'required|string|max:255',
-            'email'        => 'required|string|max:255|unique:users,email,' . $id,
-            'rol'          => "required|integer|in:{$maxRol}",
-            'centro_costo' => 'nullable|string|max:100',
+            'name'            => 'required|string|max:255',
+            'email'           => 'required|string|max:255|unique:users,email,' . $id,
+            'rol'             => "required|integer|in:{$maxRol}",
+            'centro_costo_id' => 'nullable|integer|exists:centros_costo,id',
         ]);
 
         $usuario->name  = $data['name'];
@@ -79,14 +76,10 @@ class UsuarioController extends Controller
         if (auth()->id() !== $usuario->id) {
             $usuario->rol = $data['rol'];
         }
+
         $authUser = auth()->user();
         if ($authUser->esDev() || $authUser->esAdmin()) {
-            $cc = trim($data['centro_costo'] ?? '') ?: null;
-            // Si dev escribe un valor nuevo, guardarlo en la tabla
-            if ($cc && $authUser->esDev()) {
-                CentroCosto::firstOrCreate(['nombre' => strtoupper($cc)]);
-            }
-            $usuario->centro_costo = $cc;
+            $usuario->centro_costo_id = $data['centro_costo_id'] ?: null;
         }
 
         // Permisos: solo dev puede modificarlos

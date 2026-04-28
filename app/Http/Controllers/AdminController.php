@@ -21,12 +21,18 @@ class AdminController extends Controller
     public function solicitudes()
     {
         abort_unless(auth()->user()->tienePermiso('solicitudes') || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
+        $user = auth()->user();
+        $ccId = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+
         $solicitudes = Solicitud::with(['producto.container', 'usuario'])
             ->where('estado', 'pendiente')
+            ->when($ccId, fn($q) => $q->whereHas('producto', fn($q2) => $q2->where('centro_costo_id', $ccId)))
             ->orderByDesc('created_at')
             ->get();
 
-        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+        $containers = Container::orderBy('nombre')
+            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+            ->get(['id', 'nombre']);
 
         return view('admin.solicitudes', compact('solicitudes', 'containers'));
     }
@@ -106,12 +112,17 @@ class AdminController extends Controller
     public function rechazadas()
     {
         abort_unless(auth()->user()->tienePermiso('rechazadas'), 403);
+        $user = auth()->user();
+        $ccId = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+
         $solicitudes = Solicitud::with(['producto', 'usuario'])
             ->where('estado', 'rechazado')
+            ->when($ccId, fn($q) => $q->whereHas('producto', fn($q2) => $q2->where('centro_costo_id', $ccId)))
             ->orderByDesc('created_at')
             ->get();
 
         $productosAgrupados = Producto::orderBy('nombre')
+            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get(['id', 'nombre'])
             ->groupBy('nombre');
 
@@ -323,7 +334,8 @@ class AdminController extends Controller
         }
         $descripcion = $request->input('descripcion');
 
-        $productosDB = Producto::get(['id', 'nombre', 'contenedor']);
+        $ccIdMasiva  = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+        $productosDB = Producto::when($ccIdMasiva, fn($q) => $q->where('centro_costo_id', $ccIdMasiva))->get(['id', 'nombre', 'contenedor']);
         $exactos     = [];
         $conflictos  = [];
 
@@ -344,8 +356,10 @@ class AdminController extends Controller
                 'totalNeto'   => $totalNeto,
             ];
 
-            // Coincidencia exacta: por nombre
-            $producto = Producto::where('nombre', $desc)->first();
+            // Coincidencia exacta: por nombre dentro del mismo CC
+            $producto = Producto::where('nombre', $desc)
+                ->when($ccIdMasiva, fn($q) => $q->where('centro_costo_id', $ccIdMasiva))
+                ->first();
             if ($producto) {
                 $item['producto_id']     = $producto->id;
                 $item['producto_nombre'] = $producto->nombre;
@@ -410,9 +424,10 @@ class AdminController extends Controller
         if (!$pendiente) {
             return redirect()->route('dashboard')->with('error', 'Sesión expirada. Vuelve a cargar el Excel.');
         }
-        $productos  = Producto::orderBy('nombre')->get(['id', 'nombre']);
-        $familias   = Familia::with('categorias')->where('activo', true)->orderBy('nombre')->get();
-        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+        $ccId       = auth()->user()->tieneFiltroCC() ? auth()->user()->centro_costo_id : null;
+        $productos  = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
+        $familias   = Familia::with('categorias')->where('activo', true)->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->orderBy('nombre')->get();
+        $containers = Container::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
         return view('admin.productos.resolver-carga-masiva', compact('pendiente', 'productos', 'familias', 'containers'));
     }
 
@@ -548,19 +563,22 @@ class AdminController extends Controller
             }
         }
 
-        DB::transaction(function () use ($items, $motivo, $sicd, $vincularOc, &$actualizados) {
+        $ccId = auth()->user()->centro_costo_id;
+
+        DB::transaction(function () use ($items, $motivo, $sicd, $vincularOc, &$actualizados, $ccId) {
             foreach ($items as $item) {
                 $productoId = $item['producto_id'] ?? null;
 
                 // Crear producto nuevo si el usuario eligió esa opción
                 if (!$productoId && ($item['accion'] ?? '') === 'nuevo' && !empty($item['nuevo_nombre'])) {
                     $nuevo = Producto::create([
-                        'nombre'        => $item['nuevo_nombre'],
-                        'categoria_id'  => $item['nuevo_categoria_id'] ?? null,
-                        'stock_actual'  => 0,
-                        'stock_minimo'  => 0,
-                        'stock_critico' => 0,
-                        'contenedor'    => $item['contenedor_id'] ?? 1,
+                        'nombre'          => $item['nuevo_nombre'],
+                        'categoria_id'    => $item['nuevo_categoria_id'] ?? null,
+                        'stock_actual'    => 0,
+                        'stock_minimo'    => 0,
+                        'stock_critico'   => 0,
+                        'contenedor'      => $item['contenedor_id'] ?? 1,
+                        'centro_costo_id' => $ccId,
                     ]);
                     $productoId = $nuevo->id;
                 }
@@ -577,11 +595,12 @@ class AdminController extends Controller
                             $productoId = $enDestino->id;
                         } else {
                             $copia = Producto::create([
-                                'nombre'        => $prod->nombre,
-                                'stock_actual'  => 0,
-                                'stock_minimo'  => $prod->stock_minimo,
-                                'stock_critico' => $prod->stock_critico,
-                                'contenedor'    => $item['contenedor_id'],
+                                'nombre'          => $prod->nombre,
+                                'stock_actual'    => 0,
+                                'stock_minimo'    => $prod->stock_minimo,
+                                'stock_critico'   => $prod->stock_critico,
+                                'contenedor'      => $item['contenedor_id'],
+                                'centro_costo_id' => $prod->centro_costo_id ?? $ccId,
                             ]);
                             $productoId = $copia->id;
                         }
@@ -697,7 +716,9 @@ class AdminController extends Controller
             }
         }
 
-        DB::transaction(function () use ($request, $sicd, $codigoSicd) {
+        $ccIdManual = auth()->user()->centro_costo_id;
+
+        DB::transaction(function () use ($request, $sicd, $codigoSicd, $ccIdManual) {
             foreach ($request->items_manual as $item) {
                 $producto     = Producto::findOrFail($item['producto_id']);
                 $cantidad     = (int) $item['cantidad'];
@@ -712,11 +733,12 @@ class AdminController extends Controller
                         $producto = $enDestino;
                     } else {
                         $producto = Producto::create([
-                            'nombre'        => $producto->nombre,
-                            'stock_actual'  => 0,
-                            'stock_minimo'  => $producto->stock_minimo,
-                            'stock_critico' => $producto->stock_critico,
-                            'contenedor'    => $contenedorId,
+                            'nombre'          => $producto->nombre,
+                            'stock_actual'    => 0,
+                            'stock_minimo'    => $producto->stock_minimo,
+                            'stock_critico'   => $producto->stock_critico,
+                            'contenedor'      => $contenedorId,
+                            'centro_costo_id' => $producto->centro_costo_id ?? $ccIdManual,
                         ]);
                     }
                 }
@@ -774,12 +796,13 @@ class AdminController extends Controller
         $categoria = Categoria::findOrFail($request->categoria_id);
 
         $producto = \App\Models\Producto::create([
-            'nombre'        => trim($request->nombre),
-            'stock_actual'  => 0,
-            'stock_minimo'  => 0,
-            'stock_critico' => 0,
-            'contenedor'    => null,
-            'categoria_id'  => $categoria->id,
+            'nombre'          => trim($request->nombre),
+            'stock_actual'    => 0,
+            'stock_minimo'    => 0,
+            'stock_critico'   => 0,
+            'contenedor'      => null,
+            'categoria_id'    => $categoria->id,
+            'centro_costo_id' => auth()->user()->centro_costo_id,
         ]);
 
         return response()->json([

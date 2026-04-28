@@ -27,11 +27,23 @@ class RetiroController extends Controller
             return response()->json([]);
         }
 
-        $productos = Producto::where('nombre', 'like', "%{$q}%")
-            ->select('id', 'nombre', 'stock_actual')
+        $user = Auth::user();
+        $ccId = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+
+        $productos = Producto::with(['categoria.familia'])
+            ->where('nombre', 'like', "%{$q}%")
+            ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId))
+            ->select('id', 'nombre', 'stock_actual', 'categoria_id', 'centro_costo_id')
             ->orderBy('nombre')
             ->limit(12)
-            ->get();
+            ->get()
+            ->map(fn($p) => [
+                'id'          => $p->id,
+                'nombre'      => $p->nombre,
+                'stock_actual'=> $p->stock_actual,
+                'categoria'   => $p->categoria?->nombre ?? '',
+                'familia'     => $p->categoria?->familia?->nombre ?? '',
+            ]);
 
         return response()->json($productos);
     }
@@ -58,13 +70,18 @@ class RetiroController extends Controller
         ]);
 
         $user   = Auth::user();
+        $ccId   = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
         $items  = $request->items;
         $motivo = $request->motivo_retiro;
 
         try {
-            DB::transaction(function () use ($user, $items, $motivo) {
+            DB::transaction(function () use ($user, $ccId, $items, $motivo) {
                 foreach ($items as $item) {
                     $producto = Producto::lockForUpdate()->findOrFail($item['producto_id']);
+
+                    if ($ccId && $producto->centro_costo_id !== $ccId) {
+                        throw new \Exception("No tienes acceso al producto \"{$producto->nombre}\".");
+                    }
 
                     if ($producto->stock_actual < (int) $item['cantidad']) {
                         throw new \Exception(

@@ -7,5 +7,5 @@ use Illuminate\Database\Eloquent\Model;
 class CentroCosto extends Model
 {
     protected $table    = 'centros_costo';
-    protected $fillable = ['nombre'];
+    protected $fillable = ['acronimo', 'nombre_completo'];
 }
