@@ -13,8 +13,7 @@ class CatalogoController extends Controller
 {
     private function ccId(): ?int
     {
-        $user = auth()->user();
-        return $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+        return auth()->user()->ccFiltro();
     }
 
     public function index(Request $request)
@@ -107,29 +106,6 @@ class CatalogoController extends Controller
         }
 
         return back()->with('success', 'Categoría actualizada.');
-    }
-
-    public function asignarCCFamilia(Request $request, Familia $familia)
-    {
-        abort_unless(auth()->user()->esAdmin(), 403);
-
-        $data = $request->validate([
-            'centro_costo_id' => ['nullable', 'integer', 'exists:centros_costo,id'],
-        ]);
-
-        $ccId = $data['centro_costo_id'] ?? null;
-        $familia->update(['centro_costo_id' => $ccId]);
-
-        // Propagar a todos los productos de las categorías de esta familia
-        $categoriaIds = $familia->categorias()->pluck('id');
-        Producto::whereIn('categoria_id', $categoriaIds)
-            ->update(['centro_costo_id' => $ccId]);
-
-        if ($request->ajax()) {
-            return response()->json(['ok' => true]);
-        }
-
-        return back()->with('success', "Centro de costo asignado a la familia y sus productos.");
     }
 
     public function buscarBarcode(Request $request)
@@ -272,5 +248,14 @@ class CatalogoController extends Controller
         }
 
         return back()->with('success', 'Producto actualizado.');
+    }
+
+    public function destroyProducto(Producto $producto)
+    {
+        abort_unless(auth()->user()->esDev(), 403);
+
+        $producto->update(['activo' => false]);
+
+        return response()->json(['ok' => true]);
     }
 }

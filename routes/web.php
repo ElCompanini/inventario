@@ -127,6 +127,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::put('/catalogo/productos/{producto}', [CatalogoController::class, 'updateProducto'])->name('catalogo.productos.update');
     Route::get('/catalogo/barcode', [CatalogoController::class, 'buscarBarcode'])->name('catalogo.barcode');
     Route::patch('/catalogo/productos/{producto}/barcode', [CatalogoController::class, 'asociarBarcode'])->name('catalogo.productos.asociar-barcode');
+    Route::delete('/catalogo/productos/{producto}', [CatalogoController::class, 'destroyProducto'])->name('catalogo.productos.destroy');
 
     // Containers
     Route::get('/containers', [ContainerController::class, 'index'])->name('containers.index');
@@ -136,6 +137,4 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/containers/{id}/trasladar', [ContainerController::class, 'trasladar'])->name('containers.trasladar');
     Route::patch('/containers/{id}/cc', [ContainerController::class, 'asignarCC'])->name('containers.asignar-cc');
 
-    // Catálogo: asignar CC a familia existente
-    Route::patch('/catalogo/familias/{familia}/cc', [CatalogoController::class, 'asignarCCFamilia'])->name('catalogo.familias.asignar-cc');
 });

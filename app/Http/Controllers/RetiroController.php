@@ -28,7 +28,7 @@ class RetiroController extends Controller
         }
 
         $user = Auth::user();
-        $ccId = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+        $ccId = $user->ccFiltro();
 
         $productos = Producto::with(['categoria.familia'])
             ->where('nombre', 'like', "%{$q}%")
@@ -70,7 +70,7 @@ class RetiroController extends Controller
         ]);
 
         $user   = Auth::user();
-        $ccId   = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+        $ccId   = $user->ccFiltro();
         $items  = $request->items;
         $motivo = $request->motivo_retiro;
 

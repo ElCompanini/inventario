@@ -20,7 +20,13 @@ class Producto extends Model
         'centro_costo_id',
         'stock_minimo_desde',
         'stock_critico_desde',
+        'activo',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('activo', fn($q) => $q->where('productos.activo', true));
+    }
 
     protected $casts = [
         'stock_minimo_desde'  => 'datetime',

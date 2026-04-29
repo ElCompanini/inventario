@@ -13,6 +13,67 @@
     </div>
 
     <div class="flex items-center gap-4 flex-wrap">
+
+        @if(auth()->user()->esDev() && $centrosCostoConProductos->isNotEmpty())
+        {{-- Filtro CC exclusivo para dev ─────────────────────────────── --}}
+        <div class="relative" id="dev-cc-wrapper">
+            <button type="button" id="dev-cc-btn"
+                    onclick="toggleDevCC()"
+                    class="flex items-center gap-2 px-3 py-2 text-sm font-semibold border border-indigo-300 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition whitespace-nowrap">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
+                </svg>
+                Centro de costo
+                <span id="dev-cc-badge" class="hidden bg-indigo-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none"></span>
+                <svg class="w-3.5 h-3.5 transition-transform duration-200" id="dev-cc-chevron" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+
+            {{-- Dropdown multi-select ──────────────────────────────── --}}
+            <div id="dev-cc-dropdown"
+                 style="position:absolute; right:0; top:calc(100% + 6px); width:460px; z-index:99999; display:none;
+                        background:#fff; border:1px solid #e5e7eb; border-radius:0.75rem;
+                        box-shadow:0 12px 40px rgba(0,0,0,.18);">
+
+                <div style="padding:0.5rem 0.75rem; border-bottom:1px solid #f3f4f6;
+                            display:flex; align-items:center; justify-content:space-between;
+                            background:#fff; border-radius:0.75rem 0.75rem 0 0;">
+                    <span style="font-size:0.6875rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:0.06em;">Centros de costo</span>
+                    <button type="button" onclick="devCCLimpiar()"
+                            style="font-size:0.6875rem; color:#4f46e5; background:none; border:none; cursor:pointer; font-weight:500;">Limpiar</button>
+                </div>
+
+                <div style="padding:0.375rem 0.625rem; border-bottom:1px solid #f3f4f6; background:#fff;">
+                    <input type="text" id="dev-cc-search" oninput="devCCBuscar(this.value)"
+                           placeholder="Buscar centro de costo..."
+                           style="width:100%; box-sizing:border-box; padding:0.35rem 0.6rem; font-size:0.75rem; color:#374151;
+                                  border:1px solid #e5e7eb; border-radius:0.5rem; outline:none; background:#f9fafb;">
+                </div>
+
+                <div id="dev-cc-list" style="max-height:260px; overflow-y:auto; padding:0.375rem 0.5rem; background:#fff;">
+                    @foreach($centrosCostoConProductos as $cc)
+                    <label style="display:flex; align-items:flex-start; gap:0.5rem;
+                                  padding:0.375rem 0.5rem; border-radius:0.5rem; cursor:pointer;"
+                           onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background=''">
+                        <input type="checkbox" class="dev-cc-check" value="{{ $cc->id }}" onchange="devCCFiltrar()"
+                               style="width:0.875rem; height:0.875rem; accent-color:#4f46e5; flex-shrink:0; margin-top:0.15rem; cursor:pointer;">
+                        <span style="font-size:0.75rem; color:#374151; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ $cc->nombre_completo }}</span>
+                    </label>
+                    @endforeach
+                </div>
+
+                <div style="padding:0.5rem 0.75rem; border-top:1px solid #f3f4f6;
+                            background:#fff; border-radius:0 0 0.75rem 0.75rem;">
+                    <button type="button" onclick="devCCMarcarTodos()"
+                            style="font-size:0.6875rem; color:#9ca3af; background:none; border:none; cursor:pointer; font-weight:500; text-align:left; padding:0;">
+                        Seleccionar todos
+                    </button>
+                </div>
+            </div>
+        </div>
+        @endif
+
         @if(auth()->user()->esAdmin())
         <button type="button" id="btn-agregar-inventario"
             style="background:#2563eb; color:#fff; font-size:0.82rem; font-weight:600; padding:0.5rem 1.1rem; border-radius:0.5rem; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:0.4rem; transition:background .15s; white-space:nowrap;"
@@ -186,6 +247,9 @@
                 <th class="px-4 py-3 font-semibold text-gray-600">Mínimo</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Crítico</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Estado</th>
+                @if(auth()->user()->esDev())
+                <th class="px-4 py-3 font-semibold text-gray-600 text-center">CC</th>
+                @endif
                 <th class="px-4 py-3 font-semibold text-gray-600">Acciones</th>
             </tr>
         </thead>
@@ -205,6 +269,7 @@
             <tr class="{{ $rowClass }} hover:brightness-95 transition"
                 data-contenedor="{{ $producto->contenedor }}"
                 data-estado="{{ $estado }}"
+                data-cc-id="{{ $producto->centro_costo_id }}"
                 data-producto-id="{{ $producto->id }}">
                 <td class="px-4 py-3 font-medium text-gray-900">
                     <div class="flex items-center gap-2">
@@ -317,6 +382,13 @@
                     </span>
                     @endif
                 </td>
+                @if(auth()->user()->esDev())
+                <td class="px-4 py-3 text-center">
+                    <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                        {{ $producto->centroCosto?->acronimo ?? '—' }}
+                    </span>
+                </td>
+                @endif
                 <td class="px-4 py-3 text-center">
                     <div class="flex flex-col items-center gap-1.5">
                         @if(auth()->user()->esAdmin())
@@ -1027,8 +1099,39 @@ function escHtmlGm(str) {
                 data-url-masiva="{{ route('admin.productos.carga.masiva') }}"
                 data-url-manual="{{ route('admin.productos.carga.manual') }}">
                 <input type="hidden" name="_modo" value="nuevo">
+                <input type="hidden" name="confirmar_duplicado" id="ai-confirmar-duplicado" value="0">
                 @csrf
                 <div style="padding:1.25rem; display:flex; flex-direction:column; gap:1rem;">
+
+                    @if(session('sicd_duplicada'))
+                    @php $dup = session('sicd_duplicada'); @endphp
+                    <div style="background:#fffbeb; border:1.5px solid #f59e0b; border-radius:0.6rem; padding:0.75rem 1rem;">
+                        <div style="display:flex; align-items:flex-start; gap:0.6rem;">
+                            <svg style="width:18px;height:18px;flex-shrink:0;margin-top:1px;color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                            </svg>
+                            <div style="flex:1;">
+                                <p style="font-size:0.82rem; font-weight:700; color:#92400e; margin:0 0 0.2rem;">
+                                    La SICD <strong>{{ $dup['codigo'] }}</strong> ya fue ingresada al sistema
+                                </p>
+                                <p style="font-size:0.75rem; color:#b45309; margin:0 0 0.55rem;">
+                                    Estado actual: <strong>{{ $dup['estado'] }}</strong>
+                                </p>
+                                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                                    <a href="{{ $dup['url'] }}" target="_blank"
+                                       style="font-size:0.78rem; font-weight:600; background:#d97706; color:#fff; padding:4px 14px; border-radius:6px; text-decoration:none;">
+                                        Ver SICD ingresada
+                                    </a>
+                                    <button type="button"
+                                            onclick="document.getElementById('ai-confirmar-duplicado').value='1'; document.getElementById('form-agregar-inv').dispatchEvent(new Event('submit-confirmed'));"
+                                            style="font-size:0.78rem; font-weight:600; background:#fef3c7; color:#92400e; border:1px solid #f59e0b; padding:4px 14px; border-radius:6px; cursor:pointer;">
+                                        Ingresar de todas formas
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
 
                     {{-- Selector de tipo --}}
                     <div>
@@ -1139,6 +1242,29 @@ function escHtmlGm(str) {
                             <input type="text" name="codigo_sicd" id="ai-codigo-sicd" placeholder="Ej: TIC(S)/81"
                                 style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
                             <span id="ai-codigo-hint" style="font-size:0.7rem; margin-top:0.35rem; display:flex; align-items:center; gap:0.3rem;"></span>
+                            {{-- Advertencia: SICD ya ingresada en el sistema interno --}}
+                            <div id="ai-sicd-ya-ingresada" style="display:none; margin-top:0.5rem; background:#fffbeb; border:1.5px solid #f59e0b; border-radius:0.5rem; padding:0.6rem 0.75rem;">
+                                <div style="display:flex; align-items:flex-start; gap:0.5rem;">
+                                    <svg style="width:16px;height:16px;flex-shrink:0;margin-top:1px;color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                                    </svg>
+                                    <div style="flex:1; min-width:0;">
+                                        <p style="font-size:0.78rem; font-weight:700; color:#92400e; margin:0 0 0.2rem;">Esta SICD ya fue ingresada al sistema</p>
+                                        <p id="ai-sicd-ya-estado" style="font-size:0.72rem; color:#b45309; margin:0 0 0.45rem;"></p>
+                                        <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                                            <a id="ai-sicd-ya-ver" href="#" target="_blank"
+                                               style="font-size:0.72rem; font-weight:600; background:#d97706; color:#fff; padding:3px 12px; border-radius:5px; text-decoration:none; white-space:nowrap;">
+                                                Ver SICD ingresada
+                                            </a>
+                                            <button type="button" id="ai-sicd-ya-continuar"
+                                                    onclick="aiOcultarAdvertenciaSicd()"
+                                                    style="font-size:0.72rem; font-weight:600; background:#fef3c7; color:#92400e; border:1px solid #f59e0b; padding:3px 12px; border-radius:5px; cursor:pointer; white-space:nowrap;">
+                                                Ingresar de todas formas
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div id="ai-sicd-info" style="display:none; margin-top:0.4rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.4rem; padding:0.35rem 0.6rem; font-size:0.72rem; color:#166534;"></div>
                         </div>
 
@@ -1235,7 +1361,7 @@ function escHtmlGm(str) {
                                             <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">Precio Total ($)</th>
                                             <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; width:150px;">Contenedor</th>
                                             <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Motivo</th>
-                                            <th style="padding:0.4rem 0.6rem; width:36px;"></th>
+                                            <th style="padding:0.4rem 0.6rem; width:60px;"></th>
                                         </tr>
                                     </thead>
                                     <tbody id="ai-items-manual"></tbody>
@@ -1364,6 +1490,7 @@ function escHtmlGm(str) {
 
 @push('scripts')
 <script>
+    window.devCCActive = new Set();
     $(document).ready(function() {
         const table = $('#tabla-inventario').DataTable({
             language: {
@@ -1441,6 +1568,12 @@ function escHtmlGm(str) {
                 if (!pid || !filProductoIds.has(pid)) return false;
             }
 
+            // Dev: filtro por centro de costo
+            if (window.devCCActive && window.devCCActive.size) {
+                var ccId = tr ? parseInt(tr.getAttribute('data-cc-id'), 10) : NaN;
+                if (!window.devCCActive.has(ccId)) return false;
+            }
+
             return true;
         });
 
@@ -1512,6 +1645,80 @@ function escHtmlGm(str) {
         });
     });
 
+    @if(auth()->user()->esDev())
+    window.toggleDevCC = function() {
+        var dd = document.getElementById('dev-cc-dropdown');
+        var open = dd.style.display === 'block';
+        dd.style.display = open ? 'none' : 'block';
+        document.getElementById('dev-cc-chevron').style.transform = open ? '' : 'rotate(180deg)';
+    };
+    window.devCCFiltrar = function() {
+        window.devCCActive.clear();
+        document.querySelectorAll('.dev-cc-check:checked').forEach(function(ch) {
+            window.devCCActive.add(parseInt(ch.value, 10));
+        });
+        var badge = document.getElementById('dev-cc-badge');
+        if (window.devCCActive.size) {
+            badge.textContent = window.devCCActive.size;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+        $('#tabla-inventario').DataTable().draw();
+    };
+    window.devCCLimpiar = function() {
+        document.querySelectorAll('.dev-cc-check').forEach(function(ch) { ch.checked = false; });
+        window.devCCActive.clear();
+        document.getElementById('dev-cc-badge').classList.add('hidden');
+        var s = document.getElementById('dev-cc-search');
+        if (s) { s.value = ''; window.devCCBuscar(''); }
+        $('#tabla-inventario').DataTable().draw();
+    };
+    window.devCCBuscar = function(q) {
+        var term = q.toLowerCase().trim();
+        document.querySelectorAll('#dev-cc-list label').forEach(function(el) {
+            var name = el.querySelector('span').textContent.toLowerCase();
+            el.style.display = (!term || name.includes(term)) ? 'flex' : 'none';
+        });
+    };
+    window.devCCCargarMas = function() {
+        var hidden = document.querySelectorAll('#dev-cc-list label[data-more="1"]');
+        var count = 0;
+        hidden.forEach(function(el) {
+            if (count < 20) {
+                el.style.display = 'flex';
+                el.removeAttribute('data-more');
+                count++;
+            }
+        });
+        var remaining = document.querySelectorAll('#dev-cc-list label[data-more="1"]').length;
+        var btn = document.getElementById('dev-cc-load-more');
+        if (btn) {
+            if (remaining === 0) btn.style.display = 'none';
+            else btn.textContent = 'Cargar más (' + remaining + ' restantes)';
+        }
+    };
+    window.devCCMarcarTodos = function() {
+        document.querySelectorAll('#dev-cc-list label[data-more="1"]').forEach(function(el) {
+            el.style.display = 'flex';
+            el.removeAttribute('data-more');
+        });
+        var btn = document.getElementById('dev-cc-load-more');
+        if (btn) btn.style.display = 'none';
+        document.querySelectorAll('.dev-cc-check').forEach(function(ch) { ch.checked = true; });
+        window.devCCFiltrar();
+    };
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#dev-cc-wrapper')) {
+            var dd = document.getElementById('dev-cc-dropdown');
+            if (dd && dd.style.display === 'block') {
+                dd.style.display = 'none';
+                document.getElementById('dev-cc-chevron').style.transform = '';
+            }
+        }
+    });
+    @endif
+
     // Sincronizar todas las animaciones de pulso al mismo tiempo
     document.addEventListener('DOMContentLoaded', function () {
         const els = document.querySelectorAll('.estado-pulso-critico, .estado-pulso-minimo');
@@ -1544,7 +1751,8 @@ function escHtmlGm(str) {
     <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 64px rgba(0,0,0,.3); width:480px; max-width:calc(100vw - 2rem); padding:1.5rem; max-height:88vh; overflow-y:auto; position:relative;">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.1rem;">
             <div>
-                <h3 style="font-size:1rem; font-weight:700; color:#1f2937; margin:0 0 0.25rem;">Nuevo producto</h3>
+                <h3 id="ai-crear-titulo" style="font-size:1rem; font-weight:700; color:#1f2937; margin:0 0 0.25rem;">Nuevo producto</h3>
+
                 <p id="ai-crear-nombre-display" style="font-size:0.8rem; color:#374151; margin:0; font-weight:500; word-break:break-word;"></p>
             </div>
             <button type="button" onclick="aiCerrarModalCrear()" style="flex-shrink:0; color:#9ca3af; background:none; border:none; cursor:pointer; font-size:1.25rem; line-height:1; padding:0.1rem;">✕</button>
@@ -1553,11 +1761,55 @@ function escHtmlGm(str) {
         <div style="margin-bottom:0.85rem;">
             <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.5rem;">Familia <span style="color:#ef4444;">*</span></label>
             <div id="ai-crear-familias" style="display:flex; flex-wrap:wrap; gap:0.4rem; min-height:1.5rem;"></div>
+            @if(auth()->user()->esDev())
+            <button type="button" id="ai-btn-nueva-familia" onclick="aiMostrarNuevaFamilia()"
+                    style="font-size:0.72rem; color:#7c3aed; background:none; border:none; cursor:pointer; padding:0.25rem 0; margin-top:0.4rem; display:inline-flex; align-items:center; gap:0.2rem; font-weight:600;">
+                + Nueva familia
+            </button>
+            <div id="ai-nueva-familia-wrap" style="display:none; margin-top:0.35rem;">
+                <div style="display:flex; gap:0.35rem; align-items:center;">
+                    <input type="text" id="ai-nueva-familia-input" placeholder="Nombre de la nueva familia"
+                           style="flex:1; font-size:0.8rem; padding:0.3rem 0.6rem; border:1px solid #d1d5db; border-radius:0.4rem; outline:none; color:#374151;"
+                           onkeydown="if(event.key==='Enter')aiGuardarNuevaFamilia(); if(event.key==='Escape')aiOcultarNuevaFamilia();">
+                    <button type="button" onclick="aiGuardarNuevaFamilia()"
+                            style="font-size:0.75rem; font-weight:600; padding:0.3rem 0.7rem; background:#7c3aed; color:#fff; border:none; border-radius:0.4rem; cursor:pointer; white-space:nowrap;">
+                        Crear
+                    </button>
+                    <button type="button" onclick="aiOcultarNuevaFamilia()"
+                            style="font-size:0.75rem; padding:0.3rem 0.5rem; background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; border-radius:0.4rem; cursor:pointer;">
+                        ✕
+                    </button>
+                </div>
+                <p id="ai-nueva-familia-error" style="display:none; font-size:0.72rem; color:#dc2626; margin-top:0.2rem;"></p>
+            </div>
+            @endif
         </div>
 
         <div id="ai-crear-cat-wrapper" style="display:none; margin-bottom:0.85rem;">
             <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.5rem;">Categoría <span style="color:#ef4444;">*</span></label>
             <div id="ai-crear-categorias-btns" style="display:flex; flex-wrap:wrap; gap:0.4rem;"></div>
+            @if(auth()->user()->esDev())
+            <button type="button" id="ai-btn-nueva-categoria" onclick="aiMostrarNuevaCategoria()"
+                    style="font-size:0.72rem; color:#7c3aed; background:none; border:none; cursor:pointer; padding:0.25rem 0; margin-top:0.4rem; display:inline-flex; align-items:center; gap:0.2rem; font-weight:600;">
+                + Nueva categoría
+            </button>
+            <div id="ai-nueva-categoria-wrap" style="display:none; margin-top:0.35rem;">
+                <div style="display:flex; gap:0.35rem; align-items:center;">
+                    <input type="text" id="ai-nueva-categoria-input" placeholder="Nombre de la nueva categoría"
+                           style="flex:1; font-size:0.8rem; padding:0.3rem 0.6rem; border:1px solid #d1d5db; border-radius:0.4rem; outline:none; color:#374151;"
+                           onkeydown="if(event.key==='Enter')aiGuardarNuevaCategoria(); if(event.key==='Escape')aiOcultarNuevaCategoria();">
+                    <button type="button" onclick="aiGuardarNuevaCategoria()"
+                            style="font-size:0.75rem; font-weight:600; padding:0.3rem 0.7rem; background:#7c3aed; color:#fff; border:none; border-radius:0.4rem; cursor:pointer; white-space:nowrap;">
+                        Crear
+                    </button>
+                    <button type="button" onclick="aiOcultarNuevaCategoria()"
+                            style="font-size:0.75rem; padding:0.3rem 0.5rem; background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; border-radius:0.4rem; cursor:pointer;">
+                        ✕
+                    </button>
+                </div>
+                <p id="ai-nueva-categoria-error" style="display:none; font-size:0.72rem; color:#dc2626; margin-top:0.2rem;"></p>
+            </div>
+            @endif
         </div>
 
         <div id="ai-crear-error" style="display:none; font-size:0.8rem; color:#dc2626; margin-bottom:0.75rem; padding:0.4rem 0.6rem; background:#fef2f2; border-radius:0.375rem;"></div>
@@ -1605,10 +1857,10 @@ $aiFamiliasJson = json_encode(
 <script type="application/json" id="ai-containers-data">{!! $aiContainersJson !!}</script>
 <script type="application/json" id="ai-familias-data">{!! $aiFamiliasJson !!}</script>
 <script>
+var aiFamilias = JSON.parse(document.getElementById('ai-familias-data').textContent);
 if (document.getElementById('btn-agregar-inventario')) {
 var aiProductos  = JSON.parse(document.getElementById('ai-data').textContent);
 var aiContainers = JSON.parse(document.getElementById('ai-containers-data').textContent);
-var aiFamilias   = JSON.parse(document.getElementById('ai-familias-data').textContent);
 var aiItems = [];
 var aiCounter = 0;
 var aiForm = document.getElementById('form-agregar-inv');
@@ -1618,8 +1870,10 @@ var aiUrlMasiva  = aiForm.dataset.urlMasiva;
 var aiUrlManual  = aiForm.dataset.urlManual;
 var AI_IS_DEV    = {{ auth()->user()->esDev() ? 'true' : 'false' }};
 var AI_IS_ADMIN  = {{ auth()->user()->esAdmin() ? 'true' : 'false' }};
-var AI_URL_CREAR = '{{ route('admin.productos.crear.rapido') }}';
-var AI_CSRF      = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+var AI_URL_CREAR     = '{{ route('admin.productos.crear.rapido') }}';
+var AI_URL_FAMILIA   = '{{ route('admin.catalogo.familias.store') }}';
+var AI_URL_CATEGORIA = '{{ route('admin.catalogo.categorias.store') }}';
+var AI_CSRF          = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 var aiMetodoCargaActual = 'masiva';
 var aiItemsManual = [];
 var aiCounterManual = 0;
@@ -1633,6 +1887,20 @@ document.getElementById('btn-agregar-inventario').addEventListener('click', func
     inner.offsetHeight;
     inner.style.animation = '';
 });
+
+// Abrir automáticamente si hubo un error de duplicado (withInput devuelve al dashboard)
+@if(session('sicd_duplicada'))
+window.addEventListener('DOMContentLoaded', function() {
+    var modal = document.getElementById('modal-agregar-inv');
+    if (modal) {
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        // Activar tab "externa"
+        var sel = document.getElementById('ai-tipo');
+        if (sel) { sel.value = 'externa'; sel.dispatchEvent(new Event('change')); }
+    }
+});
+@endif
 
 var _aiSicdEnlazadoId = null;
 
@@ -1816,6 +2084,18 @@ function aiEnviar() {
     aiForm.submit();
 }
 
+// Envío cuando el usuario confirma un duplicado desde el banner de sesión
+document.getElementById('form-agregar-inv').addEventListener('submit-confirmed', function() {
+    var tipo = document.getElementById('ai-tipo').value;
+    if (tipo === 'externa') {
+        if (aiMetodoCargaActual === 'masiva') {
+            aiForm.action = aiUrlMasiva;
+        } else {
+            aiForm.action = aiUrlManual;
+        }
+    }
+    aiForm.submit();
+});
 
 // ── Validación en tiempo real del código SICD contra sistema externo ──────
 var aiSicdValidTimer = null;
@@ -1977,6 +2257,25 @@ function aiValidarCodigo(codigo) {
                 }
                 hint.innerHTML = '<svg style="width:13px;height:13px;flex-shrink:0" fill="none" stroke="#16a34a" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg><span style="color:#16a34a;font-weight:600;">Código válido en el sistema</span>';
                 document.getElementById('ai-codigo-sicd').style.borderColor = '#16a34a';
+
+                // Verificar si esta SICD ya existe en el sistema interno
+                var advertenciaEl  = document.getElementById('ai-sicd-ya-ingresada');
+                var advertenciaOk  = false;
+                fetch('{{ route("admin.sicd.buscar-por-codigo") }}?codigo=' + encodeURIComponent(codigoFinal))
+                    .then(function(r) { return r.json(); })
+                    .then(function(interno) {
+                        if (interno.encontrado && interno.tiene_detalles) {
+                            var estadosLabel = { recibido:'Recibida', pendiente:'Pendiente / En OC' };
+                            var estadoText   = estadosLabel[interno.estado] || interno.estado || '—';
+                            document.getElementById('ai-sicd-ya-estado').textContent = 'Estado: ' + estadoText;
+                            document.getElementById('ai-sicd-ya-ver').href = interno.url;
+                            advertenciaEl.style.display = 'block';
+                        } else {
+                            advertenciaEl.style.display = 'none';
+                        }
+                    })
+                    .catch(function() { advertenciaEl.style.display = 'none'; });
+
                 info.style.display = 'block';
                 var sicdEstadoLabels = {
                     1: 'Ingresada', 2: 'Enviada', 3: 'Aprobada',
@@ -2091,11 +2390,16 @@ function aiValidarCodigo(codigo) {
         });
 }
 
+function aiOcultarAdvertenciaSicd() {
+    document.getElementById('ai-sicd-ya-ingresada').style.display = 'none';
+}
+
 document.getElementById('ai-codigo-sicd').addEventListener('input', function() {
     var codigo = this.value.trim();
     this.style.borderColor = '#d1d5db';
     document.getElementById('ai-codigo-hint').innerHTML = '';
     document.getElementById('ai-sicd-info').style.display = 'none';
+    document.getElementById('ai-sicd-ya-ingresada').style.display = 'none';
     aiSicdValido = false;
     clearTimeout(aiSicdValidTimer);
     if (codigo.length >= 3) {
@@ -2220,10 +2524,17 @@ function aiRenderFilaManual(idx, id, nombre, contenedorId) {
         + '<input type="text" name="items_manual[' + idx + '][motivo]" placeholder="Motivo (opcional)"'
         + ' style="width:100%;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.78rem;">'
         + '</td>'
-        + '<td style="padding:0.4rem 0.3rem;text-align:center;">'
-        + '<button type="button" onclick="aiQuitarManual(' + idx + ')" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;">&#x2715;</button>'
+        + '<td style="padding:0.4rem 0.3rem;text-align:center;white-space:nowrap;">'
+        + '<button type="button" onclick="aiEditarManual(' + idx + ',\'' + escHtmlAi(nombre).replace(/'/g,"\\'") + '\')" title="Cambiar producto" style="color:#6b7280;background:none;border:none;cursor:pointer;font-size:0.95rem;line-height:1;margin-right:0.25rem;">&#9998;</button>'
+        + '<button type="button" onclick="aiQuitarManual(' + idx + ')" title="Quitar" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;">&#x2715;</button>'
         + '</td>';
     tbody.appendChild(tr);
+}
+
+function aiEditarManual(idx, nombre) {
+    var row = document.getElementById('ai-row-manual-' + idx);
+    if (row) row.style.opacity = '0.4';
+    aiAbrirModalCrear(nombre, idx);
 }
 
 function aiQuitarManual(idx) {
@@ -2232,6 +2543,7 @@ function aiQuitarManual(idx) {
     if (row) row.remove();
     aiActualizarTablaManual();
 }
+
 
 function aiActualizarTablaManual() {
     var wrap = document.getElementById('ai-tabla-manual-wrap');
@@ -2314,9 +2626,11 @@ function escHtmlAi(str) {
 var aiCrearFamiliaId = null;
 var aiCrearCatId     = null;
 var aiCrearNombre    = '';
+var aiEditandoIdx    = null;
 
-function aiAbrirModalCrear(nombre) {
+function aiAbrirModalCrear(nombre, editIdx) {
     if (!AI_IS_ADMIN) return;
+    aiEditandoIdx    = (editIdx !== undefined) ? editIdx : null;
     aiCrearFamiliaId = null;
     aiCrearCatId     = null;
     aiCrearNombre    = nombre;
@@ -2324,6 +2638,8 @@ function aiAbrirModalCrear(nombre) {
     document.getElementById('ai-crear-cat-wrapper').style.display = 'none';
     var nombreEl = document.getElementById('ai-crear-nombre-display');
     if (nombreEl) nombreEl.textContent = nombre;
+    var tituloEl = document.getElementById('ai-crear-titulo');
+    if (tituloEl) tituloEl.textContent = aiEditandoIdx !== null ? 'Editar producto' : 'Nuevo producto';
     var res = document.getElementById('ai-resultados-manual');
     if (res) res.style.display = 'none';
     aiRenderCrearFamilias();
@@ -2331,6 +2647,11 @@ function aiAbrirModalCrear(nombre) {
 }
 
 function aiCerrarModalCrear() {
+    if (aiEditandoIdx !== null) {
+        var row = document.getElementById('ai-row-manual-' + aiEditandoIdx);
+        if (row) row.style.opacity = '1';
+        aiEditandoIdx = null;
+    }
     document.getElementById('ai-modal-crear-producto').style.display = 'none';
 }
 
@@ -2361,19 +2682,28 @@ function aiRenderCrearCategorias() {
     var cont    = document.getElementById('ai-crear-categorias-btns');
     if (!wrapper || !cont) return;
     if (!aiCrearFamiliaId) { wrapper.style.display = 'none'; return; }
-    var lista   = (typeof aiFamilias !== 'undefined') ? aiFamilias : [];
+    var lista   = aiFamilias || [];
     var familia = lista.find(function(f) { return f.id === aiCrearFamiliaId; });
+    var cats    = (familia ? familia.categorias : []) || [];
     cont.innerHTML = '';
-    (familia ? familia.categorias : []).forEach(function(c) {
-        var sel = c.id === aiCrearCatId;
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = c.nombre;
-        btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;'
-            + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : 'background:#fff;color:#374151;border-color:#d1d5db;');
-        btn.onclick = function() { aiCrearCatId = c.id; aiRenderCrearCategorias(); };
-        cont.appendChild(btn);
-    });
+    if (cats.length === 0) {
+        var empty = document.createElement('p');
+        empty.textContent = 'Esta familia no tiene categorías aún. Crea una nueva usando el botón de abajo.';
+        empty.style.cssText = 'font-size:0.75rem;color:#9ca3af;margin:0;';
+        cont.appendChild(empty);
+        aiCrearCatId = null;
+    } else {
+        cats.forEach(function(c) {
+            var sel = c.id === aiCrearCatId;
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = c.nombre;
+            btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;'
+                + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : 'background:#fff;color:#374151;border-color:#d1d5db;');
+            btn.onclick = function() { aiCrearCatId = c.id; aiRenderCrearCategorias(); };
+            cont.appendChild(btn);
+        });
+    }
     wrapper.style.display = 'block';
 }
 
@@ -2401,7 +2731,21 @@ function aiConfirmarCrearProducto() {
             if (typeof aiProductos !== 'undefined') {
                 aiProductos.push({ id: p.id, nombre: p.nombre, contenedor_id: null, contenedor_nombre: '', stock: 0 });
             }
-            if (typeof aiAgregarManual === 'function') aiAgregarManual(p.id, p.nombre, null);
+            if (aiEditandoIdx !== null) {
+                var row = document.getElementById('ai-row-manual-' + aiEditandoIdx);
+                if (row) {
+                    var hidden = row.querySelector('input[type="hidden"]');
+                    if (hidden) hidden.value = p.id;
+                    var nameSpan = row.querySelector('span[style]');
+                    if (nameSpan) nameSpan.textContent = p.nombre;
+                    row.style.opacity = '1';
+                }
+                var item = aiItemsManual.find(function(i) { return i.idx === aiEditandoIdx; });
+                if (item) { item.id = p.id; item.nombre = p.nombre; }
+                aiEditandoIdx = null;
+            } else {
+                if (typeof aiAgregarManual === 'function') aiAgregarManual(p.id, p.nombre, null);
+            }
             aiCerrarModalCrear();
             var buscador = document.getElementById('ai-buscador-manual');
             if (buscador) buscador.value = '';
@@ -2419,5 +2763,85 @@ function aiConfirmarCrearProducto() {
 document.getElementById('ai-modal-crear-producto').addEventListener('click', function(e) {
     if (e.target === e.currentTarget) aiCerrarModalCrear();
 });
+
+// ── Crear nueva familia (solo dev) ─────────────────────────────────
+function aiMostrarNuevaFamilia() {
+    document.getElementById('ai-btn-nueva-familia').style.display = 'none';
+    document.getElementById('ai-nueva-familia-wrap').style.display = 'block';
+    document.getElementById('ai-nueva-familia-input').value = '';
+    document.getElementById('ai-nueva-familia-error').style.display = 'none';
+    setTimeout(function() { document.getElementById('ai-nueva-familia-input').focus(); }, 50);
+}
+function aiOcultarNuevaFamilia() {
+    document.getElementById('ai-nueva-familia-wrap').style.display = 'none';
+    document.getElementById('ai-btn-nueva-familia').style.display = 'inline-flex';
+}
+function aiGuardarNuevaFamilia() {
+    var nombre = (document.getElementById('ai-nueva-familia-input').value || '').trim();
+    var errEl  = document.getElementById('ai-nueva-familia-error');
+    errEl.style.display = 'none';
+    if (!nombre) { errEl.textContent = 'Escribe un nombre.'; errEl.style.display = 'block'; return; }
+
+    fetch(AI_URL_FAMILIA, {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': AI_CSRF, 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ nombre: nombre }),
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+        if (!res.ok) {
+            errEl.textContent = (res.d.errors ? Object.values(res.d.errors).flat().join(' ') : null) || res.d.message || 'Error al crear.';
+            errEl.style.display = 'block';
+            return;
+        }
+        aiFamilias.push({ id: res.d.id, nombre: res.d.nombre, categorias: [] });
+        aiCrearFamiliaId = res.d.id;
+        aiCrearCatId = null;
+        aiOcultarNuevaFamilia();
+        aiRenderCrearFamilias();
+        aiRenderCrearCategorias();
+    })
+    .catch(function() { errEl.textContent = 'Error de conexión.'; errEl.style.display = 'block'; });
+}
+
+// ── Crear nueva categoría (solo dev) ───────────────────────────────
+function aiMostrarNuevaCategoria() {
+    document.getElementById('ai-btn-nueva-categoria').style.display = 'none';
+    document.getElementById('ai-nueva-categoria-wrap').style.display = 'block';
+    document.getElementById('ai-nueva-categoria-input').value = '';
+    document.getElementById('ai-nueva-categoria-error').style.display = 'none';
+    setTimeout(function() { document.getElementById('ai-nueva-categoria-input').focus(); }, 50);
+}
+function aiOcultarNuevaCategoria() {
+    document.getElementById('ai-nueva-categoria-wrap').style.display = 'none';
+    document.getElementById('ai-btn-nueva-categoria').style.display = 'inline-flex';
+}
+function aiGuardarNuevaCategoria() {
+    var nombre = (document.getElementById('ai-nueva-categoria-input').value || '').trim();
+    var errEl  = document.getElementById('ai-nueva-categoria-error');
+    errEl.style.display = 'none';
+    if (!nombre) { errEl.textContent = 'Escribe un nombre.'; errEl.style.display = 'block'; return; }
+    if (!aiCrearFamiliaId) { errEl.textContent = 'Selecciona una familia primero.'; errEl.style.display = 'block'; return; }
+
+    fetch(AI_URL_CATEGORIA, {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': AI_CSRF, 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ nombre: nombre, familia_id: aiCrearFamiliaId }),
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+        if (!res.ok) {
+            errEl.textContent = (res.d.errors ? Object.values(res.d.errors).flat().join(' ') : null) || res.d.message || 'Error al crear.';
+            errEl.style.display = 'block';
+            return;
+        }
+        var familia = aiFamilias.find(function(f) { return f.id === aiCrearFamiliaId; });
+        if (familia) familia.categorias.push({ id: res.d.id, nombre: res.d.nombre });
+        aiCrearCatId = res.d.id;
+        aiOcultarNuevaCategoria();
+        aiRenderCrearCategorias();
+    })
+    .catch(function() { errEl.textContent = 'Error de conexión.'; errEl.style.display = 'block'; });
+}
 </script>
 @endpush

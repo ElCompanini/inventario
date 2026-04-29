@@ -21,13 +21,12 @@ class GastoMenorController extends Controller
         $query = GastoMenor::with(['producto', 'user', 'historialCambio.container'])
             ->orderByDesc('created_at');
 
-        if ($user->tieneFiltroCC()) {
-            $ccId = $user->centro_costo_id;
+        $ccId = $user->ccFiltro();
+        if ($ccId) {
             $query->whereHas('user', fn($q) => $q->where('centro_costo_id', $ccId));
         }
 
         $registros  = $query->get()->groupBy('folio');
-        $ccId       = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
         $productos  = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get();
         $containers = Container::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
 

@@ -83,27 +83,6 @@
 
 @if($familiaActual)
 
-{{-- CC de la familia activa --}}
-<div class="mb-4 flex items-center gap-3 bg-white rounded-xl shadow px-4 py-3">
-    <svg class="w-4 h-4 text-indigo-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-    </svg>
-    <span class="text-sm font-semibold text-gray-700">Centro de costo de la familia
-        <span class="text-indigo-600">{{ $familiaActual->nombre }}</span>:
-    </span>
-    <select id="select-cc-familia"
-            data-url="{{ route('admin.catalogo.familias.asignar-cc', $familiaActual->id) }}"
-            class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-        <option value="">— Sin centro de costo —</option>
-        @foreach(\App\Models\CentroCosto::orderBy('acronimo')->get(['id','acronimo']) as $cc)
-            <option value="{{ $cc->id }}" {{ $familiaActual->centro_costo_id == $cc->id ? 'selected' : '' }}>
-                {{ $cc->acronimo }}
-            </option>
-        @endforeach
-    </select>
-    <span id="cc-familia-ok" class="text-green-600 text-sm font-semibold hidden">✓ Guardado</span>
-    <span id="cc-familia-err" class="text-red-500 text-sm hidden">Error al guardar</span>
-</div>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -446,11 +425,13 @@
 @push('scripts')
 <script>
 const CSRF             = '{{ csrf_token() }}';
+const IS_DEV           = {{ auth()->user()->esDev() ? 'true' : 'false' }};
 const ROUTE_FAM_STORE  = '{{ route('admin.catalogo.familias.store') }}';
 const ROUTE_CAT_STORE  = '{{ route('admin.catalogo.categorias.store') }}';
 const ROUTE_CAT_UPDATE = (id) => `{{ url('admin/catalogo/categorias') }}/${id}`;
-const ROUTE_PROD_STORE  = '{{ route('admin.catalogo.productos.store') }}';
-const ROUTE_PROD_UPDATE = (id) => `{{ url('admin/catalogo/productos') }}/${id}`;
+const ROUTE_PROD_STORE   = '{{ route('admin.catalogo.productos.store') }}';
+const ROUTE_PROD_UPDATE  = (id) => `{{ url('admin/catalogo/productos') }}/${id}`;
+const ROUTE_PROD_DESTROY = (id) => `{{ url('admin/catalogo/productos') }}/${id}`;
 const ROUTE_BARCODE          = '{{ route('admin.catalogo.barcode') }}';
 const ROUTE_ASOCIAR_BARCODE  = (id) => `{{ url('admin/catalogo/productos') }}/${id}/barcode`;
 
@@ -854,6 +835,10 @@ function renderProductos(productos) {
                         class="btn-ghost text-xs font-semibold text-gray-600 hover:text-gray-800 border border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 px-3 py-1.5 rounded-lg">
                     Editar
                 </button>
+                ${IS_DEV ? `<button onclick="eliminarProducto(${p.id}, '${escHtml(p.nombre).replace(/'/g,"\\'")}')"
+                        class="btn-ghost text-xs font-semibold text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 bg-white hover:bg-red-50 px-3 py-1.5 rounded-lg">
+                    Eliminar
+                </button>` : ''}
             </div>
         </div>`;
     });
@@ -983,6 +968,33 @@ function editarProducto(prodId) {
 
 function cerrarModalProducto() { cerrarModal('modal-producto'); }
 
+async function eliminarProducto(prodId, nombre) {
+    if (!confirm('¿Inactivar el producto "' + nombre + '"?\n\nEl producto quedará inactivo y no aparecerá en el inventario, pero sus datos históricos se conservan.')) return;
+    try {
+        const res  = await fetch(ROUTE_PROD_DESTROY(prodId), {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) { alert('Error al inactivar el producto.'); return; }
+        // Quitar del catalogoData local
+        catalogoData.forEach(function(f) {
+            f.categorias.forEach(function(c) {
+                var idx = c.productos.findIndex(function(p) { return p.id === prodId; });
+                if (idx !== -1) c.productos.splice(idx, 1);
+            });
+        });
+        // Actualizar contador de la categoría activa
+        var cat = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
+        if (cat) {
+            var span = document.querySelector('#cat-btn-' + catActualId + ' span.text-xs');
+            if (span) span.textContent = cat.productos.length;
+            document.getElementById('subtitulo-categoria').textContent = cat.productos.length === 0 ? 'Sin productos' : cat.productos.length + ' producto' + (cat.productos.length !== 1 ? 's' : '');
+            renderProductos(cat.productos);
+        }
+    } catch(e) { alert('Error de conexión.'); }
+}
+
 async function guardarProducto() {
     var stock_minimo  = document.getElementById('prod-stock-minimo').value;
     var stock_critico = document.getElementById('prod-stock-critico').value;
@@ -1040,39 +1052,6 @@ document.getElementById('modal-producto').addEventListener('click', function(e) 
 window.addEventListener('DOMContentLoaded', function() {
     const primerBtn = document.querySelector('.cat-item');
     if (primerBtn) seleccionarCategoria(parseInt(primerBtn.dataset.catId), primerBtn.querySelector('.cat-nombre').textContent.trim());
-
-    // Asignación de CC de familia
-    const selCC = document.getElementById('select-cc-familia');
-    if (selCC) {
-        selCC.addEventListener('change', function() {
-            const url  = this.dataset.url;
-            const ccId = this.value || null;
-            const ok   = document.getElementById('cc-familia-ok');
-            const err  = document.getElementById('cc-familia-err');
-            ok.classList.add('hidden');
-            err.classList.add('hidden');
-
-            fetch(url, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ centro_costo_id: ccId }),
-            })
-            .then(r => r.json())
-            .then(d => {
-                if (d.ok) {
-                    ok.classList.remove('hidden');
-                    setTimeout(() => ok.classList.add('hidden'), 2500);
-                } else {
-                    err.classList.remove('hidden');
-                }
-            })
-            .catch(() => err.classList.remove('hidden'));
-        });
-    }
 });
 </script>
 @endpush

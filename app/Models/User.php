@@ -79,6 +79,18 @@ class User extends Authenticatable
         return $this->centro_costo_id !== null;
     }
 
+    /**
+     * ID a usar en filtros de CC:
+     * - dev          → null  (sin filtro, ve todo)
+     * - tiene CC     → su centro_costo_id
+     * - sin CC y no dev → -1  (ID imposible, no ve nada)
+     */
+    public function ccFiltro(): ?int
+    {
+        if ($this->esDev()) return null;
+        return $this->centro_costo_id ?? -1;
+    }
+
     public function tienePermiso(string $permiso): bool
     {
         if ($this->esAdmin()) return true;

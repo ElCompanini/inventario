@@ -236,7 +236,7 @@ class SicdController extends Controller
                 ->with('error', 'Sesión expirada. Vuelve a cargar el SICD.');
         }
 
-        $ccId      = auth()->user()->tieneFiltroCC() ? auth()->user()->centro_costo_id : null;
+        $ccId      = auth()->user()->ccFiltro();
         $productos = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
 
         return view('admin.sicd.resolver', compact('pendiente', 'productos'));
@@ -539,12 +539,16 @@ class SicdController extends Controller
             return response()->json(['encontrado' => false]);
         }
 
+        $tieneDetalles = $sicd->detalles()->exists();
+
         return response()->json([
-            'encontrado'    => true,
-            'id'            => $sicd->id,
-            'ya_enlazado'   => !empty($sicd->documento_blob),
-            'url'           => route('admin.sicd.show', $sicd->id),
-            'enlazar_url'   => route('admin.sicd.enlazar-pdf', $sicd->id),
+            'encontrado'     => true,
+            'id'             => $sicd->id,
+            'ya_enlazado'    => !empty($sicd->documento_blob),
+            'tiene_detalles' => $tieneDetalles,
+            'estado'         => $sicd->estado,
+            'url'            => route('admin.sicd.show', $sicd->id),
+            'enlazar_url'    => route('admin.sicd.enlazar-pdf', $sicd->id),
         ]);
     }
 

@@ -22,7 +22,7 @@ class AdminController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('solicitudes') || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
         $user = auth()->user();
-        $ccId = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+        $ccId = $user->ccFiltro();
 
         $solicitudes = Solicitud::with(['producto.container', 'usuario'])
             ->where('estado', 'pendiente')
@@ -113,7 +113,7 @@ class AdminController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('rechazadas'), 403);
         $user = auth()->user();
-        $ccId = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+        $ccId = $user->ccFiltro();
 
         $solicitudes = Solicitud::with(['producto', 'usuario'])
             ->where('estado', 'rechazado')
@@ -332,9 +332,25 @@ class AdminController extends Controller
                 return back()->with('error', "El código SICD \"{$codigoSicd}\" no pertenece a tu centro de costo ({$prefix}).");
             }
         }
+
+        // Advertir si la SICD ya está ingresada en el sistema (tiene detalles)
+        if (!$request->boolean('confirmar_duplicado')) {
+            $sicdExistente = Sicd::where('codigo_sicd', $codigoSicd)->whereHas('detalles')->latest()->first();
+            if ($sicdExistente) {
+                return back()
+                    ->withInput()
+                    ->with('sicd_duplicada', [
+                        'codigo' => $codigoSicd,
+                        'id'     => $sicdExistente->id,
+                        'estado' => $sicdExistente->estado,
+                        'url'    => route('admin.sicd.show', $sicdExistente->id),
+                    ]);
+            }
+        }
+
         $descripcion = $request->input('descripcion');
 
-        $ccIdMasiva  = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+        $ccIdMasiva  = $user->ccFiltro();
         $productosDB = Producto::when($ccIdMasiva, fn($q) => $q->where('centro_costo_id', $ccIdMasiva))->get(['id', 'nombre', 'contenedor']);
         $exactos     = [];
         $conflictos  = [];
@@ -424,7 +440,7 @@ class AdminController extends Controller
         if (!$pendiente) {
             return redirect()->route('dashboard')->with('error', 'Sesión expirada. Vuelve a cargar el Excel.');
         }
-        $ccId       = auth()->user()->tieneFiltroCC() ? auth()->user()->centro_costo_id : null;
+        $ccId       = auth()->user()->ccFiltro();
         $productos  = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
         $familias   = Familia::with('categorias')->where('activo', true)->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->orderBy('nombre')->get();
         $containers = Container::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
@@ -676,6 +692,21 @@ class AdminController extends Controller
         $codigoSicd  = strtoupper(trim($request->input('codigo_sicd', ''))) ?: null;
         $descripcion = trim($request->input('descripcion', '')) ?: null;
         $vincularOc  = (bool) $request->input('vincular_oc_manual');
+
+        // Advertir si la SICD ya está ingresada en el sistema (tiene detalles)
+        if ($codigoSicd && !$request->boolean('confirmar_duplicado')) {
+            $sicdExistente = Sicd::where('codigo_sicd', $codigoSicd)->whereHas('detalles')->latest()->first();
+            if ($sicdExistente) {
+                return back()
+                    ->withInput()
+                    ->with('sicd_duplicada', [
+                        'codigo' => $codigoSicd,
+                        'id'     => $sicdExistente->id,
+                        'estado' => $sicdExistente->estado,
+                        'url'    => route('admin.sicd.show', $sicdExistente->id),
+                    ]);
+            }
+        }
 
         // Crear registro SICD si viene con código externo
         $sicd = null;

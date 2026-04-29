@@ -14,7 +14,7 @@ class SearchController extends Controller
     {
         $like  = "%{$q}%";
         $user  = auth()->user();
-        $ccId  = $user->tieneFiltroCC() ? $user->centro_costo_id : null;
+        $ccId  = $user->ccFiltro();
 
         $productos = Producto::with('container')
             ->where(fn($w) => $w->where('id', $q)->orWhere('nombre', 'LIKE', $like)->orWhere('descripcion', 'LIKE', $like))

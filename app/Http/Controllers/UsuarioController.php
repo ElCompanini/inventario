@@ -24,16 +24,19 @@ class UsuarioController extends Controller
 
     public function store(Request $request)
     {
-        $maxRol = auth()->user()->esDev() ? '0,1,2' : '0,1';
+        $authUser = auth()->user();
         $data = $request->validate([
             'name'            => 'required|string|max:255',
             'email'           => 'required|string|max:255|unique:users,email',
             'password'        => 'required|string|min:6|confirmed',
-            'rol'             => "required|integer|in:{$maxRol}",
             'centro_costo_id' => 'nullable|integer|exists:centros_costo,id',
         ]);
 
-        $authUser = auth()->user();
+        $rol = $authUser->esDev() ? (int) $request->input('rol', 0) : 0;
+        if ($authUser->esDev()) {
+            abort_unless(in_array($rol, [0, 1, 2]), 422);
+        }
+
         $ccId = ($authUser->esDev() || $authUser->esAdmin())
             ? ($data['centro_costo_id'] ?: null)
             : null;
@@ -42,7 +45,7 @@ class UsuarioController extends Controller
             'name'            => $data['name'],
             'email'           => $data['email'],
             'password'        => Hash::make($data['password']),
-            'rol'             => $data['rol'],
+            'rol'             => $rol,
             'centro_costo_id' => $ccId,
         ]);
 
@@ -62,29 +65,30 @@ class UsuarioController extends Controller
         abort_unless(auth()->user()->esAdmin(), 403);
         $usuario = User::findOrFail($id);
 
-        $maxRol = auth()->user()->esDev() ? '0,1,2' : '0,1';
+        $authUser = auth()->user();
         $data = $request->validate([
             'name'            => 'required|string|max:255',
             'email'           => 'required|string|max:255|unique:users,email,' . $id,
-            'rol'             => "required|integer|in:{$maxRol}",
             'centro_costo_id' => 'nullable|integer|exists:centros_costo,id',
         ]);
 
         $usuario->name  = $data['name'];
         $usuario->email = $data['email'];
 
-        if (auth()->id() !== $usuario->id) {
-            $usuario->rol = $data['rol'];
+        if ($authUser->esDev() && auth()->id() !== $usuario->id) {
+            $rol = (int) $request->input('rol', $usuario->rol);
+            if (in_array($rol, [0, 1, 2])) {
+                $usuario->rol = $rol;
+            }
         }
 
-        $authUser = auth()->user();
         if ($authUser->esDev() || $authUser->esAdmin()) {
             $usuario->centro_costo_id = $data['centro_costo_id'] ?: null;
         }
 
         // Permisos: solo dev puede modificarlos
         if ($authUser->esDev()) {
-            if ((int) $data['rol'] === 0) {
+            if ($usuario->rol === 0) {
                 $permisos = array_keys(array_filter(
                     $request->only(array_keys(User::PERMISOS_DISPONIBLES))
                 ));

@@ -55,7 +55,7 @@ if (strlen($limpio) < 2) return $rut;
     <p id="gm-sin-resultados" class="hidden text-sm text-gray-400 text-center py-6">Sin resultados para la búsqueda.</p>
 
     @if($registros->isEmpty())
-    <div class="bg-white rounded-xl shadow p-10 text-center text-gray-400">
+    <div class="bg-white rounded-xl shadow py-32 text-center text-gray-400">
         <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-3-3v6M4.5 19.5l15-15M3 10.5A7.5 7.5 0 1110.5 3" />
         </svg>

@@ -37,15 +37,18 @@
                     <div class="w-full border border-gray-200 bg-gray-50 rounded-lg px-2.5 py-1.5 text-sm text-gray-400 select-none">
                         {{ $rolLabels[$usuario->rol] ?? 'Usuario' }} <span class="text-xs">(no modificable)</span>
                     </div>
-                @else
+                @elseif(auth()->user()->esDev())
                     <select name="rol" required
                             class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
                         <option value="0" {{ old('rol', $usuario->rol) == 0 ? 'selected' : '' }}>Usuario</option>
                         <option value="1" {{ old('rol', $usuario->rol) == 1 ? 'selected' : '' }}>Admin</option>
-                        @if(auth()->user()->esDev())
                         <option value="2" {{ old('rol', $usuario->rol) == 2 ? 'selected' : '' }}>Dev</option>
-                        @endif
                     </select>
+                @else
+                    <input type="hidden" name="rol" value="{{ $usuario->rol }}">
+                    <div class="w-full border border-gray-200 bg-gray-50 rounded-lg px-2.5 py-1.5 text-sm text-gray-400 select-none">
+                        {{ $rolLabels[$usuario->rol] ?? 'Usuario' }} <span class="text-xs">(solo dev puede cambiar roles)</span>
+                    </div>
                 @endif
                 @error('rol') <p class="text-red-500 text-xs mt-0.5">{{ $message }}</p> @enderror
             </div>
