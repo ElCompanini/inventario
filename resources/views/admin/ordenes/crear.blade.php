@@ -407,9 +407,9 @@ function _buildCard(e) {
         ? _ocTypeBadgeHtml(e.tipoInfo)
         : _badgeHtml(e.estado);
 
-    // Extra in header for error state: reintentar button
+    // Extra in header for error/not-found state: reintentar button
     var headerExtra = '';
-    if (e.estado === 'error') {
+    if (e.estado === 'error' || e.estado === 'no_encontrado') {
         headerExtra = '<button type="button" onclick="event.stopPropagation();reintentarCodigo(\'' + codeEsc + '\')"'
             + ' style="font-size:0.7rem;font-weight:600;color:#4f46e5;background:#eef2ff;border:1px solid #a5b4fc;border-radius:0.375rem;padding:2px 9px;cursor:pointer;white-space:nowrap;flex-shrink:0;">'
             + 'Reintentar</button>';
