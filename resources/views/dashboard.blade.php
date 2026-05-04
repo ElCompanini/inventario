@@ -1358,9 +1358,10 @@ function escHtmlGm(str) {
                                         <tr style="background:#f3e8ff; color:#6b21a8;">
                                             <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Producto</th>
                                             <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:80px;">Cantidad</th>
-                                            <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">Precio Total ($)</th>
+                                            <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:80px;">Unidad</th>
+                                            <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:100px;">Precio Neto($)</th>
+                                            <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:110px;">Total Neto($)</th>
                                             <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; width:150px;">Contenedor</th>
-                                            <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Motivo</th>
                                             <th style="padding:0.4rem 0.6rem; width:60px;"></th>
                                         </tr>
                                     </thead>
@@ -1383,6 +1384,12 @@ function escHtmlGm(str) {
 
                     </div>
 
+                </div>
+
+                {{-- Toast de validación --}}
+                <div id="ai-toast-error" style="display:none; margin:0 1.25rem 0.75rem; padding:0.6rem 1rem; background:#fef2f2; border:1px solid #fca5a5; border-radius:0.5rem; color:#991b1b; font-size:0.8rem; font-weight:500; align-items:center; gap:0.5rem;">
+                    <span>⚠</span>
+                    <span id="ai-toast-msg"></span>
                 </div>
 
                 {{-- Footer --}}
@@ -1904,6 +1911,19 @@ window.addEventListener('DOMContentLoaded', function() {
 
 var _aiSicdEnlazadoId = null;
 
+(function() {
+    var orphan = sessionStorage.getItem('ai_sicd_pending');
+    if (!orphan) return;
+    sessionStorage.removeItem('ai_sicd_pending');
+    fetch('{{ url("admin/sicd") }}/' + orphan + '/cancelar', {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            'Accept': 'application/json',
+        }
+    });
+})();
+
 function cerrarConConfirmacion() {
     if (_aiSicdEnlazadoId) {
         var overlay = document.getElementById('ai-confirm-salida');
@@ -1937,6 +1957,9 @@ function aiConfirmarSalida() {
 
 function cerrarModalAgregarInv() {
     _aiSicdEnlazadoId = null;
+    sessionStorage.removeItem('ai_sicd_pending');
+    var toast = document.getElementById('ai-toast-error');
+    if (toast) toast.style.display = 'none';
     var overlay = document.getElementById('ai-confirm-salida');
     if (overlay) overlay.style.display = 'none';
     window._aiEnlazarUrl = null;
@@ -2025,48 +2048,57 @@ function aiCambiarTipo(tipo) {
     }
 }
 
+var _aiToastTimer = null;
+function aiError(msg, focusId) {
+    var toast = document.getElementById('ai-toast-error');
+    var label = document.getElementById('ai-toast-msg');
+    if (!toast || !label) { alert(msg); return; }
+    label.textContent = msg;
+    toast.style.display = 'flex';
+    if (_aiToastTimer) clearTimeout(_aiToastTimer);
+    _aiToastTimer = setTimeout(function() { toast.style.display = 'none'; }, 5000);
+    if (focusId) { var el = document.getElementById(focusId); if (el) el.focus(); }
+}
+
 function aiEnviar() {
     var tipo = document.getElementById('ai-tipo').value;
-    if (!tipo) { alert('Selecciona el tipo de ingreso.'); return; }
+    if (!tipo) { aiError('Selecciona el tipo de ingreso.'); return; }
 
     if (tipo === 'local') {
         var rut = document.getElementById('ai-rut').value.trim();
         var folio = document.getElementById('ai-folio').value.trim();
         var fecha = document.getElementById('ai-fecha').value;
         var doc = document.getElementById('ai-doc').files.length;
-        if (!rut)   { alert('El RUT del proveedor es obligatorio.'); document.getElementById('ai-rut').focus(); return; }
-        if (!folio) { alert('El folio es obligatorio.'); document.getElementById('ai-folio').focus(); return; }
-        if (!fecha) { alert('La fecha de emisión es obligatoria.'); document.getElementById('ai-fecha').focus(); return; }
-        if (!doc)   { alert('La boleta PDF es obligatoria.'); return; }
-        if (aiItems.length === 0) { alert('Agrega al menos un producto.'); document.getElementById('ai-buscador').focus(); return; }
+        if (!rut)   { aiError('El RUT del proveedor es obligatorio.', 'ai-rut'); return; }
+        if (!folio) { aiError('El folio es obligatorio.', 'ai-folio'); return; }
+        if (!fecha) { aiError('La fecha de emisión es obligatoria.', 'ai-fecha'); return; }
+        if (!doc)   { aiError('La boleta PDF es obligatoria.'); return; }
+        if (aiItems.length === 0) { aiError('Agrega al menos un producto.', 'ai-buscador'); return; }
         aiForm.action = aiUrlLocal;
     } else if (tipo === 'externa') {
-        // Validar que el código SICD esté verificado contra el sistema externo
         var codigoSicd = document.getElementById('ai-codigo-sicd').value.trim();
         if (!codigoSicd) {
-            alert('El código SICD es obligatorio.');
-            document.getElementById('ai-codigo-sicd').focus();
+            aiError('El código SICD es obligatorio.', 'ai-codigo-sicd');
             return;
         }
         if (!aiSicdValido) {
-            alert('El código SICD "' + codigoSicd + '" no está validado en el sistema externo. Verifica el código antes de continuar.');
-            document.getElementById('ai-codigo-sicd').focus();
+            aiError('El código SICD "' + codigoSicd + '" no está validado en el sistema externo. Verifica el código antes de continuar.', 'ai-codigo-sicd');
             return;
         }
         if (aiMetodoCargaActual === 'masiva') {
             if (!document.getElementById('ai-excel-masivo').files.length) {
-                alert('El archivo Excel de productos es obligatorio.'); return;
+                aiError('El archivo Excel de productos es obligatorio.'); return;
             }
             var vincularOc = document.getElementById('ai-vincular-oc').checked;
             if (!vincularOc && !document.getElementById('ai-boleta-masiva-input').files.length) {
-                alert('La boleta/factura es obligatoria cuando no se asigna a una Orden de Compra.'); return;
+                aiError('La boleta/factura es obligatoria cuando no se asigna a una Orden de Compra.'); return;
             }
             aiForm.action = aiUrlMasiva;
         } else {
-            if (aiItemsManual.length === 0) { alert('Agrega al menos un producto.'); document.getElementById('ai-buscador-manual').focus(); return; }
+            if (aiItemsManual.length === 0) { aiError('Agrega al menos un producto.', 'ai-buscador-manual'); return; }
             var vincularOcManual = document.getElementById('ai-vincular-oc-manual').checked;
             if (!vincularOcManual && !document.getElementById('ai-boleta-manual-input').files.length) {
-                alert('La boleta/factura es obligatoria cuando no se asigna a una Orden de Compra.'); return;
+                aiError('La boleta/factura es obligatoria cuando no se asigna a una Orden de Compra.'); return;
             }
             aiForm.action = aiUrlManual;
         }
@@ -2081,6 +2113,7 @@ function aiEnviar() {
         if (inactivo) inactivo.disabled = true;
     }
 
+    sessionStorage.removeItem('ai_sicd_pending');
     aiForm.submit();
 }
 
@@ -2094,6 +2127,7 @@ document.getElementById('form-agregar-inv').addEventListener('submit-confirmed',
             aiForm.action = aiUrlManual;
         }
     }
+    sessionStorage.removeItem('ai_sicd_pending');
     aiForm.submit();
 });
 
@@ -2138,7 +2172,7 @@ function aiEnlazarSolicitud() {
         .then(function(res) {
             btn.disabled = false;
             if (res.ok) {
-                if (res.id) _aiSicdEnlazadoId = res.id;
+                if (res.id) { _aiSicdEnlazadoId = res.id; sessionStorage.setItem('ai_sicd_pending', String(res.id)); }
                 var url = sicdUrl || res.url || null;
                 if (url) {
                     var link = document.createElement('a');
@@ -2204,7 +2238,7 @@ function aiEnlazarSolicitud() {
             .then(function(res) {
                 btn.disabled = false;
                 if (res.ok) {
-                    if (res.id) _aiSicdEnlazadoId = res.id;
+                    if (res.id) { _aiSicdEnlazadoId = res.id; sessionStorage.setItem('ai_sicd_pending', String(res.id)); }
                     window._aiSicdUrl = res.url;
                     var link = document.createElement('a');
                     link.href = res.url;
@@ -2507,12 +2541,20 @@ function aiRenderFilaManual(idx, id, nombre, contenedorId) {
         + '<span style="font-size:0.8rem;font-weight:500;color:#1f2937;">' + escHtmlAi(nombre) + '</span>'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" name="items_manual[' + idx + '][cantidad]" value="1" min="1"'
+        + '<input type="number" id="ai-cant-' + idx + '" name="items_manual[' + idx + '][cantidad]" value="1" min="1"'
         + ' style="width:62px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" name="items_manual[' + idx + '][precio_total]" placeholder="0" min="0" step="1"'
-        + ' style="width:100%;text-align:right;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '<input type="text" name="items_manual[' + idx + '][unidad]" placeholder="Unid."'
+        + ' style="width:68px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
+        + '<input type="number" id="ai-pneto-' + idx + '" name="items_manual[' + idx + '][precio_neto]" placeholder="0" min="0" step="any"'
+        + ' style="width:88px;text-align:right;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
+        + '<input type="number" id="ai-ptotal-' + idx + '" name="items_manual[' + idx + '][precio_total]" placeholder="0" min="0" step="1"'
+        + ' style="width:88px;text-align:right;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;">'
         + '<select name="items_manual[' + idx + '][contenedor_id]"'
@@ -2520,15 +2562,31 @@ function aiRenderFilaManual(idx, id, nombre, contenedorId) {
         + contOptions
         + '</select>'
         + '</td>'
-        + '<td style="padding:0.4rem 0.4rem;">'
-        + '<input type="text" name="items_manual[' + idx + '][motivo]" placeholder="Motivo (opcional)"'
-        + ' style="width:100%;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.78rem;">'
-        + '</td>'
         + '<td style="padding:0.4rem 0.3rem;text-align:center;white-space:nowrap;">'
         + '<button type="button" onclick="aiEditarManual(' + idx + ',\'' + escHtmlAi(nombre).replace(/'/g,"\\'") + '\')" title="Cambiar producto" style="color:#6b7280;background:none;border:none;cursor:pointer;font-size:0.95rem;line-height:1;margin-right:0.25rem;">&#9998;</button>'
         + '<button type="button" onclick="aiQuitarManual(' + idx + ')" title="Quitar" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;">&#x2715;</button>'
         + '</td>';
     tbody.appendChild(tr);
+
+    var inpCant  = document.getElementById('ai-cant-'   + idx);
+    var inpNeto  = document.getElementById('ai-pneto-'  + idx);
+    var inpTotal = document.getElementById('ai-ptotal-' + idx);
+
+    inpNeto.addEventListener('input', function() {
+        var cant  = parseFloat(inpCant.value) || 1;
+        var neto  = parseFloat(this.value);
+        inpTotal.value = isNaN(neto) ? '' : Math.round(neto * cant);
+    });
+    inpTotal.addEventListener('input', function() {
+        var cant  = parseFloat(inpCant.value) || 1;
+        var total = parseFloat(this.value);
+        inpNeto.value = (!isNaN(total) && cant > 0) ? parseFloat((total / cant).toFixed(2)) : '';
+    });
+    inpCant.addEventListener('input', function() {
+        var cant = parseFloat(this.value) || 1;
+        var neto = parseFloat(inpNeto.value);
+        if (!isNaN(neto)) inpTotal.value = Math.round(neto * cant);
+    });
 }
 
 function aiEditarManual(idx, nombre) {

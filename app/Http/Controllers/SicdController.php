@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Imports\SicdDetallesImport;
 use App\Models\Boleta;
+use App\Models\Familia;
 use App\Models\HistorialCambio;
 use App\Models\Producto;
 use App\Models\Sicd;
@@ -501,8 +502,17 @@ class SicdController extends Controller
     public function show(int $id)
     {
         abort_unless(auth()->user()->tienePermiso('sicd'), 403);
-        $sicd = Sicd::with(['usuario', 'boleta', 'detalles.producto', 'ordenesCompra'])->findOrFail($id);
-        return view('admin.sicd.show', compact('sicd'));
+        $sicd  = Sicd::with(['usuario', 'boleta', 'detalles.producto', 'ordenesCompra'])->findOrFail($id);
+        $ccId  = auth()->user()->ccFiltro();
+        $familias = Familia::with([
+            'categorias' => fn($q) => $q->with([
+                'productos' => fn($q2) => $q2->when($ccId, fn($q3) => $q3->where('centro_costo_id', $ccId))->orderBy('nombre'),
+            ])->orderBy('nombre'),
+        ])->where('activo', true)
+            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+            ->orderBy('nombre')
+            ->get();
+        return view('admin.sicd.show', compact('sicd', 'familias'));
     }
 
     public function descargar(int $id)
@@ -646,6 +656,43 @@ class SicdController extends Controller
         }
 
         return response()->json(['ok' => true, 'id' => $sicd->id, 'url' => route('admin.sicd.show', $sicd->id)]);
+    }
+
+    public function updateDetalles(int $id, Request $request)
+    {
+        abort_unless(auth()->user()->tienePermiso('sicd'), 403);
+        $sicd = Sicd::findOrFail($id);
+
+        $request->validate([
+            'detalles'                           => ['present', 'array'],
+            'detalles.*.nombre'                  => ['required', 'string', 'max:500'],
+            'detalles.*.unidad'                  => ['nullable', 'string', 'max:50'],
+            'detalles.*.cantidad_solicitada'     => ['required', 'integer', 'min:0'],
+            'detalles.*.precio_neto'             => ['nullable', 'numeric', 'min:0'],
+            'detalles.*.total_neto'              => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $incoming    = collect($request->detalles);
+        $keepIds     = $incoming->pluck('id')->filter()->map(fn($v) => (int) $v)->toArray();
+
+        $sicd->detalles()->whereNotIn('id', $keepIds)->delete();
+
+        foreach ($incoming as $det) {
+            $data = [
+                'nombre_producto_excel' => trim($det['nombre']),
+                'unidad'                => trim($det['unidad'] ?? '') ?: null,
+                'cantidad_solicitada'   => (int) $det['cantidad_solicitada'],
+                'precio_neto'           => isset($det['precio_neto']) && $det['precio_neto'] !== '' ? (float) $det['precio_neto'] : null,
+                'total_neto'            => isset($det['total_neto'])  && $det['total_neto']  !== '' ? (float) $det['total_neto']  : null,
+            ];
+            if (!empty($det['id'])) {
+                $sicd->detalles()->where('id', (int) $det['id'])->update($data);
+            } else {
+                $sicd->detalles()->create($data);
+            }
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     public function cancelar(int $id)

@@ -681,7 +681,8 @@ class AdminController extends Controller
             'items_manual.*.producto_id'    => ['required', 'integer', 'exists:productos,id'],
             'items_manual.*.cantidad'       => ['required', 'integer', 'min:1'],
             'items_manual.*.contenedor_id'  => ['nullable', 'integer', 'exists:containers,id'],
-            'items_manual.*.motivo'         => ['nullable', 'string', 'max:500'],
+            'items_manual.*.unidad'         => ['nullable', 'string', 'max:50'],
+            'items_manual.*.precio_neto'    => ['nullable', 'numeric', 'min:0'],
             'items_manual.*.precio_total'   => ['nullable', 'numeric', 'min:0'],
         ], [
             'items_manual.required'              => 'Agrega al menos un producto.',
@@ -753,6 +754,7 @@ class AdminController extends Controller
             foreach ($request->items_manual as $item) {
                 $producto     = Producto::findOrFail($item['producto_id']);
                 $cantidad     = (int) $item['cantidad'];
+                $unidad       = trim($item['unidad'] ?? '') ?: null;
                 $motivo       = trim($item['motivo'] ?? '') ?: ($codigoSicd ? "Carga manual – SICD {$codigoSicd}" : 'Carga manual de inventario');
                 $contenedorId = isset($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
 
@@ -765,6 +767,7 @@ class AdminController extends Controller
                     } else {
                         $producto = Producto::create([
                             'nombre'          => $producto->nombre,
+                            'unidad'          => $unidad ?? $producto->unidad,
                             'stock_actual'    => 0,
                             'stock_minimo'    => $producto->stock_minimo,
                             'stock_critico'   => $producto->stock_critico,
@@ -774,13 +777,20 @@ class AdminController extends Controller
                     }
                 }
 
+                if ($unidad && $producto->unidad !== $unidad) {
+                    $producto->unidad = $unidad;
+                }
+
                 if ($sicd) {
+                    $precioNeto  = isset($item['precio_neto'])  && $item['precio_neto']  !== '' ? (float) $item['precio_neto']  : null;
                     $precioTotal = isset($item['precio_total']) && $item['precio_total'] !== '' ? (float) $item['precio_total'] : null;
-                    $precioNeto  = ($precioTotal !== null && $cantidad > 0) ? round($precioTotal / $cantidad, 2) : null;
+                    if ($precioNeto === null && $precioTotal !== null && $cantidad > 0) {
+                        $precioNeto = round($precioTotal / $cantidad, 2);
+                    }
                     $sicd->detalles()->create([
                         'producto_id'           => $producto->id,
                         'nombre_producto_excel' => $producto->nombre,
-                        'unidad'                => null,
+                        'unidad'                => trim($item['unidad'] ?? '') ?: null,
                         'cantidad_solicitada'   => $cantidad,
                         'cantidad_recibida'     => $cantidad,
                         'precio_neto'           => $precioNeto,

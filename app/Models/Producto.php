@@ -11,6 +11,7 @@ class Producto extends Model
 
     protected $fillable = [
         'nombre',
+        'unidad',
         'codigo_barras',
         'stock_actual',
         'stock_minimo',
