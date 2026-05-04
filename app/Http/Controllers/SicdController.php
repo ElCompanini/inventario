@@ -114,7 +114,7 @@ class SicdController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('sicd'), 403);
         $user  = auth()->user();
-        $query = Sicd::with(['usuario', 'detalles', 'ordenesCompra'])->orderByDesc('created_at');
+        $query = Sicd::with(['usuario', 'detalles', 'ordenesCompra'])->where('estado', '!=', 'cancelado')->orderByDesc('created_at');
 
         if ($user->tieneFiltroCC()) {
             $prefix = $user->centroCostoPrefix();
@@ -650,9 +650,10 @@ class SicdController extends Controller
 
     public function cancelar(int $id)
     {
-        $sicd = Sicd::findOrFail($id);
-        $sicd->estado = 'cancelado';
-        $sicd->save();
+        $sicd = Sicd::with('boleta')->findOrFail($id);
+        $boleta = $sicd->boleta;
+        $sicd->delete();
+        if ($boleta) $boleta->delete();
         return response()->json(['ok' => true]);
     }
 
