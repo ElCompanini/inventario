@@ -23,6 +23,7 @@
                 <th class="px-4 py-3 font-semibold text-gray-600">Código SICD</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Productos</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Estado</th>
+                <th class="px-4 py-3 font-semibold text-gray-600">Est. Externo</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">OC</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Creado por</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Fecha</th>
@@ -45,6 +46,16 @@
                         @else
                             <span class="inline-flex items-center bg-yellow-100 text-yellow-700 text-xs font-semibold px-2.5 py-1 rounded-full">⏳ Pendiente</span>
                         @endif
+                    </td>
+                    @php
+                        $estNum = $estadosExternos[$sicd->codigo_sicd] ?? null;
+                        $estExt = \App\Models\SicdExterno::etiquetaEstado($estNum);
+                    @endphp
+                    <td class="px-4 py-3">
+                        <span class="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
+                              style="background:{{ $estExt['bg'] }}; color:{{ $estExt['color'] }};">
+                            {{ $estExt['texto'] }}
+                        </span>
                     </td>
                     <td class="px-4 py-3 text-gray-600">
                         @if($oc)

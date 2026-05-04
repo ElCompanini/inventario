@@ -51,7 +51,22 @@
                 @endphp
                 <tr id="oc-row-{{ $oc->id }}" data-id="{{ $oc->id }}" class="hover:bg-gray-50">
                     <td class="px-4 py-2 font-mono font-semibold text-indigo-700">{{ $oc->numero_oc }}</td>
-                    <td class="px-4 py-2 text-gray-600">{{ $oc->sicds->count() }} SICD(s)</td>
+                    <td class="px-4 py-2 text-gray-600">
+                        <div class="text-xs font-medium text-gray-600 mb-1">{{ $oc->sicds->count() }} SICD(s)</div>
+                        @foreach($oc->sicds as $s)
+                            @php
+                                $en = $estadosExternos[$s->codigo_sicd] ?? null;
+                                $et = \App\Models\SicdExterno::etiquetaEstado($en);
+                            @endphp
+                            <div class="flex items-center gap-1.5 mb-0.5">
+                                <span class="font-mono text-xs text-indigo-600">{{ $s->codigo_sicd }}</span>
+                                <span class="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                                      style="background:{{ $et['bg'] }}; color:{{ $et['color'] }};">
+                                    {{ $et['texto'] }}
+                                </span>
+                            </div>
+                        @endforeach
+                    </td>
                     <td class="px-4 py-2" id="estado-cell-{{ $oc->id }}">
                         @if($oc->estado === 'recibido')
                             <span class="inline-flex items-center bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">✓ Recibido</span>

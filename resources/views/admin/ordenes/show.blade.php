@@ -145,13 +145,13 @@
                         </svg>
                         Descargar factura
                     </a>
-                @elseif($oc->estado === 'pendiente')
+                @elseif($oc->estado !== 'recibido')
                     <form method="POST" action="{{ route('admin.ordenes.factura.subir', $oc->id) }}" enctype="multipart/form-data" class="space-y-3">
                         @csrf
                         <input type="file" id="input-factura" name="factura" accept=".pdf,.jpg,.jpeg,.png" class="hidden"
                                onchange="document.getElementById('label-factura').textContent = this.files[0]?.name ?? 'Ningún archivo seleccionado'">
                         <label for="input-factura"
-                               class="flex items-center justify-center gap-2 w-full py-2 text-xs font-semibold border-2 border-dashed border-indigo-300 text-indigo-600 rounded-lg cursor-pointer hover:bg-indigo-50 transition">
+                               class="flex items-center justify-center gap-2 w-full py-2 text-xs font-semibold border-2 border-dashed border-blue-300 text-blue-600 rounded-lg cursor-pointer hover:bg-blue-50 transition">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                             </svg>
@@ -162,7 +162,7 @@
                             <p class="text-red-500 text-xs">{{ $message }}</p>
                         @enderror
                         <button type="submit"
-                                class="w-full py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition">
+                                class="w-full py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">
                             Subir factura
                         </button>
                     </form>
@@ -297,8 +297,24 @@
                             <p class="mt-1 text-red-400">Intentos: {{ $oc->api_intentos }}</p>
                         @endif
                     </div>
+                    @if($oc->estado !== 'recibido')
+                        <button onclick="validarMPShow()"
+                                style="width:100%; margin-top:0.5rem; padding:0.45rem; font-size:0.75rem; font-weight:600; color:#fff; background:#dc2626; border:none; border-radius:0.5rem; cursor:pointer;"
+                                onmouseover="this.style.background='#b91c1c'"
+                                onmouseout="this.style.background='#dc2626'">
+                            🔄 Reintentar validación
+                        </button>
+                    @endif
                 @else
-                    <p class="text-sm text-gray-400">Esta OC aún no ha sido validada contra Mercado Público.</p>
+                    <p class="text-sm text-gray-400 mb-2">Esta OC aún no ha sido validada contra Mercado Público.</p>
+                    @if($oc->estado !== 'recibido')
+                        <button onclick="validarMPShow()"
+                                style="width:100%; padding:0.45rem; font-size:0.75rem; font-weight:600; color:#fff; background:#4f46e5; border:none; border-radius:0.5rem; cursor:pointer;"
+                                onmouseover="this.style.background='#4338ca'"
+                                onmouseout="this.style.background='#4f46e5'">
+                            Validar en Mercado Público
+                        </button>
+                    @endif
                 @endif
 
                 <div id="mp-show-error" style="display:none;"
@@ -318,19 +334,30 @@
         </div>
 
         {{-- BOTÓN RECEPCIÓN --}}
-        @if($oc->estado === 'pendiente')
+        @if($oc->estado !== 'recibido')
+            @php
+                $puedeRecepcionar = $oc->factura && $oc->guia;
+            @endphp
             <div class="bg-white rounded-xl shadow p-5">
                 <h3 class="text-sm font-semibold text-gray-700 mb-3">Registrar Recepción</h3>
 
-                @if(!$oc->factura)
+                @if(!$oc->factura && !$oc->guia)
                     <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                        Sube la <strong>factura</strong> antes de registrar la recepción.
+                        Sube la <strong>factura</strong> y la <strong>guía de despacho</strong> antes de registrar la recepción.
+                    </div>
+                @elseif(!$oc->factura)
+                    <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        Falta subir la <strong>factura</strong> para continuar.
+                    </div>
+                @elseif(!$oc->guia)
+                    <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        Falta subir la <strong>guía de despacho</strong> para continuar.
                     </div>
                 @endif
 
-                <a href="{{ route('admin.ordenes.recepcion', $oc->id) }}"
+                <a href="{{ $puedeRecepcionar ? route('admin.ordenes.recepcion', $oc->id) : '#' }}"
                    class="block w-full py-2 text-sm font-semibold rounded-lg text-center transition
-                          {{ $oc->factura ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-100 text-gray-400 pointer-events-none' }}">
+                          {{ $puedeRecepcionar ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-100 text-gray-400 pointer-events-none cursor-not-allowed' }}">
                     Iniciar recepción →
                 </a>
             </div>
@@ -348,6 +375,39 @@
     </div>
 
 </div>
+
+{{-- ── Estado MP cuando no hay datos ── --}}
+@if(!$oc->api_validado_at && $oc->estado !== 'recibido')
+<div class="mt-6 bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+        <h2 class="text-base font-semibold text-gray-700">Validación Mercado Público</h2>
+    </div>
+    <div class="px-5 py-6 flex flex-col items-center gap-3 text-center">
+        @if($oc->api_error)
+            <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+            </svg>
+            <p class="text-sm font-semibold text-red-700">Error al conectar con Mercado Público</p>
+            <p class="text-xs text-gray-500">{{ $oc->api_error }}</p>
+        @else
+            <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+            </svg>
+            <p class="text-sm text-gray-500">Esta OC aún no ha sido validada en Mercado Público.</p>
+        @endif
+        <button onclick="validarMPShow()"
+                class="inline-flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2 rounded-lg transition"
+                style="background:{{ $oc->api_error ? '#dc2626' : '#4f46e5' }};"
+                onmouseover="this.style.background='{{ $oc->api_error ? '#b91c1c' : '#4338ca' }}'"
+                onmouseout="this.style.background='{{ $oc->api_error ? '#dc2626' : '#4f46e5' }}'">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            {{ $oc->api_error ? 'Reintentar' : 'Validar en Mercado Público' }}
+        </button>
+    </div>
+</div>
+@endif
 
 {{-- ── Detalle de ítems Mercado Público (solo si está validada y tiene ítems) ── --}}
 @if($oc->api_validado_at && !empty($oc->api_items))
@@ -385,7 +445,7 @@
                     <td class="px-3 py-2.5 text-gray-600">{{ $item['especificacion_comprador'] ?? '—' }}</td>
                     <td class="px-3 py-2.5 text-gray-600">{{ $item['especificacion_proveedor'] ?? '—' }}</td>
                     <td class="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">
-                        {{ isset($item['precio_unitario']) ? '$&nbsp;' . number_format($item['precio_unitario'], 0, ',', '.') : '—' }}
+                        {{ isset($item['precio_unitario']) ? '$ ' . number_format($item['precio_unitario'], 0, ',', '.') : '—' }}
                     </td>
                     <td class="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">
                         {{ number_format($item['descuento'] ?? 0, 2, ',', '.') }}
@@ -394,7 +454,7 @@
                         {{ number_format($item['cargo'] ?? 0, 2, ',', '.') }}
                     </td>
                     <td class="px-3 py-2.5 text-right font-semibold text-gray-800 whitespace-nowrap">
-                        {{ isset($item['total']) ? '$&nbsp;' . number_format($item['total'], 0, ',', '.') : '—' }}
+                        {{ isset($item['total']) ? '$ ' . number_format($item['total'], 0, ',', '.') : '—' }}
                     </td>
                 </tr>
                 @endforeach

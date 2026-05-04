@@ -1122,11 +1122,6 @@ function escHtmlGm(str) {
                                        style="font-size:0.78rem; font-weight:600; background:#d97706; color:#fff; padding:4px 14px; border-radius:6px; text-decoration:none;">
                                         Ver SICD ingresada
                                     </a>
-                                    <button type="button"
-                                            onclick="document.getElementById('ai-confirmar-duplicado').value='1'; document.getElementById('form-agregar-inv').dispatchEvent(new Event('submit-confirmed'));"
-                                            style="font-size:0.78rem; font-weight:600; background:#fef3c7; color:#92400e; border:1px solid #f59e0b; padding:4px 14px; border-radius:6px; cursor:pointer;">
-                                        Ingresar de todas formas
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1256,11 +1251,6 @@ function escHtmlGm(str) {
                                                style="font-size:0.72rem; font-weight:600; background:#d97706; color:#fff; padding:3px 12px; border-radius:5px; text-decoration:none; white-space:nowrap;">
                                                 Ver SICD ingresada
                                             </a>
-                                            <button type="button" id="ai-sicd-ya-continuar"
-                                                    onclick="aiOcultarAdvertenciaSicd()"
-                                                    style="font-size:0.72rem; font-weight:600; background:#fef3c7; color:#92400e; border:1px solid #f59e0b; padding:3px 12px; border-radius:5px; cursor:pointer; white-space:nowrap;">
-                                                Ingresar de todas formas
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -1410,10 +1400,10 @@ function escHtmlGm(str) {
                 <div style="background:#fff; border-radius:0.75rem; padding:1.5rem; max-width:360px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.2); text-align:center;">
                     <div style="font-size:2rem; margin-bottom:0.5rem;">⚠️</div>
                     <p style="font-size:0.95rem; font-weight:700; color:#1e293b; margin-bottom:0.4rem;">¿Salir de Agregar Inventario?</p>
-                    <p style="font-size:0.8rem; color:#64748b; margin-bottom:1.25rem;">Si sales ahora, se cancelará el PDF SICD enlazado y la acción de ingresar no se completará.</p>
+                    <p id="ai-confirm-salida-msg" style="font-size:0.8rem; color:#64748b; margin-bottom:1.25rem;">Si sales ahora, perderás los cambios y la acción de ingresar no se completará.</p>
                     <div style="display:flex; gap:0.6rem; justify-content:center;">
                         <button onclick="aiConfirmarSalida()" style="padding:0.45rem 1.1rem; font-size:0.8rem; font-weight:600; background:#ef4444; color:#fff; border:none; border-radius:0.5rem; cursor:pointer;">
-                            Sí, salir y cancelar
+                            Sí, salir
                         </button>
                         <button onclick="aiCancelarSalida()" style="padding:0.45rem 1.1rem; font-size:0.8rem; font-weight:600; background:#f1f5f9; color:#374151; border:none; border-radius:0.5rem; cursor:pointer;">
                             Quedarme
@@ -1877,13 +1867,27 @@ var aiUrlMasiva  = aiForm.dataset.urlMasiva;
 var aiUrlManual  = aiForm.dataset.urlManual;
 var AI_IS_DEV    = {{ auth()->user()->esDev() ? 'true' : 'false' }};
 var AI_IS_ADMIN  = {{ auth()->user()->esAdmin() ? 'true' : 'false' }};
-var AI_URL_CREAR     = '{{ route('admin.productos.crear.rapido') }}';
+var AI_URL_CREAR         = '{{ route('admin.productos.crear.rapido') }}';
+var AI_URL_PROD_DESTROY  = '{{ url('admin/catalogo/productos') }}/';
 var AI_URL_FAMILIA   = '{{ route('admin.catalogo.familias.store') }}';
 var AI_URL_CATEGORIA = '{{ route('admin.catalogo.categorias.store') }}';
 var AI_CSRF          = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-var aiMetodoCargaActual = 'masiva';
-var aiItemsManual = [];
-var aiCounterManual = 0;
+var aiMetodoCargaActual  = 'masiva';
+var aiItemsManual        = [];
+var aiCounterManual      = 0;
+var _aiProductosCreados  = [];
+
+function _aiEliminarProductosCreados(ids) {
+    if (!ids || !ids.length) return;
+    ids.forEach(function(id) {
+        fetch(AI_URL_PROD_DESTROY + id, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': AI_CSRF, 'Accept': 'application/json' }
+        });
+    });
+    _aiProductosCreados = [];
+    try { sessionStorage.removeItem('ai_prods_creados'); } catch(e) {}
+}
 
 document.getElementById('btn-agregar-inventario').addEventListener('click', function() {
     var modal = document.getElementById('modal-agregar-inv');
@@ -1912,20 +1916,44 @@ window.addEventListener('DOMContentLoaded', function() {
 var _aiSicdEnlazadoId = null;
 
 (function() {
-    var orphan = sessionStorage.getItem('ai_sicd_pending');
-    if (!orphan) return;
-    sessionStorage.removeItem('ai_sicd_pending');
-    fetch('{{ url("admin/sicd") }}/' + orphan + '/cancelar', {
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-            'Accept': 'application/json',
-        }
-    });
+    var csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var orphanSicd = sessionStorage.getItem('ai_sicd_pending');
+    if (orphanSicd) {
+        sessionStorage.removeItem('ai_sicd_pending');
+        fetch('{{ url("admin/sicd") }}/' + orphanSicd + '/cancelar', {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
+        });
+    }
+    var orphanProds = sessionStorage.getItem('ai_prods_creados');
+    if (orphanProds) {
+        sessionStorage.removeItem('ai_prods_creados');
+        try {
+            var ids = JSON.parse(orphanProds);
+            ids.forEach(function(id) {
+                fetch(AI_URL_PROD_DESTROY + id, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
+                });
+            });
+        } catch(e) {}
+    }
 })();
 
 function cerrarConConfirmacion() {
-    if (_aiSicdEnlazadoId) {
+    var tieneItems  = aiItemsManual && aiItemsManual.length > 0;
+    var tieneSicd   = !!_aiSicdEnlazadoId;
+    if (tieneSicd || tieneItems) {
+        var msg = document.getElementById('ai-confirm-salida-msg');
+        if (msg) {
+            if (tieneSicd && tieneItems) {
+                msg.textContent = 'Si sales ahora, se cancelará el SICD enlazado y se perderán los productos agregados.';
+            } else if (tieneSicd) {
+                msg.textContent = 'Si sales ahora, se cancelará el PDF SICD enlazado y la acción de ingresar no se completará.';
+            } else {
+                msg.textContent = 'Si sales ahora, se perderán los ' + aiItemsManual.length + ' producto(s) agregados a la carga manual.';
+            }
+        }
         var overlay = document.getElementById('ai-confirm-salida');
         if (overlay) overlay.style.display = 'flex';
     } else {
@@ -1939,6 +1967,7 @@ function aiCancelarSalida() {
 }
 
 function aiConfirmarSalida() {
+    _aiEliminarProductosCreados(_aiProductosCreados.slice());
     var id = _aiSicdEnlazadoId;
     if (!id) { cerrarModalAgregarInv(); return; }
 
@@ -2114,6 +2143,8 @@ function aiEnviar() {
     }
 
     sessionStorage.removeItem('ai_sicd_pending');
+    sessionStorage.removeItem('ai_prods_creados');
+    _aiProductosCreados = [];
     aiForm.submit();
 }
 
@@ -2128,6 +2159,8 @@ document.getElementById('form-agregar-inv').addEventListener('submit-confirmed',
         }
     }
     sessionStorage.removeItem('ai_sicd_pending');
+    sessionStorage.removeItem('ai_prods_creados');
+    _aiProductosCreados = [];
     aiForm.submit();
 });
 
@@ -2472,7 +2505,8 @@ document.addEventListener('click', function(e) {
 });
 
 document.getElementById('ai-buscador-manual').addEventListener('input', function() {
-    var q = this.value.trim().toLowerCase();
+    var qOrig = this.value.trim();
+    var q     = qOrig.toLowerCase();
     var res = document.getElementById('ai-resultados-manual');
     if (q.length < 1) { res.style.display = 'none'; return; }
     var matches = aiProductos.filter(function(p) {
@@ -2490,7 +2524,7 @@ document.getElementById('ai-buscador-manual').addEventListener('input', function
     }).join('');
 
     if (AI_IS_ADMIN) {
-        var qEsc = q.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        var qEsc = qOrig.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         html += '<div data-crear-nombre="' + qEsc + '" onclick="aiAbrirModalCrear(this.dataset.crearNombre)"'
             + ' style="padding:0.5rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;border-top:1px solid #e5e7eb;background:#f0fdf4;"'
             + ' onmouseover="this.style.background=\'#dcfce7\'" onmouseout="this.style.background=\'#f0fdf4\'">'
@@ -2786,6 +2820,8 @@ function aiConfirmarCrearProducto() {
             errDiv.style.display = 'block';
         } else {
             var p = data.p;
+            _aiProductosCreados.push(p.id);
+            try { sessionStorage.setItem('ai_prods_creados', JSON.stringify(_aiProductosCreados)); } catch(e) {}
             if (typeof aiProductos !== 'undefined') {
                 aiProductos.push({ id: p.id, nombre: p.nombre, contenedor_id: null, contenedor_nombre: '', stock: 0 });
             }

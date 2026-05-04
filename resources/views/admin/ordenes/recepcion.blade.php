@@ -14,7 +14,7 @@
 </div>
 
 
-<form method="POST" action="{{ route('admin.ordenes.recepcion.procesar', $oc->id) }}">
+<form id="form-recepcion" method="POST" action="{{ route('admin.ordenes.recepcion.procesar', $oc->id) }}">
     @csrf
 
     <div class="space-y-4">
@@ -102,7 +102,7 @@
                                                    style="width:100%;"
                                                    class="input-precio border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none">
                                             @if($det->precio_neto)
-                                                <span style="font-size:0.65rem; color:#9ca3af; white-space:nowrap;">SICD: ${{ number_format($det->precio_neto, 0, ',', '.') }}</span>
+                                                <span style="font-size:0.78rem; color:#111827; white-space:nowrap;"><strong>SICD:</strong> ${{ number_format($det->precio_neto, 0, ',', '.') }}</span>
                                             @endif
                                         </div>
                                     </td>
@@ -117,7 +117,7 @@
                                                    style="width:100%;"
                                                    class="input-precio border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none">
                                             @if($det->total_neto)
-                                                <span style="font-size:0.65rem; color:#9ca3af; white-space:nowrap;">SICD: ${{ number_format($det->total_neto, 0, ',', '.') }}</span>
+                                                <span style="font-size:0.78rem; color:#111827; white-space:nowrap;"><strong>SICD:</strong> ${{ number_format($det->total_neto, 0, ',', '.') }}</span>
                                             @endif
                                         </div>
                                     </td>
@@ -169,13 +169,49 @@
            onmouseout="this.style.background='#f87171'">
             Cancelar
         </a>
-        <button type="submit"
-                onclick="return confirm('¿Confirmar recepción de OC {{ $oc->numero_oc }}? Esta acción actualizará el stock y no se puede deshacer.')"
+        <button type="button" onclick="abrirConfirmRecepcion()"
                 class="px-6 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition">
             Confirmar recepción →
         </button>
+        <button type="submit" id="btn-submit-real" style="display:none">Confirmar</button>
     </div>
 </form>
+
+{{-- Modal confirmación recepción --}}
+<div id="modal-confirm-recepcion"
+     style="display:none; position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,.5); align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 20px 60px rgba(0,0,0,.25); width:420px; max-width:calc(100vw - 2rem); animation:recep-in .2s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="padding:1.5rem 1.5rem 1rem;">
+            <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;">
+                <div style="width:2.5rem; height:2.5rem; border-radius:9999px; background:#dcfce7; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <svg style="width:1.25rem;height:1.25rem;" fill="none" stroke="#16a34a" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p style="font-size:1rem; font-weight:700; color:#111827; margin:0;">Confirmar recepción</p>
+                    <p style="font-size:0.8rem; color:#6b7280; margin:0.1rem 0 0;">OC <strong style="color:#4f46e5;">{{ $oc->numero_oc }}</strong></p>
+                </div>
+            </div>
+            <p style="font-size:0.85rem; color:#374151; line-height:1.6; margin:0;">
+                Esta acción <strong>actualizará el stock</strong> de todos los productos recibidos y marcará la OC como recibida.<br>
+                <span style="color:#dc2626; font-size:0.78rem;">⚠ Esta acción no se puede deshacer.</span>
+            </p>
+        </div>
+        <div style="padding:0.75rem 1.5rem 1.25rem; display:flex; gap:0.5rem; justify-content:flex-end;">
+            <button type="button" onclick="cerrarConfirmRecepcion()"
+                    style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">
+                Cancelar
+            </button>
+            <button type="button" onclick="confirmarRecepcion()"
+                    style="padding:0.5rem 1.25rem; font-size:0.875rem; font-weight:600; color:#fff; background:#16a34a; border:none; border-radius:0.5rem; cursor:pointer; transition:background .15s;"
+                    onmouseover="this.style.background='#15803d'"
+                    onmouseout="this.style.background='#16a34a'">
+                Sí, confirmar →
+            </button>
+        </div>
+    </div>
+</div>
 
 @push('scripts')
 <script>
@@ -267,12 +303,37 @@
     });
 
     // Antes de enviar: convertir a número puro
-    document.querySelector('form').addEventListener('submit', function () {
+    document.getElementById('form-recepcion').addEventListener('submit', function () {
         document.querySelectorAll('.input-precio').forEach(function(input) {
             input.value = input.value.replace(/\$/g, '').replace(/\./g, '').replace(/[^0-9]/g, '');
         });
     });
+
+    function abrirConfirmRecepcion() {
+        document.getElementById('modal-confirm-recepcion').style.display = 'flex';
+    }
+    function cerrarConfirmRecepcion() {
+        document.getElementById('modal-confirm-recepcion').style.display = 'none';
+    }
+    function confirmarRecepcion() {
+        cerrarConfirmRecepcion();
+        var form = document.getElementById('form-recepcion');
+        if (form.requestSubmit) {
+            form.requestSubmit();
+        } else {
+            form.submit();
+        }
+    }
+    document.getElementById('modal-confirm-recepcion').addEventListener('click', function(e) {
+        if (e.target === this) cerrarConfirmRecepcion();
+    });
 </script>
+@endpush
+
+@push('head')
+<style>
+@keyframes recep-in { from { opacity:0; transform:scale(.95) translateY(-8px); } to { opacity:1; transform:none; } }
+</style>
 @endpush
 
 @endsection

@@ -83,4 +83,9 @@ class OrdenCompra extends Model
     {
         return $this->factura !== null;
     }
+
+    public function tieneGuia(): bool
+    {
+        return $this->guia !== null;
+    }
 }

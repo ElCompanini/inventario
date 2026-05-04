@@ -9,6 +9,7 @@ use App\Models\GuiaDespacho;
 use App\Models\HistorialCambio;
 use App\Models\OrdenCompra;
 use App\Models\Sicd;
+use App\Models\SicdExterno;
 use App\Services\MercadoPublicoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,7 +37,10 @@ class OrdenCompraController extends Controller
 
         $ordenes = $query->paginate(20);
 
-        return view('admin.ordenes.index', compact('ordenes'));
+        $codigosSicd     = $ordenes->flatMap(fn($oc) => $oc->sicds->pluck('codigo_sicd'))->unique()->values()->toArray();
+        $estadosExternos = SicdExterno::estadosBulk($codigosSicd);
+
+        return view('admin.ordenes.index', compact('ordenes', 'estadosExternos'));
     }
 
     public function create()
@@ -207,7 +211,7 @@ class OrdenCompraController extends Controller
     {
         $oc = OrdenCompra::with(['sicds.detalles.producto', 'factura'])->findOrFail($id);
 
-        if ($oc->estado !== 'pendiente') {
+        if ($oc->estado === 'recibido') {
             return redirect()->route('admin.ordenes.show', $oc->id)
                 ->with('error', 'Esta OC ya fue procesada.');
         }
@@ -224,17 +228,30 @@ class OrdenCompraController extends Controller
 
     public function procesarRecepcion(int $id, Request $request)
     {
-        $oc = OrdenCompra::with(['sicds.detalles.producto', 'factura'])->findOrFail($id);
+        \Log::info('procesarRecepcion START', ['id' => $id, 'user' => Auth::id()]);
 
-        if ($oc->estado !== 'pendiente') {
+        try {
+        $oc = OrdenCompra::with(['sicds.detalles.producto', 'factura', 'guia'])->findOrFail($id);
+
+        if ($oc->estado === 'recibido') {
+            \Log::info('procesarRecepcion: ya recibido');
             return back()->with('error', 'Esta OC ya fue procesada.');
         }
 
         if (!$oc->tieneFactura()) {
+            \Log::info('procesarRecepcion: sin factura');
             return back()->with('error', 'Sube la factura antes de procesar la recepción.');
         }
 
-        DB::transaction(function () use ($oc, $request) {
+        if (!$oc->tieneGuia()) {
+            \Log::info('procesarRecepcion: sin guia');
+            return back()->with('error', 'Sube la guía de despacho antes de procesar la recepción.');
+        }
+
+        $userName = Auth::user()->name;
+        $userId   = Auth::id();
+
+        DB::transaction(function () use ($oc, $request, $userName, $userId) {
             foreach ($oc->sicds as $sicd) {
                 foreach ($sicd->detalles as $detalle) {
                     $recibido = (int) $request->input("recibido.{$detalle->id}", 0);
@@ -279,8 +296,8 @@ class OrdenCompraController extends Controller
                             'cantidad'     => $recibido,
                             'tipo'         => 'entrada',
                             'motivo'       => $motivoBase,
-                            'aprobado_por' => Auth::user()->name,
-                            'usuario_id'   => Auth::id(),
+                            'aprobado_por' => $userName,
+                            'usuario_id'   => $userId,
                             'origen'       => 'sicd',
                             'origen_id'    => $sicd->id,
                         ]);
@@ -292,13 +309,23 @@ class OrdenCompraController extends Controller
             }
 
             $oc->estado        = 'recibido';
-            $oc->procesado_por = Auth::user()->name;
+            $oc->procesado_por = $userName;
             $oc->procesado_at  = now();
             $oc->save();
         });
 
+        \Log::info('procesarRecepcion OK', ['oc' => $oc->numero_oc]);
         return redirect()->route('admin.ordenes.show', $oc->id)
             ->with('success', "Recepción de OC {$oc->numero_oc} registrada. Stock actualizado.");
+
+        } catch (\Throwable $e) {
+            \Log::error('procesarRecepcion ERROR', [
+                'message' => $e->getMessage(),
+                'file'    => $e->getFile(),
+                'line'    => $e->getLine(),
+            ]);
+            return back()->with('error', 'Error al procesar la recepción: ' . $e->getMessage());
+        }
     }
 
     public function descargarFactura(int $id)

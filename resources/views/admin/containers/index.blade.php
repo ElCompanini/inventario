@@ -153,7 +153,7 @@
 
         // ── Child rows: expandir/contraer productos ──
         $('#tabla-containers tbody').on('click', 'tr.fila-container', function (e) {
-            if ($(e.target).closest('button, form, a').length) return;
+            if ($(e.target).closest('button, form, a, select').length) return;
 
             const tr          = $(this);
             const row         = table.row(tr);

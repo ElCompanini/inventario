@@ -17,7 +17,7 @@ class ContainerController extends Controller
         abort_unless(auth()->user()->tienePermiso('containers'), 403);
 
         $user  = auth()->user();
-        $query = Container::withCount('productos')
+        $query = Container::withoutGlobalScope('con_cc')->withCount('productos')
             ->with(['productos:id,nombre,stock_actual,contenedor', 'centroCosto'])
             ->orderBy('id');
 
@@ -54,7 +54,7 @@ class ContainerController extends Controller
     public function destroy(int $id)
     {
         abort_unless(auth()->user()->esAdmin(), 403);
-        $container = Container::withCount('productos')->findOrFail($id);
+        $container = Container::withoutGlobalScope('con_cc')->withCount('productos')->findOrFail($id);
 
         if ($container->productos_count > 0) {
             return back()->with('error',
@@ -75,7 +75,7 @@ class ContainerController extends Controller
             'centro_costo_id' => ['nullable', 'integer', 'exists:centros_costo,id'],
         ]);
 
-        $container = Container::findOrFail($id);
+        $container = Container::withoutGlobalScope('con_cc')->findOrFail($id);
         $container->update(['centro_costo_id' => $data['centro_costo_id'] ?? null]);
 
         // Propagar el CC a todos los productos de este container
@@ -101,13 +101,13 @@ class ContainerController extends Controller
             'motivo.required'                => 'El motivo es obligatorio.',
         ]);
 
-        $origen = Container::findOrFail($id);
+        $origen = Container::withoutGlobalScope('con_cc')->findOrFail($id);
 
         if ((int) $data['contenedor_destino_id'] === $id) {
             return back()->with('error', 'El container de destino debe ser diferente al de origen.');
         }
 
-        $destino = Container::findOrFail($data['contenedor_destino_id']);
+        $destino = Container::withoutGlobalScope('con_cc')->findOrFail($data['contenedor_destino_id']);
 
         $productos = Producto::where('contenedor', $id)->get();
 

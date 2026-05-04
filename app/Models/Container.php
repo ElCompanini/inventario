@@ -13,6 +13,7 @@ class Container extends Model
     protected static function booted(): void
     {
         static::addGlobalScope('activo', fn($q) => $q->where('activo', 1));
+        static::addGlobalScope('con_cc', fn($q) => $q->whereNotNull('centro_costo_id'));
     }
 
     public function centroCosto()

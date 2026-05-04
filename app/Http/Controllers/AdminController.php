@@ -610,13 +610,14 @@ class AdminController extends Controller
                         if ($enDestino) {
                             $productoId = $enDestino->id;
                         } else {
+                            $contDest2 = Container::withoutGlobalScope('con_cc')->find($item['contenedor_id']);
                             $copia = Producto::create([
                                 'nombre'          => $prod->nombre,
                                 'stock_actual'    => 0,
                                 'stock_minimo'    => $prod->stock_minimo,
                                 'stock_critico'   => $prod->stock_critico,
                                 'contenedor'      => $item['contenedor_id'],
-                                'centro_costo_id' => $prod->centro_costo_id ?? $ccId,
+                                'centro_costo_id' => $contDest2?->centro_costo_id ?? $ccId,
                             ]);
                             $productoId = $copia->id;
                         }
@@ -750,7 +751,7 @@ class AdminController extends Controller
 
         $ccIdManual = auth()->user()->centro_costo_id;
 
-        DB::transaction(function () use ($request, $sicd, $codigoSicd, $ccIdManual) {
+        DB::transaction(function () use ($request, $sicd, $codigoSicd, $ccIdManual, $vincularOc) {
             foreach ($request->items_manual as $item) {
                 $producto     = Producto::findOrFail($item['producto_id']);
                 $cantidad     = (int) $item['cantidad'];
@@ -758,13 +759,14 @@ class AdminController extends Controller
                 $motivo       = trim($item['motivo'] ?? '') ?: ($codigoSicd ? "Carga manual – SICD {$codigoSicd}" : 'Carga manual de inventario');
                 $contenedorId = isset($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
 
-                if ($contenedorId && $contenedorId !== $producto->contenedor) {
+                if (!$vincularOc && $contenedorId && $contenedorId !== $producto->contenedor) {
                     $enDestino = Producto::where('nombre', $producto->nombre)
                         ->where('contenedor', $contenedorId)
                         ->first();
                     if ($enDestino) {
                         $producto = $enDestino;
                     } else {
+                        $contDest = Container::withoutGlobalScope('con_cc')->find($contenedorId);
                         $producto = Producto::create([
                             'nombre'          => $producto->nombre,
                             'unidad'          => $unidad ?? $producto->unidad,
@@ -772,7 +774,7 @@ class AdminController extends Controller
                             'stock_minimo'    => $producto->stock_minimo,
                             'stock_critico'   => $producto->stock_critico,
                             'contenedor'      => $contenedorId,
-                            'centro_costo_id' => $producto->centro_costo_id ?? $ccIdManual,
+                            'centro_costo_id' => $contDest?->centro_costo_id ?? $ccIdManual,
                         ]);
                     }
                 }
@@ -798,21 +800,25 @@ class AdminController extends Controller
                     ]);
                 }
 
-                $producto->stock_actual += $cantidad;
-                $producto->actualizarFechasStock();
-                $producto->save();
+                if (!$vincularOc) {
+                    $producto->stock_actual += $cantidad;
+                    $producto->actualizarFechasStock();
+                    $producto->save();
 
-                HistorialCambio::create([
-                    'producto_id'  => $producto->id,
-                    'contenedor_id'=> $producto->contenedor,
-                    'cantidad'     => $cantidad,
-                    'tipo'         => 'entrada',
-                    'motivo'       => $motivo,
-                    'aprobado_por' => Auth::user()->name,
-                    'usuario_id'   => Auth::id(),
-                    'origen'       => $sicd ? 'sicd' : null,
-                    'origen_id'    => $sicd ? $sicd->id : null,
-                ]);
+                    HistorialCambio::create([
+                        'producto_id'  => $producto->id,
+                        'contenedor_id'=> $producto->contenedor,
+                        'cantidad'     => $cantidad,
+                        'tipo'         => 'entrada',
+                        'motivo'       => $motivo,
+                        'aprobado_por' => Auth::user()->name,
+                        'usuario_id'   => Auth::id(),
+                        'origen'       => $sicd ? 'sicd' : null,
+                        'origen_id'    => $sicd ? $sicd->id : null,
+                    ]);
+                } else {
+                    $producto->save();
+                }
             }
         });
 

@@ -123,8 +123,9 @@ class SicdController extends Controller
             $query->whereRaw("REGEXP_REPLACE(codigo_sicd, '[^A-Za-z].*', '') = ?", [$prefix]);
         }
 
-        $sicds = $query->paginate(20);
-        return view('admin.sicd.index', compact('sicds'));
+        $sicds          = $query->paginate(20);
+        $estadosExternos = SicdExterno::estadosBulk($sicds->pluck('codigo_sicd')->toArray());
+        return view('admin.sicd.index', compact('sicds', 'estadosExternos'));
     }
 
     public function create()
