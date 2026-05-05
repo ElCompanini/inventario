@@ -121,11 +121,12 @@ class ContainerController extends Controller
                 $producto->save();
 
                 HistorialCambio::create([
-                    'producto_id'  => $producto->id,
-                    'contenedor_id'=> $destino->id,
-                    'cantidad'     => $producto->stock_actual,
-                    'tipo'         => 'traslado',
-                    'motivo'       => "Traslado de {$origen->nombre} a {$destino->nombre}: {$data['motivo']}",
+                    'producto_id'     => $producto->id,
+                    'nombre_producto' => $producto->nombre,
+                    'contenedor_id'   => $destino->id,
+                    'cantidad'        => $producto->stock_actual,
+                    'tipo'            => 'traslado',
+                    'motivo'          => "Traslado de {$origen->nombre} a {$destino->nombre}: {$data['motivo']}",
                     'aprobado_por' => Auth::user()->name,
                     'usuario_id'   => Auth::id(),
                 ]);

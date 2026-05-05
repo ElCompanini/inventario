@@ -72,8 +72,9 @@ class AdminController extends Controller
 
             // Registrar en historial
             HistorialCambio::create([
-                'producto_id'  => $solicitud->producto_id,
-                'contenedor_id'=> $producto->contenedor,
+                'producto_id'     => $solicitud->producto_id,
+                'nombre_producto' => $producto->nombre,
+                'contenedor_id'   => $producto->contenedor,
                 'cantidad'     => $solicitud->cantidad,
                 'tipo'         => $solicitud->tipo,
                 'motivo'       => $solicitud->motivo,
@@ -135,7 +136,9 @@ class AdminController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('historial'), 403);
         $user  = auth()->user();
-        $query = HistorialCambio::with(['producto', 'usuario', 'sicd', 'container'])
+        $query = HistorialCambio::with(['usuario', 'sicd', 'container',
+            'producto' => fn($q) => $q->withoutGlobalScopes(),
+        ])
             ->orderByDesc('created_at');
 
         if ($user->tieneFiltroCC()) {
@@ -230,11 +233,12 @@ class AdminController extends Controller
             $producto->save();
 
             HistorialCambio::create([
-                'producto_id'  => $producto->id,
-                'contenedor_id'=> $producto->contenedor,
-                'cantidad'     => $data['cantidad'],
-                'tipo'         => $data['tipo'],
-                'motivo'       => $data['motivo'],
+                'producto_id'     => $producto->id,
+                'nombre_producto' => $producto->nombre,
+                'contenedor_id'   => $producto->contenedor,
+                'cantidad'        => $data['cantidad'],
+                'tipo'            => $data['tipo'],
+                'motivo'          => $data['motivo'],
                 'aprobado_por' => Auth::user()->name,
                 'usuario_id'   => Auth::id(),
             ]);
@@ -271,11 +275,12 @@ class AdminController extends Controller
             $producto->save();
 
             HistorialCambio::create([
-                'producto_id'  => $producto->id,
-                'contenedor_id'=> $containerDestino->id,
-                'cantidad'     => $producto->stock_actual,
-                'tipo'         => 'traslado',
-                'motivo'       => "Traslado de {$containerOrigen->nombre} a {$containerDestino->nombre}: {$data['motivo']}",
+                'producto_id'     => $producto->id,
+                'nombre_producto' => $producto->nombre,
+                'contenedor_id'   => $containerDestino->id,
+                'cantidad'        => $producto->stock_actual,
+                'tipo'            => 'traslado',
+                'motivo'          => "Traslado de {$containerOrigen->nombre} a {$containerDestino->nombre}: {$data['motivo']}",
                 'aprobado_por' => Auth::user()->name,
                 'usuario_id'   => Auth::id(),
             ]);
@@ -591,8 +596,8 @@ class AdminController extends Controller
                         'nombre'          => $item['nuevo_nombre'],
                         'categoria_id'    => $item['nuevo_categoria_id'] ?? null,
                         'stock_actual'    => 0,
-                        'stock_minimo'    => 0,
-                        'stock_critico'   => 0,
+                        'stock_minimo'    => (int) ($item['nuevo_stock_minimo']  ?? 0),
+                        'stock_critico'   => (int) ($item['nuevo_stock_critico'] ?? 0),
                         'contenedor'      => $item['contenedor_id'] ?? 1,
                         'centro_costo_id' => $ccId,
                     ]);
@@ -648,11 +653,12 @@ class AdminController extends Controller
                 $producto->save();
 
                 HistorialCambio::create([
-                    'producto_id'  => $producto->id,
-                    'contenedor_id'=> $producto->contenedor,
-                    'cantidad'     => $item['cantidad'],
-                    'tipo'         => 'entrada',
-                    'motivo'       => $sicd ? "Carga masiva – SICD {$sicd->codigo_sicd}" : $motivo,
+                    'producto_id'     => $producto->id,
+                    'nombre_producto' => $producto->nombre,
+                    'contenedor_id'   => $producto->contenedor,
+                    'cantidad'        => $item['cantidad'],
+                    'tipo'            => 'entrada',
+                    'motivo'          => $sicd ? "Carga masiva – SICD {$sicd->codigo_sicd}" : $motivo,
                     'aprobado_por' => Auth::user()->name,
                     'usuario_id'   => Auth::id(),
                     'origen'       => $sicd ? 'sicd' : null,
@@ -806,11 +812,12 @@ class AdminController extends Controller
                     $producto->save();
 
                     HistorialCambio::create([
-                        'producto_id'  => $producto->id,
-                        'contenedor_id'=> $producto->contenedor,
-                        'cantidad'     => $cantidad,
-                        'tipo'         => 'entrada',
-                        'motivo'       => $motivo,
+                        'producto_id'     => $producto->id,
+                        'nombre_producto' => $producto->nombre,
+                        'contenedor_id'   => $producto->contenedor,
+                        'cantidad'        => $cantidad,
+                        'tipo'            => 'entrada',
+                        'motivo'          => $motivo,
                         'aprobado_por' => Auth::user()->name,
                         'usuario_id'   => Auth::id(),
                         'origen'       => $sicd ? 'sicd' : null,
@@ -836,8 +843,10 @@ class AdminController extends Controller
         abort_unless(auth()->user()->esAdmin(), 403);
 
         $request->validate([
-            'categoria_id' => ['required', 'integer', 'exists:categorias,id'],
-            'nombre'       => ['required', 'string', 'max:500'],
+            'categoria_id'  => ['required', 'integer', 'exists:categorias,id'],
+            'nombre'        => ['required', 'string', 'max:500'],
+            'stock_minimo'  => ['nullable', 'integer', 'min:0'],
+            'stock_critico' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $categoria = Categoria::findOrFail($request->categoria_id);
@@ -845,8 +854,8 @@ class AdminController extends Controller
         $producto = \App\Models\Producto::create([
             'nombre'          => trim($request->nombre),
             'stock_actual'    => 0,
-            'stock_minimo'    => 0,
-            'stock_critico'   => 0,
+            'stock_minimo'    => (int) ($request->stock_minimo ?? 0),
+            'stock_critico'   => (int) ($request->stock_critico ?? 0),
             'contenedor'      => null,
             'categoria_id'    => $categoria->id,
             'centro_costo_id' => auth()->user()->centro_costo_id,

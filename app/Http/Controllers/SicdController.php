@@ -364,11 +364,12 @@ class SicdController extends Controller
                     $detalle->producto->save();
 
                     HistorialCambio::create([
-                        'producto_id'  => $detalle->producto_id,
-                        'contenedor_id'=> $detalle->producto->contenedor,
-                        'cantidad'     => $cantidad,
-                        'tipo'         => 'entrada',
-                        'motivo'       => "Recepción directa – SICD {$sicd->codigo_sicd}",
+                        'producto_id'     => $detalle->producto_id,
+                        'nombre_producto' => $detalle->producto->nombre,
+                        'contenedor_id'   => $detalle->producto->contenedor,
+                        'cantidad'        => $cantidad,
+                        'tipo'            => 'entrada',
+                        'motivo'          => "Recepción directa – SICD {$sicd->codigo_sicd}",
                         'aprobado_por' => Auth::user()->name,
                         'usuario_id'   => Auth::id(),
                         'origen'       => 'sicd',
@@ -478,11 +479,12 @@ class SicdController extends Controller
                         $producto->save();
 
                         HistorialCambio::create([
-                            'producto_id'  => $producto->id,
-                            'contenedor_id'=> $producto->contenedor,
-                            'cantidad'     => $cantidad,
-                            'tipo'         => 'entrada',
-                            'motivo'       => "Recepción directa – SICD {$codigo}",
+                            'producto_id'     => $producto->id,
+                            'nombre_producto' => $producto->nombre,
+                            'contenedor_id'   => $producto->contenedor,
+                            'cantidad'        => $cantidad,
+                            'tipo'            => 'entrada',
+                            'motivo'          => "Recepción directa – SICD {$codigo}",
                             'aprobado_por' => Auth::user()->name,
                             'usuario_id'   => Auth::id(),
                             'origen'       => 'sicd',

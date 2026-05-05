@@ -13,6 +13,7 @@ class HistorialCambio extends Model
 
     protected $fillable = [
         'producto_id',
+        'nombre_producto',
         'contenedor_id',
         'cantidad',
         'tipo',

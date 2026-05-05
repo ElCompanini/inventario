@@ -171,7 +171,8 @@
                     {{ $registro->created_at->format('d/m/Y H:i') }}
                 </td>
                 <td class="px-4 py-3" style="max-width:200px;">
-                    <p class="font-medium text-gray-900 truncate" title="{{ $registro->producto->nombre }}">{{ $registro->producto->nombre }}</p>
+                    @php $nombreP = $registro->producto?->nombre ?? $registro->nombre_producto ?? '—'; @endphp
+                    <p class="font-medium text-gray-900 truncate" title="{{ $nombreP }}">{{ $nombreP }}</p>
                 </td>
                 <td class="px-4 py-3">
                     @php
@@ -268,7 +269,7 @@ var grupoChildren = @json($grupoChildren);
 $(document).ready(function() {
     const table = $('#tabla-historial').DataTable({
         language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json' },
-        order: [[0, 'desc']],
+        order: [[]],
         paging: false,
         layout: { topStart: 'buttons', topEnd: null, bottomStart: null, bottomEnd: null },
         buttons: [

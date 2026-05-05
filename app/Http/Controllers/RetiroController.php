@@ -107,10 +107,11 @@ class RetiroController extends Controller
 
                         // Registrar en historial
                         HistorialCambio::create([
-                            'producto_id'  => $producto->id,
-                            'contenedor_id'=> $producto->contenedor,
-                            'usuario_id'   => $user->id,
-                            'tipo'         => 'salida',
+                            'producto_id'     => $producto->id,
+                            'nombre_producto' => $producto->nombre,
+                            'contenedor_id'   => $producto->contenedor,
+                            'usuario_id'      => $user->id,
+                            'tipo'            => 'salida',
                             'cantidad'     => (int) $item['cantidad'],
                             'motivo'       => $motivo,
                             'aprobado_por' => $user->name,

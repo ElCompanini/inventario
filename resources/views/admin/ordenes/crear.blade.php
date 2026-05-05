@@ -473,7 +473,7 @@ function _buildOCBody(e) {
           + '<div><span style="color:#9ca3af;">Proveedor: </span><b style="color:#1f2937;">' + esc(d.proveedor_nombre || '—') + '</b></div>'
           + '<div><span style="color:#9ca3af;">RUT: </span><span style="color:#374151;">' + esc(d.proveedor_rut || '—') + '</span></div>'
           + '<div><span style="color:#9ca3af;">Estado: </span><span style="color:#374151;">' + esc(d.estado || '—') + '</span></div>'
-          + '<div><span style="color:#9ca3af;">Envío: </span><span style="color:#374151;">' + esc(d.fecha_envio || '—') + '</span></div>'
+          + '<div><span style="color:#9ca3af;">Envío: </span><span style="color:#374151;">' + (d.fecha_envio ? (function(s){ var dt=new Date(s); return dt.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+dt.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); })(d.fecha_envio) : '—') + '</span></div>'
           + (licLink ? '<div><span style="color:#9ca3af;">Licitación: </span><span style="font-family:monospace;font-weight:600;color:#4338ca;">' + esc(licLink) + '</span></div>' : '')
           + '</div>';
 

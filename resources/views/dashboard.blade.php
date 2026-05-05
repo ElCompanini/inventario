@@ -236,21 +236,23 @@
 <div class="bg-white rounded-xl shadow overflow-hidden p-4">
 
     <p class="font-medium text-gray-900 text-sm mb-1">Exportar archivo:</p>
+    <div class="overflow-x-auto">
     <table id="tabla-inventario" class="w-full text-sm">
         <thead class="bg-gray-50 text-left">
             <tr>
                 <th class="px-4 py-3 font-semibold text-gray-600">Producto</th>
-                <th class="px-4 py-3 font-semibold text-gray-600">Familia</th>
-                <th class="px-4 py-3 font-semibold text-gray-600">Categoría</th>
-                <th class="px-4 py-3 font-semibold text-gray-600" style="text-align:center;">Contenedor</th>
-                <th class="px-4 py-3 font-semibold text-gray-600">Stock Actual</th>
-                <th class="px-4 py-3 font-semibold text-gray-600">Mínimo</th>
-                <th class="px-4 py-3 font-semibold text-gray-600">Crítico</th>
-                <th class="px-4 py-3 font-semibold text-gray-600">Estado</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Unidad</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Familia</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Categoría</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Cont.</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Stock</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Mín.</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Crít.</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Estado</th>
                 @if(auth()->user()->esDev())
-                <th class="px-4 py-3 font-semibold text-gray-600 text-center">CC</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center">CC</th>
                 @endif
-                <th class="px-4 py-3 font-semibold text-gray-600">Acciones</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs">Acciones</th>
             </tr>
         </thead>
         <tbody>
@@ -307,9 +309,10 @@
                         <span>{{ $producto->nombre }}</span>
                     </div>
                 </td>
-                <td class="px-4 py-3 text-gray-500">{{ $producto->categoria->familia->nombre ?? '—' }}</td>
-                <td class="px-4 py-3 text-gray-500">{{ $producto->categoria->nombre ?? '—' }}</td>
-                <td class="px-4 py-3" style="text-align:center; vertical-align:middle;">
+                <td class="px-2 py-3 text-gray-500 text-xs whitespace-nowrap">{{ $producto->unidad ?? '—' }}</td>
+                <td class="px-2 py-3 text-gray-500 text-xs">{{ $producto->categoria->familia->nombre ?? '—' }}</td>
+                <td class="px-2 py-3 text-gray-500 text-xs">{{ $producto->categoria->nombre ?? '—' }}</td>
+                <td class="px-2 py-3" style="text-align:center; vertical-align:middle;">
                     @if($producto->container)
                         @if(auth()->user()->esAdmin())
                             <a href="{{ route('admin.containers.index') }}#container-{{ $producto->container->id }}"
@@ -325,25 +328,25 @@
                         <span style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.875rem; font-weight:700; padding:2px 12px; border-radius:9999px;">—</span>
                     @endif
                 </td>
-                <td class="px-4 py-3 text-center font-bold
+                <td class="px-2 py-3 text-center font-bold whitespace-nowrap
                         {{ $estado === 'critico' ? 'text-red-700' : ($estado === 'minimo' ? 'text-yellow-700' : 'text-gray-800') }}">
                     {{ $producto->stock_actual }}
                 </td>
-                <td class="px-4 py-3 text-center text-gray-600">
+                <td class="px-2 py-3 text-center text-gray-600 whitespace-nowrap">
                     @if($estado === 'minimo')
                         <span class="inline-block px-2 py-0.5 rounded-full estado-pulso-minimo">{{ $producto->stock_minimo }}</span>
                     @else
                         {{ $producto->stock_minimo }}
                     @endif
                 </td>
-                <td class="px-4 py-3 text-center text-gray-600">
+                <td class="px-2 py-3 text-center text-gray-600 whitespace-nowrap">
                     @if($estado === 'critico')
                         <span class="inline-block px-2 py-0.5 rounded-full estado-pulso-critico">{{ $producto->stock_critico }}</span>
                     @else
                         {{ $producto->stock_critico }}
                     @endif
                 </td>
-                <td class="px-4 py-3 text-center">
+                <td class="px-2 py-3 text-center">
                     @if($estado === 'critico')
                     <span style="position:relative; display:inline-flex; cursor:default;"
                           onmouseenter="this.querySelector('.tt').style.display='block'"
@@ -383,13 +386,13 @@
                     @endif
                 </td>
                 @if(auth()->user()->esDev())
-                <td class="px-4 py-3 text-center">
+                <td class="px-2 py-3 text-center">
                     <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
                         {{ $producto->centroCosto?->acronimo ?? '—' }}
                     </span>
                 </td>
                 @endif
-                <td class="px-4 py-3 text-center">
+                <td class="px-2 py-3 text-center">
                     <div class="flex flex-col items-center gap-1.5">
                         @if(auth()->user()->esAdmin())
                         {{-- Admin: modificar stock directamente --}}
@@ -427,6 +430,7 @@
             @endforeach
         </tbody>
     </table>
+    </div>
 </div>
 
 {{-- Modal solicitud (solo usuarios) --}}
@@ -1433,6 +1437,31 @@ function escHtmlGm(str) {
 
     .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s, transform .15s; }
     .dt-btn-pdf:hover { background:#b91c1c; transform:translateY(-1px); animation:btn-breathe-red 1.6s ease-in-out infinite; }
+
+    /* ── Paginación DataTables estilo Tailwind ── */
+    .dt-paging { margin-top:1rem !important; display:flex !important; justify-content:flex-end !important; gap:4px !important; align-items:center !important; }
+    .dt-paging button,
+    .dt-paging .dt-paging-button {
+        display:inline-flex !important; align-items:center !important; justify-content:center !important;
+        min-width:2rem !important; height:2rem !important; padding:0 0.6rem !important;
+        border-radius:0.375rem !important;
+        font-size:0.8rem !important; font-weight:600 !important; cursor:pointer !important;
+        border:1px solid #3b82f6 !important; background:#3b82f6 !important; color:#fff !important;
+        transition:background .15s, transform .1s !important;
+        line-height:1 !important; box-shadow:none !important;
+    }
+    .dt-paging button:hover:not([disabled]):not(.current),
+    .dt-paging .dt-paging-button:hover:not(.disabled):not(.current) {
+        background:#2563eb !important; border-color:#2563eb !important; transform:translateY(-1px) !important;
+    }
+    .dt-paging button.current,
+    .dt-paging .dt-paging-button.current {
+        background:#1d4ed8 !important; border-color:#1d4ed8 !important; color:#fff !important; font-weight:700 !important;
+        box-shadow:0 0 0 3px rgba(59,130,246,.35) !important;
+    }
+    .dt-paging button[disabled],
+    .dt-paging .dt-paging-button.disabled { opacity:0.35 !important; cursor:not-allowed !important; }
+    .dt-info { font-size:0.78rem !important; color:#6b7280 !important; margin-top:1.1rem !important; }
     @keyframes gmFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     .gm-modal-inner { animation: gmFadeUp 0.35s cubic-bezier(.22,.68,0,1.2) both; }
     .ai-modal-inner { animation: gmFadeUp 0.35s cubic-bezier(.22,.68,0,1.2) both; }
@@ -1494,19 +1523,32 @@ function escHtmlGm(str) {
                 url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json'
             },
             order: [],
-            paging: false,
+            paging: true,
+            pageLength: 20,
+            pagingType: 'numbers',
             layout: {
                 topStart: 'buttons',
                 topEnd: null,
-                bottomStart: null,
-                bottomEnd: null,
+                bottomStart: 'info',
+                bottomEnd: 'paging',
             },
             buttons: [
-                { extend: 'excelHtml5', text: 'Excel', className: 'dt-btn-excel', exportOptions: { columns: ':not(:last-child)' } },
-                { extend: 'csvHtml5',   text: 'CSV',   className: 'dt-btn',       exportOptions: { columns: ':not(:last-child)' } },
-                { extend: 'pdfHtml5',   text: 'PDF',   className: 'dt-btn-pdf',   exportOptions: { columns: ':not(:last-child)' }, orientation: 'landscape', pageSize: 'A4' },
+                { extend: 'excelHtml5', text: 'Excel', className: 'dt-btn-excel', exportOptions: { columns: ':not(:last-child)', modifier: { page: 'all' } } },
+                { extend: 'csvHtml5',   text: 'CSV',   className: 'dt-btn',       exportOptions: { columns: ':not(:last-child)', modifier: { page: 'all' } } },
+                { extend: 'pdfHtml5',   text: 'PDF',   className: 'dt-btn-pdf',   exportOptions: { columns: ':not(:last-child)', modifier: { page: 'all' } }, orientation: 'landscape', pageSize: 'A4' },
             ],
             columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+            drawCallback: function() {
+                $('#tabla-inventario_paginate button, #tabla-inventario_paginate .dt-paging-button').css({
+                    'background':'#3b82f6','color':'#fff','border':'1px solid #3b82f6',
+                    'border-radius':'0.375rem','font-weight':'600','min-width':'2rem',
+                    'height':'2rem','padding':'0 0.6rem','font-size':'0.8rem'
+                });
+                $('#tabla-inventario_paginate button.current, #tabla-inventario_paginate .dt-paging-button.current').css({
+                    'background':'#1d4ed8','border-color':'#1d4ed8',
+                    'box-shadow':'0 0 0 3px rgba(59,130,246,.35)'
+                });
+            },
         });
 
         // ── Sets de filtros activos ─────────────────────────────────────
@@ -1807,6 +1849,23 @@ function escHtmlGm(str) {
                 <p id="ai-nueva-categoria-error" style="display:none; font-size:0.72rem; color:#dc2626; margin-top:0.2rem;"></p>
             </div>
             @endif
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.85rem;">
+            <div>
+                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
+                    Stock mínimo <span style="color:#ef4444;">*</span>
+                </label>
+                <input type="number" id="ai-crear-stock-minimo" min="0" value="0"
+                       style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.6rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
+            </div>
+            <div>
+                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
+                    Stock crítico <span style="color:#ef4444;">*</span>
+                </label>
+                <input type="number" id="ai-crear-stock-critico" min="0" value="0"
+                       style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.6rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
+            </div>
         </div>
 
         <div id="ai-crear-error" style="display:none; font-size:0.8rem; color:#dc2626; margin-bottom:0.75rem; padding:0.4rem 0.6rem; background:#fef2f2; border-radius:0.375rem;"></div>
@@ -2728,6 +2787,8 @@ function aiAbrirModalCrear(nombre, editIdx) {
     aiCrearNombre    = nombre;
     document.getElementById('ai-crear-error').style.display = 'none';
     document.getElementById('ai-crear-cat-wrapper').style.display = 'none';
+    document.getElementById('ai-crear-stock-minimo').value  = '0';
+    document.getElementById('ai-crear-stock-critico').value = '0';
     var nombreEl = document.getElementById('ai-crear-nombre-display');
     if (nombreEl) nombreEl.textContent = nombre;
     var tituloEl = document.getElementById('ai-crear-titulo');
@@ -2805,13 +2866,16 @@ function aiConfirmarCrearProducto() {
     if (!aiCrearFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.style.display = 'block'; return; }
     if (!aiCrearCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.style.display = 'block'; return; }
 
+    var minimo  = parseInt(document.getElementById('ai-crear-stock-minimo').value)  || 0;
+    var critico = parseInt(document.getElementById('ai-crear-stock-critico').value) || 0;
+
     var btn = document.getElementById('ai-crear-btn-guardar');
     btn.disabled = true; btn.textContent = 'Creando…';
 
     fetch(AI_URL_CREAR, {
         method: 'POST',
         headers: { 'X-CSRF-TOKEN': AI_CSRF, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoria_id: aiCrearCatId, nombre: aiCrearNombre }),
+        body: JSON.stringify({ categoria_id: aiCrearCatId, nombre: aiCrearNombre, stock_minimo: minimo, stock_critico: critico }),
     })
     .then(function(res) { return res.json().then(function(p) { return { ok: res.ok, p: p }; }); })
     .then(function(data) {
@@ -2854,9 +2918,7 @@ function aiConfirmarCrearProducto() {
     });
 }
 
-document.getElementById('ai-modal-crear-producto').addEventListener('click', function(e) {
-    if (e.target === e.currentTarget) aiCerrarModalCrear();
-});
+// No cerrar al hacer click en el overlay del modal de crear producto
 
 // ── Crear nueva familia (solo dev) ─────────────────────────────────
 function aiMostrarNuevaFamilia() {

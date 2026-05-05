@@ -42,7 +42,7 @@
             </div>
         @endif
 
-        {{-- SICDs y sus productos --}}
+        {{-- SICDs y sus detalles --}}
         @foreach($oc->sicds as $sicd)
             <div class="bg-white rounded-xl shadow overflow-hidden">
                 <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -118,6 +118,104 @@
                 </table>
             </div>
         @endforeach
+
+        {{-- ── Estado MP cuando no hay datos ── --}}
+        @if(!$oc->api_validado_at && $oc->estado !== 'recibido')
+        <div class="bg-white rounded-xl shadow overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h2 class="text-base font-semibold text-gray-700">Validación Mercado Público</h2>
+            </div>
+            <div class="px-5 py-6 flex flex-col items-center gap-3 text-center">
+                @if($oc->api_error)
+                    <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+                    </svg>
+                    <p class="text-sm font-semibold text-red-700">Error al conectar con Mercado Público</p>
+                    <p class="text-xs text-gray-500">{{ $oc->api_error }}</p>
+                @else
+                    <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                    </svg>
+                    <p class="text-sm text-gray-500">Esta OC aún no ha sido validada en Mercado Público.</p>
+                @endif
+                <button onclick="validarMPShow()"
+                        class="inline-flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2 rounded-lg transition"
+                        style="background:{{ $oc->api_error ? '#dc2626' : '#4f46e5' }};"
+                        onmouseover="this.style.background='{{ $oc->api_error ? '#b91c1c' : '#4338ca' }}'"
+                        onmouseout="this.style.background='{{ $oc->api_error ? '#dc2626' : '#4f46e5' }}'">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    {{ $oc->api_error ? 'Reintentar' : 'Validar en Mercado Público' }}
+                </button>
+            </div>
+        </div>
+        @endif
+
+        {{-- ── Detalle de ítems Mercado Público ── --}}
+        @if($oc->api_validado_at && !empty($oc->api_items))
+        <div class="bg-white rounded-xl shadow overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-700">Detalle de ítems — Mercado Público</h2>
+                    @if($oc->api_nombre)
+                        <p class="text-xs text-gray-400 italic mt-0.5">"{{ $oc->api_nombre }}"</p>
+                    @endif
+                </div>
+                <span class="text-xs text-gray-400">{{ count($oc->api_items) }} ítem(s)</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-xs divide-y divide-gray-100">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2.5 text-left font-semibold text-gray-600 whitespace-nowrap">Código</th>
+                            <th class="px-3 py-2.5 text-left font-semibold text-gray-600">Producto</th>
+                            <th class="px-3 py-2.5 text-center font-semibold text-gray-600">Cantidad</th>
+                            <th class="px-3 py-2.5 text-left font-semibold text-gray-600">Esp. Comprador</th>
+                            <th class="px-3 py-2.5 text-left font-semibold text-gray-600">Esp. Proveedor</th>
+                            <th class="px-3 py-2.5 text-right font-semibold text-gray-600 whitespace-nowrap">P. Unit.</th>
+                            <th class="px-3 py-2.5 text-right font-semibold text-gray-600">Dcto.</th>
+                            <th class="px-3 py-2.5 text-right font-semibold text-gray-600">Cargos</th>
+                            <th class="px-3 py-2.5 text-right font-semibold text-gray-600 whitespace-nowrap">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($oc->api_items as $item)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-2.5 font-mono text-gray-500 whitespace-nowrap">{{ $item['codigo'] ?? '—' }}</td>
+                            <td class="px-3 py-2.5 text-gray-800">{{ $item['nombre'] ?? '—' }}</td>
+                            <td class="px-3 py-2.5 text-center font-semibold text-gray-800">{{ $item['cantidad'] ?? '—' }}</td>
+                            <td class="px-3 py-2.5 text-gray-600">{{ $item['especificacion_comprador'] ?? '—' }}</td>
+                            <td class="px-3 py-2.5 text-gray-600">{{ $item['especificacion_proveedor'] ?? '—' }}</td>
+                            <td class="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">{{ isset($item['precio_unitario']) ? '$ ' . number_format($item['precio_unitario'], 0, ',', '.') : '—' }}</td>
+                            <td class="px-3 py-2.5 text-right text-gray-700">{{ number_format($item['descuento'] ?? 0, 2, ',', '.') }}</td>
+                            <td class="px-3 py-2.5 text-right text-gray-700">{{ number_format($item['cargo'] ?? 0, 2, ',', '.') }}</td>
+                            <td class="px-3 py-2.5 text-right font-semibold text-gray-800 whitespace-nowrap">{{ isset($item['total']) ? '$ ' . number_format($item['total'], 0, ',', '.') : '—' }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @php
+                $total     = $oc->api_total     ?? 0;
+                $impuestos = $oc->api_impuestos ?? 0;
+                $neto      = $total - $impuestos;
+                $dcto      = collect($oc->api_items)->sum(fn($i) => $i['descuento'] ?? 0);
+                $cargos    = collect($oc->api_items)->sum(fn($i) => $i['cargo'] ?? 0);
+            @endphp
+            <div class="flex justify-end px-5 py-4 border-t border-gray-100">
+                <table class="text-xs border border-gray-200 rounded-lg overflow-hidden" style="min-width:220px;">
+                    <tr class="border-b border-gray-100"><td class="px-4 py-1.5 text-gray-500">Neto</td><td class="px-4 py-1.5 text-right font-semibold text-gray-700">$ {{ number_format($neto, 0, ',', '.') }}</td></tr>
+                    <tr class="border-b border-gray-100"><td class="px-4 py-1.5 text-gray-500">Dcto.</td><td class="px-4 py-1.5 text-right text-gray-700">$ {{ number_format($dcto, 0, ',', '.') }}</td></tr>
+                    <tr class="border-b border-gray-100"><td class="px-4 py-1.5 text-gray-500">Cargos</td><td class="px-4 py-1.5 text-right text-gray-700">$ {{ number_format($cargos, 0, ',', '.') }}</td></tr>
+                    <tr class="border-b border-gray-200 bg-gray-50"><td class="px-4 py-1.5 font-semibold text-gray-700">Subtotal</td><td class="px-4 py-1.5 text-right font-semibold text-gray-700">$ {{ number_format($neto, 0, ',', '.') }}</td></tr>
+                    <tr class="border-b border-gray-100"><td class="px-4 py-1.5 text-gray-500">19% IVA</td><td class="px-4 py-1.5 text-right text-gray-700">$ {{ number_format($impuestos, 0, ',', '.') }}</td></tr>
+                    <tr class="bg-gray-50"><td class="px-4 py-2 font-bold text-gray-800">Total</td><td class="px-4 py-2 text-right font-bold text-green-700">$ {{ number_format($total, 0, ',', '.') }}</td></tr>
+                </table>
+            </div>
+        </div>
+        @endif
+
     </div>
 
     {{-- COLUMNA DERECHA: documentos + recepción --}}
@@ -265,7 +363,9 @@
                             </div>
                             <div>
                                 <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Fecha envío</p>
-                                <p class="text-gray-700 mt-0.5">{{ $oc->api_fecha_envio ?? '—' }}</p>
+                                <p class="text-gray-700 mt-0.5">
+                                    {{ $oc->api_fecha_envio ? \Carbon\Carbon::parse($oc->api_fecha_envio)->format('d/m/Y H:i') : '—' }}
+                                </p>
                             </div>
                             <div>
                                 <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Total</p>
@@ -375,131 +475,6 @@
     </div>
 
 </div>
-
-{{-- ── Estado MP cuando no hay datos ── --}}
-@if(!$oc->api_validado_at && $oc->estado !== 'recibido')
-<div class="mt-6 bg-white rounded-xl shadow overflow-hidden">
-    <div class="px-5 py-4 border-b border-gray-100">
-        <h2 class="text-base font-semibold text-gray-700">Validación Mercado Público</h2>
-    </div>
-    <div class="px-5 py-6 flex flex-col items-center gap-3 text-center">
-        @if($oc->api_error)
-            <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-            </svg>
-            <p class="text-sm font-semibold text-red-700">Error al conectar con Mercado Público</p>
-            <p class="text-xs text-gray-500">{{ $oc->api_error }}</p>
-        @else
-            <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
-            </svg>
-            <p class="text-sm text-gray-500">Esta OC aún no ha sido validada en Mercado Público.</p>
-        @endif
-        <button onclick="validarMPShow()"
-                class="inline-flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2 rounded-lg transition"
-                style="background:{{ $oc->api_error ? '#dc2626' : '#4f46e5' }};"
-                onmouseover="this.style.background='{{ $oc->api_error ? '#b91c1c' : '#4338ca' }}'"
-                onmouseout="this.style.background='{{ $oc->api_error ? '#dc2626' : '#4f46e5' }}'">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
-            {{ $oc->api_error ? 'Reintentar' : 'Validar en Mercado Público' }}
-        </button>
-    </div>
-</div>
-@endif
-
-{{-- ── Detalle de ítems Mercado Público (solo si está validada y tiene ítems) ── --}}
-@if($oc->api_validado_at && !empty($oc->api_items))
-<div class="mt-6 bg-white rounded-xl shadow overflow-hidden">
-    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-        <div>
-            <h2 class="text-base font-semibold text-gray-700">Detalle de ítems — Mercado Público</h2>
-            @if($oc->api_nombre)
-                <p class="text-xs text-gray-400 italic mt-0.5">"{{ $oc->api_nombre }}"</p>
-            @endif
-        </div>
-        <span class="text-xs text-gray-400">{{ count($oc->api_items) }} ítem(s)</span>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="min-w-full text-xs divide-y divide-gray-100">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-3 py-2.5 text-left font-semibold text-gray-600 whitespace-nowrap">Código</th>
-                    <th class="px-3 py-2.5 text-left font-semibold text-gray-600">Producto</th>
-                    <th class="px-3 py-2.5 text-center font-semibold text-gray-600">Cantidad</th>
-                    <th class="px-3 py-2.5 text-left font-semibold text-gray-600">Especificaciones Comprador</th>
-                    <th class="px-3 py-2.5 text-left font-semibold text-gray-600">Especificaciones Proveedor</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-gray-600 whitespace-nowrap">Precio Unitario</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-gray-600">Descuento</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-gray-600">Cargos</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-gray-600 whitespace-nowrap">Valor Total</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                @foreach($oc->api_items as $item)
-                <tr class="hover:bg-gray-50">
-                    <td class="px-3 py-2.5 font-mono text-gray-500 whitespace-nowrap">{{ $item['codigo'] ?? '—' }}</td>
-                    <td class="px-3 py-2.5 text-gray-800">{{ $item['nombre'] ?? '—' }}</td>
-                    <td class="px-3 py-2.5 text-center font-semibold text-gray-800 whitespace-nowrap">{{ $item['cantidad'] ?? '—' }}</td>
-                    <td class="px-3 py-2.5 text-gray-600">{{ $item['especificacion_comprador'] ?? '—' }}</td>
-                    <td class="px-3 py-2.5 text-gray-600">{{ $item['especificacion_proveedor'] ?? '—' }}</td>
-                    <td class="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">
-                        {{ isset($item['precio_unitario']) ? '$ ' . number_format($item['precio_unitario'], 0, ',', '.') : '—' }}
-                    </td>
-                    <td class="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">
-                        {{ number_format($item['descuento'] ?? 0, 2, ',', '.') }}
-                    </td>
-                    <td class="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">
-                        {{ number_format($item['cargo'] ?? 0, 2, ',', '.') }}
-                    </td>
-                    <td class="px-3 py-2.5 text-right font-semibold text-gray-800 whitespace-nowrap">
-                        {{ isset($item['total']) ? '$ ' . number_format($item['total'], 0, ',', '.') : '—' }}
-                    </td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
-
-    {{-- Resumen financiero --}}
-    @php
-        $total     = $oc->api_total     ?? 0;
-        $impuestos = $oc->api_impuestos ?? 0;
-        $neto      = $total - $impuestos;
-        $dcto      = collect($oc->api_items)->sum(fn($i) => $i['descuento'] ?? 0);
-        $cargos    = collect($oc->api_items)->sum(fn($i) => $i['cargo'] ?? 0);
-    @endphp
-    <div class="flex justify-end px-5 py-4 border-t border-gray-100">
-        <table class="text-xs border border-gray-200 rounded-lg overflow-hidden" style="min-width:220px;">
-            <tr class="border-b border-gray-100">
-                <td class="px-4 py-1.5 text-gray-500">Neto</td>
-                <td class="px-4 py-1.5 text-right font-semibold text-gray-700">$ {{ number_format($neto, 0, ',', '.') }}</td>
-            </tr>
-            <tr class="border-b border-gray-100">
-                <td class="px-4 py-1.5 text-gray-500">Dcto.</td>
-                <td class="px-4 py-1.5 text-right text-gray-700">$ {{ number_format($dcto, 0, ',', '.') }}</td>
-            </tr>
-            <tr class="border-b border-gray-100">
-                <td class="px-4 py-1.5 text-gray-500">Cargos</td>
-                <td class="px-4 py-1.5 text-right text-gray-700">$ {{ number_format($cargos, 0, ',', '.') }}</td>
-            </tr>
-            <tr class="border-b border-gray-200 bg-gray-50">
-                <td class="px-4 py-1.5 font-semibold text-gray-700">Subtotal</td>
-                <td class="px-4 py-1.5 text-right font-semibold text-gray-700">$ {{ number_format($neto, 0, ',', '.') }}</td>
-            </tr>
-            <tr class="border-b border-gray-100">
-                <td class="px-4 py-1.5 text-gray-500">19% IVA</td>
-                <td class="px-4 py-1.5 text-right text-gray-700">$ {{ number_format($impuestos, 0, ',', '.') }}</td>
-            </tr>
-            <tr class="bg-gray-50">
-                <td class="px-4 py-2 font-bold text-gray-800">Total</td>
-                <td class="px-4 py-2 text-right font-bold text-green-700">$ {{ number_format($total, 0, ',', '.') }}</td>
-            </tr>
-        </table>
-    </div>
-</div>
-@endif
 
 @push('scripts')
 <script>
