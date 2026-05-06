@@ -115,7 +115,10 @@ class SicdController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('sicd'), 403);
         $user  = auth()->user();
-        $query = Sicd::with(['usuario', 'detalles', 'ordenesCompra'])->where('estado', '!=', 'cancelado')->orderByDesc('created_at');
+        $query = Sicd::with(['usuario:id,name', 'ordenesCompra:id,numero_oc', 'boleta:id'])
+            ->withCount('detalles')
+            ->where('estado', '!=', 'cancelado')
+            ->orderByDesc('created_at');
 
         if ($user->tieneFiltroCC()) {
             $prefix = $user->centroCostoPrefix();
@@ -123,9 +126,8 @@ class SicdController extends Controller
             $query->whereRaw("REGEXP_REPLACE(codigo_sicd, '[^A-Za-z].*', '') = ?", [$prefix]);
         }
 
-        $sicds          = $query->paginate(20);
-        $estadosExternos = SicdExterno::estadosBulk($sicds->pluck('codigo_sicd')->toArray());
-        return view('admin.sicd.index', compact('sicds', 'estadosExternos'));
+        $sicds = $query->paginate(20);
+        return view('admin.sicd.index', compact('sicds'));
     }
 
     public function create()
@@ -738,5 +740,18 @@ class SicdController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $nombre . '"',
             'Content-Length'      => strlen($pdf),
         ]);
+    }
+
+    public function estadosExternos(Request $request)
+    {
+        abort_unless(auth()->user()->tienePermiso('sicd'), 403);
+        $codigos = array_filter((array) $request->input('codigos', []));
+        $estados = SicdExterno::estadosBulk($codigos);
+        $resultado = [];
+        foreach ($codigos as $codigo) {
+            $num = isset($estados[$codigo]) ? (int) $estados[$codigo] : null;
+            $resultado[$codigo] = SicdExterno::etiquetaEstado($num);
+        }
+        return response()->json($resultado);
     }
 }

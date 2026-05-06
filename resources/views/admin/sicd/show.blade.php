@@ -85,7 +85,12 @@
                 </div>
                 <div class="flex gap-2" id="det-botones">
                     <button id="btn-editar-det" onclick="detEditarOn()"
-                            class="det-btn-edit inline-flex items-center gap-1.5 text-xs font-semibold bg-white text-indigo-600 hover:bg-indigo-50 border border-indigo-300 px-3 py-1.5 rounded-lg transition-all duration-150 shadow-sm">
+                            class="det-btn-edit inline-flex items-center gap-1.5 text-xs font-semibold border px-3 py-1.5 rounded-lg shadow-sm"
+                            style="background:#fff; color:#4f46e5; border-color:#a5b4fc; transition:background .15s, border-color .15s, transform .1s, box-shadow .15s;"
+                            onmouseover="this.style.background='#eef2ff'; this.style.borderColor='#6366f1'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(99,102,241,.2)';"
+                            onmouseout="this.style.background='#fff'; this.style.borderColor='#a5b4fc'; this.style.transform=''; this.style.boxShadow='0 1px 2px rgba(0,0,0,.05)';"
+                            onmousedown="this.style.transform='scale(.97)';"
+                            onmouseup="this.style.transform='translateY(-1px)';">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         Editar SICD
                     </button>

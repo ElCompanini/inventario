@@ -216,13 +216,11 @@ class MercadoPublicoService
 
     public function ping(): bool
     {
+        // Sólo verifica que el servidor MP es alcanzable sin consumir cuota de la API
         try {
             $r = Http::withOptions(['verify' => false])
                 ->timeout(6)
-                ->get($this->baseUrl . '/ordenesdecompra.xml', [
-                    'codigo' => 'PING-TEST',
-                    'ticket' => $this->ticket,
-                ]);
+                ->get('https://api.mercadopublico.cl');
             return $r->status() > 0;
         } catch (\Exception) {
             return false;

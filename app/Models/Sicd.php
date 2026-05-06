@@ -15,6 +15,7 @@ class Sicd extends Model
         'documento_mime',
         'descripcion',
         'estado',
+        'permite_mas_oc',
         'usuario_id',
     ];
 

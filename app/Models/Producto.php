@@ -59,6 +59,16 @@ class Producto extends Model
         return $this->hasMany(HistorialCambio::class);
     }
 
+    public function precios()
+    {
+        return $this->hasMany(Precio::class);
+    }
+
+    public function ultimoPrecio(): ?Precio
+    {
+        return $this->precios()->latest()->first();
+    }
+
     public function estadoStock(): string
     {
         if ($this->stock_actual <= $this->stock_critico) {

@@ -8,6 +8,7 @@ use App\Models\Solicitud;
 use App\Models\Producto;
 use App\Models\Container;
 use App\Models\HistorialCambio;
+use App\Models\Precio;
 use App\Models\Sicd;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -267,8 +268,8 @@ class AdminController extends Controller
             return back()->withErrors(['contenedor_destino' => 'El producto ya está en ese container.'])->withInput();
         }
 
-        $containerOrigen = Container::find($producto->contenedor);
-        $containerDestino = Container::findOrFail($data['contenedor_destino']);
+        $containerOrigen  = Container::withoutGlobalScope('con_cc')->find($producto->contenedor);
+        $containerDestino = Container::withoutGlobalScope('con_cc')->findOrFail($data['contenedor_destino']);
 
         DB::transaction(function () use ($producto, $data, $containerOrigen, $containerDestino) {
             $producto->contenedor = $data['contenedor_destino'];
@@ -697,9 +698,10 @@ class AdminController extends Controller
             'items_manual.*.cantidad.min'         => 'La cantidad debe ser al menos 1.',
         ]);
 
-        $codigoSicd  = strtoupper(trim($request->input('codigo_sicd', ''))) ?: null;
-        $descripcion = trim($request->input('descripcion', '')) ?: null;
-        $vincularOc  = (bool) $request->input('vincular_oc_manual');
+        $codigoSicd   = strtoupper(trim($request->input('codigo_sicd', ''))) ?: null;
+        $descripcion  = trim($request->input('descripcion', '')) ?: null;
+        $vincularOc   = (bool) $request->input('vincular_oc_manual');
+        $permiteMasOc = (bool) $request->input('permite_mas_oc');
 
         // Advertir si la SICD ya está ingresada en el sistema (tiene detalles)
         if ($codigoSicd && !$request->boolean('confirmar_duplicado')) {
@@ -739,18 +741,20 @@ class AdminController extends Controller
 
             if ($sicd) {
                 $sicd->fill([
-                    'boleta_id'   => $boletaId,
-                    'descripcion' => $descripcion,
-                    'estado'      => $vincularOc ? 'pendiente' : 'recibido',
-                    'usuario_id'  => Auth::id(),
+                    'boleta_id'      => $boletaId,
+                    'descripcion'    => $descripcion,
+                    'estado'         => $vincularOc ? 'pendiente' : 'recibido',
+                    'permite_mas_oc' => $permiteMasOc,
+                    'usuario_id'     => Auth::id(),
                 ])->save();
             } else {
                 $sicd = Sicd::create([
-                    'codigo_sicd' => $codigoSicd,
-                    'boleta_id'   => $boletaId,
-                    'descripcion' => $descripcion,
-                    'estado'      => $vincularOc ? 'pendiente' : 'recibido',
-                    'usuario_id'  => Auth::id(),
+                    'codigo_sicd'    => $codigoSicd,
+                    'boleta_id'      => $boletaId,
+                    'descripcion'    => $descripcion,
+                    'estado'         => $vincularOc ? 'pendiente' : 'recibido',
+                    'permite_mas_oc' => $permiteMasOc,
+                    'usuario_id'     => Auth::id(),
                 ]);
             }
         }
@@ -759,14 +763,14 @@ class AdminController extends Controller
 
         DB::transaction(function () use ($request, $sicd, $codigoSicd, $ccIdManual, $vincularOc) {
             foreach ($request->items_manual as $item) {
-                $producto     = Producto::findOrFail($item['producto_id']);
+                $producto     = Producto::withoutGlobalScopes()->findOrFail($item['producto_id']);
                 $cantidad     = (int) $item['cantidad'];
                 $unidad       = trim($item['unidad'] ?? '') ?: null;
                 $motivo       = trim($item['motivo'] ?? '') ?: ($codigoSicd ? "Carga manual – SICD {$codigoSicd}" : 'Carga manual de inventario');
                 $contenedorId = isset($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
 
                 if (!$vincularOc && $contenedorId && $contenedorId !== $producto->contenedor) {
-                    $enDestino = Producto::where('nombre', $producto->nombre)
+                    $enDestino = Producto::withoutGlobalScopes()->where('nombre', $producto->nombre)
                         ->where('contenedor', $contenedorId)
                         ->first();
                     if ($enDestino) {
@@ -825,6 +829,19 @@ class AdminController extends Controller
                     ]);
                 } else {
                     $producto->save();
+                }
+
+                if ($precioNeto && $precioNeto > 0) {
+                    Precio::registrar(
+                        producto:   $producto,
+                        precioNeto: $precioNeto,
+                        cantidad:   $cantidad,
+                        fuente:     $sicd ? 'sicd_manual' : 'manual',
+                        origenId:   $sicd?->id,
+                        origenTipo: $sicd ? 'Sicd' : null,
+                        precioTotal: $precioTotal,
+                        notas:      $codigoSicd ? "SICD {$codigoSicd}" : 'Carga manual',
+                    );
                 }
             }
         });

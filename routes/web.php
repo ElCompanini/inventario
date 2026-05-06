@@ -73,6 +73,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/sicd/resolver-conflictos', [SicdController::class, 'resolver'])->name('sicd.resolver');
     Route::post('/sicd/confirmar', [SicdController::class, 'confirmar'])->name('sicd.confirmar');
     Route::get('/sicd/buscar-por-codigo', [SicdController::class, 'buscarPorCodigo'])->name('sicd.buscar-por-codigo');
+    Route::get('/sicd/estados-externos', [SicdController::class, 'estadosExternos'])->name('sicd.estados-externos');
     Route::post('/sicd/crear-y-enlazar', [SicdController::class, 'crearYEnlazar'])->name('sicd.crear-y-enlazar');
     Route::post('/sicd/{id}/enlazar-pdf', [SicdController::class, 'enlazarPdf'])->name('sicd.enlazar-pdf');
     Route::put('/sicd/{id}/detalles', [SicdController::class, 'updateDetalles'])->name('sicd.detalles.update');

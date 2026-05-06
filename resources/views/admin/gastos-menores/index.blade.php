@@ -478,7 +478,7 @@ function gmRenderFila(idx, id, nombre) {
         + '</td>'
         + '<td style="padding:0.4rem 0.3rem;text-align:center;">'
         + '<button type="button" onclick="gmQuitar(' + idx + ')" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;">✕</button>'
-        + '</td>';
+        + '</td>';ddddddddddd
     tbody.appendChild(tr);
 }
 

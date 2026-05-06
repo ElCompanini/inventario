@@ -84,9 +84,7 @@
                                                data-detid="{{ $det->id }}"
                                                value="{{ old("recibido.{$det->id}", $det->cantidad_solicitada) }}"
                                                min="0"
-                                               {{ !$det->producto ? 'disabled' : '' }}
-                                               class="input-recibido w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400
-                                                      {{ !$det->producto ? 'bg-gray-100 text-gray-400' : '' }}">
+                                               class="input-recibido w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                         @error("recibido.{$det->id}")
                                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                         @enderror

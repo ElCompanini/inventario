@@ -24,6 +24,7 @@
 <form id="form-nueva-oc" method="POST" action="{{ route('admin.ordenes.store') }}" enctype="multipart/form-data">
     @csrf
     <input type="hidden" id="hidden-numero-oc" name="numero_oc">
+    <input type="hidden" name="permite_mas_oc" id="hidden-permite-mas-oc" value="0">
 
     <div class="grid grid-cols-12 gap-6">
 
@@ -53,7 +54,12 @@
                                    onchange="onSicdChange()"
                                    class="mt-0.5 w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-mono font-semibold text-indigo-700">{{ $sicd->codigo_sicd }}</p>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <p class="text-sm font-mono font-semibold text-indigo-700">{{ $sicd->codigo_sicd }}</p>
+                                    @if($sicd->permite_mas_oc)
+                                        <span style="font-size:0.65rem; font-weight:700; padding:1px 7px; border-radius:9999px; background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; white-space:nowrap;">+ OC</span>
+                                    @endif
+                                </div>
                                 <p class="text-xs text-gray-400 mt-0.5">
                                     {{ $sicd->detalles->count() }} producto(s) ·
                                     {{ $sicd->created_at->format('d/m/Y') }} · {{ $sicd->usuario->name }}
@@ -136,6 +142,9 @@
 
     </div>
 
+    {{-- Feedback visual más OC --}}
+    <div id="mas-oc-feedback" style="display:none; margin-top:1rem; padding:0.6rem 1rem; border-radius:0.5rem; font-size:0.8rem; font-weight:600;"></div>
+
     {{-- Footer --}}
     <div class="mt-5 flex items-center justify-between">
         <a href="{{ route('admin.ordenes.index') }}"
@@ -144,7 +153,7 @@
         </a>
         <div class="flex items-center gap-3">
             <p id="submit-hint" class="text-xs text-gray-400"></p>
-            <button type="submit" id="btn-submit-oc" disabled
+            <button type="button" id="btn-submit-oc" disabled onclick="abrirModalMasOc()"
                     style="padding:0.6rem 1.75rem; font-size:0.875rem; font-weight:700;
                            color:#fff; background:#9ca3af; border:none; border-radius:0.75rem;
                            cursor:not-allowed; opacity:0.7; transition:background .2s;">
@@ -153,11 +162,49 @@
         </div>
     </div>
 </form>
+
+{{-- Modal: ¿más OCs? --}}
+<div id="modal-mas-oc"
+     style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 60px rgba(0,0,0,0.25); width:100%; max-width:420px; animation:masOcIn .22s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="padding:1.5rem 1.5rem 1rem;">
+            <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.9rem;">
+                <div style="width:2.5rem; height:2.5rem; border-radius:9999px; background:#eff6ff; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <svg style="width:1.2rem;height:1.2rem;" fill="none" stroke="#2563eb" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-3-3v6M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p style="font-size:1rem; font-weight:700; color:#111827; margin:0;">¿Se asociarán más OC a estos SICDs?</p>
+                    <p style="font-size:0.78rem; color:#6b7280; margin:0.15rem 0 0;">Esto determina si los SICDs quedarán disponibles para futuras Órdenes de Compra.</p>
+                </div>
+            </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; padding:0 1.5rem 1.5rem;">
+            <button type="button" onclick="confirmarMasOc(false)"
+                    style="padding:0.75rem; font-size:0.85rem; font-weight:600; color:#374151; background:#f3f4f6; border:2px solid #e5e7eb; border-radius:0.75rem; cursor:pointer; transition:all .15s; text-align:center;"
+                    onmouseover="this.style.background='#e5e7eb'; this.style.borderColor='#d1d5db';"
+                    onmouseout="this.style.background='#f3f4f6'; this.style.borderColor='#e5e7eb';">
+                <span style="display:block; font-size:1.25rem; margin-bottom:0.2rem;">🔒</span>
+                No, solo esta OC
+            </button>
+            <button type="button" onclick="confirmarMasOc(true)"
+                    style="padding:0.75rem; font-size:0.85rem; font-weight:600; color:#166534; background:#f0fdf4; border:2px solid #bbf7d0; border-radius:0.75rem; cursor:pointer; transition:all .15s; text-align:center;"
+                    onmouseover="this.style.background='#dcfce7'; this.style.borderColor='#86efac';"
+                    onmouseout="this.style.background='#f0fdf4'; this.style.borderColor='#bbf7d0';">
+                <span style="display:block; font-size:1.25rem; margin-bottom:0.2rem;">➕</span>
+                Sí, habrá más OCs
+            </button>
+        </div>
+    </div>
+</div>
+
 @endif
 
 @push('head')
 <style>
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes masOcIn { from { opacity:0; transform:scale(.93) translateY(-10px); } to { opacity:1; transform:none; } }
 </style>
 @endpush
 
@@ -189,6 +236,41 @@ function onSicdChange() {
     const badge = $el('badge-sicd-count');
     if (badge) badge.textContent = ids.length > 0 ? ids.length + ' seleccionado' + (ids.length > 1 ? 's' : '') : '';
     actualizarSubmit();
+}
+
+function abrirModalMasOc() {
+    document.getElementById('modal-mas-oc').style.display = 'flex';
+}
+
+function confirmarMasOc(masOc) {
+    document.getElementById('modal-mas-oc').style.display = 'none';
+    document.getElementById('hidden-permite-mas-oc').value = masOc ? '1' : '0';
+
+    var fb = document.getElementById('mas-oc-feedback');
+    if (masOc) {
+        fb.style.display    = '';
+        fb.style.background = '#f0fdf4';
+        fb.style.border     = '1px solid #bbf7d0';
+        fb.style.color      = '#166534';
+        fb.innerHTML = '➕ Los SICDs seleccionados quedarán disponibles para futuras Órdenes de Compra.';
+    } else {
+        fb.style.display    = '';
+        fb.style.background = '#f9fafb';
+        fb.style.border     = '1px solid #e5e7eb';
+        fb.style.color      = '#6b7280';
+        fb.innerHTML = '🔒 Solo esta OC será asociada a los SICDs seleccionados.';
+    }
+
+    // Vaciar la cola y esperar a que termine cualquier fetch en vuelo antes de enviar
+    _apiQueue = [];
+    function enviarCuandoLibre() {
+        if (!_apiRunning) {
+            document.getElementById('form-nueva-oc').submit();
+        } else {
+            setTimeout(enviarCuandoLibre, 150);
+        }
+    }
+    enviarCuandoLibre();
 }
 
 // ─── Agregar código ─────────────────────────────────────────────────────────
@@ -641,17 +723,19 @@ function actualizarSubmit() {
     }
 }
 
-// ─── Estado API ───────────────────────────────────────────────────────────
-fetch(RUTA_API_STATUS, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        var badge = $el('mp-api-badge');
-        if (badge) {
-            badge.textContent = data.activa ? '● API MP activa' : '● API MP inactiva';
-            badge.className   = 'text-xs font-medium px-2.5 py-1 rounded-full ' + (data.activa ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600');
-        }
-    })
-    .catch(function() {});
+// ─── Estado API (con delay para no colisionar con validaciones en vuelo) ───
+setTimeout(function () {
+    fetch(RUTA_API_STATUS, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var badge = $el('mp-api-badge');
+            if (badge) {
+                badge.textContent = data.activa ? '● API MP activa' : '● API MP inactiva';
+                badge.className   = 'text-xs font-medium px-2.5 py-1 rounded-full ' + (data.activa ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600');
+            }
+        })
+        .catch(function() {});
+}, 3000);
 
 // ─── Init ────────────────────────────────────────────────────────────────
 actualizarSubmit();

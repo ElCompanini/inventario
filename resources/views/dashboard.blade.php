@@ -715,7 +715,9 @@
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">— Selecciona un container —</option>
                         @foreach($containers as $c)
-                        <option value="{{ $c->id }}" class="opcion-traslado-destino">{{ $c->nombre }}</option>
+                        <option value="{{ $c->id }}" class="opcion-traslado-destino">
+                            {{ $c->nombre }}{{ $c->centroCosto ? ' — ' . $c->centroCosto->acronimo : '' }}
+                        </option>
                         @endforeach
                     </select>
                 </div>
@@ -1107,30 +1109,6 @@ function escHtmlGm(str) {
                 @csrf
                 <div style="padding:1.25rem; display:flex; flex-direction:column; gap:1rem;">
 
-                    @if(session('sicd_duplicada'))
-                    @php $dup = session('sicd_duplicada'); @endphp
-                    <div style="background:#fffbeb; border:1.5px solid #f59e0b; border-radius:0.6rem; padding:0.75rem 1rem;">
-                        <div style="display:flex; align-items:flex-start; gap:0.6rem;">
-                            <svg style="width:18px;height:18px;flex-shrink:0;margin-top:1px;color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                            </svg>
-                            <div style="flex:1;">
-                                <p style="font-size:0.82rem; font-weight:700; color:#92400e; margin:0 0 0.2rem;">
-                                    La SICD <strong>{{ $dup['codigo'] }}</strong> ya fue ingresada al sistema
-                                </p>
-                                <p style="font-size:0.75rem; color:#b45309; margin:0 0 0.55rem;">
-                                    Estado actual: <strong>{{ $dup['estado'] }}</strong>
-                                </p>
-                                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                                    <a href="{{ $dup['url'] }}" target="_blank"
-                                       style="font-size:0.78rem; font-weight:600; background:#d97706; color:#fff; padding:4px 14px; border-radius:6px; text-decoration:none;">
-                                        Ver SICD ingresada
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    @endif
 
                     {{-- Selector de tipo --}}
                     <div>
@@ -1141,8 +1119,13 @@ function escHtmlGm(str) {
                             style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.65rem; font-size:0.8rem; box-sizing:border-box; background:#fff;"
                             onchange="aiCambiarTipo(this.value)">
                             <option value="">— Selecciona el tipo de ingreso —</option>
-                            <option value="local">Local (Boleta de compra)</option>
-                            <option value="externa">Externa (Documento SICD)</option>
+                            <optgroup label="Licitación">
+                                <option value="licitacion">Licitación</option>
+                            </optgroup>
+                            <optgroup label="Gasto Menor">
+                                <option value="externa">Externa (Documento SICD)</option>
+                                <option value="local">Local (Boleta de compra)</option>
+                            </optgroup>
                         </select>
                     </div>
 
@@ -1211,7 +1194,8 @@ function escHtmlGm(str) {
                                         <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Producto</th>
                                         <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:70px;">Cant.</th>
                                         <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:110px;">Monto ($)</th>
-                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:120px;">P. Neto s/IVA</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:110px;">P. Neto s/IVA</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:110px;">Total Neto</th>
                                         <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; width:140px;">Contenedor</th>
                                         <th style="padding:0.4rem 0.6rem; width:36px;"></th>
                                     </tr>
@@ -1241,23 +1225,12 @@ function escHtmlGm(str) {
                             <input type="text" name="codigo_sicd" id="ai-codigo-sicd" placeholder="Ej: TIC(S)/81"
                                 style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
                             <span id="ai-codigo-hint" style="font-size:0.7rem; margin-top:0.35rem; display:flex; align-items:center; gap:0.3rem;"></span>
-                            {{-- Advertencia: SICD ya ingresada en el sistema interno --}}
-                            <div id="ai-sicd-ya-ingresada" style="display:none; margin-top:0.5rem; background:#fffbeb; border:1.5px solid #f59e0b; border-radius:0.5rem; padding:0.6rem 0.75rem;">
-                                <div style="display:flex; align-items:flex-start; gap:0.5rem;">
-                                    <svg style="width:16px;height:16px;flex-shrink:0;margin-top:1px;color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                                    </svg>
-                                    <div style="flex:1; min-width:0;">
-                                        <p style="font-size:0.78rem; font-weight:700; color:#92400e; margin:0 0 0.2rem;">Esta SICD ya fue ingresada al sistema</p>
-                                        <p id="ai-sicd-ya-estado" style="font-size:0.72rem; color:#b45309; margin:0 0 0.45rem;"></p>
-                                        <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
-                                            <a id="ai-sicd-ya-ver" href="#" target="_blank"
-                                               style="font-size:0.72rem; font-weight:600; background:#d97706; color:#fff; padding:3px 12px; border-radius:5px; text-decoration:none; white-space:nowrap;">
-                                                Ver SICD ingresada
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
+                            {{-- Advertencia leve: SICD ya ingresada --}}
+                            <div id="ai-sicd-ya-ingresada" style="display:none; margin-top:0.4rem; background:#fffbeb; border:1px solid #fcd34d; border-radius:0.4rem; padding:0.4rem 0.65rem; align-items:center; gap:0.5rem;">
+                                <svg style="width:14px;height:14px;flex-shrink:0;color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                                </svg>
+                                <span style="font-size:0.72rem; color:#92400e; font-weight:500;">Esta SICD ya fue ingresada · Estado: <strong id="ai-sicd-ya-estado-leve"></strong></span>
                             </div>
                             <div id="ai-sicd-info" style="display:none; margin-top:0.4rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.4rem; padding:0.35rem 0.6rem; font-size:0.72rem; color:#166534;"></div>
                         </div>
@@ -1269,6 +1242,34 @@ function escHtmlGm(str) {
                             <textarea name="descripcion" id="ai-descripcion" rows="2" maxlength="500"
                                 placeholder="Notas o descripción del documento SICD..."
                                 style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; resize:vertical;"></textarea>
+                        </div>
+
+                        {{-- Datos de boleta (ocultos para Licitación) --}}
+                        <div id="ai-ext-boleta-datos">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+                                <div>
+                                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                        RUT Proveedor <span style="color:#ef4444;">*</span>
+                                    </label>
+                                    <input type="text" name="rut_proveedor" id="ai-ext-rut" placeholder="Ej: 12.345.678-9"
+                                        style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                        Folio <span style="color:#ef4444;">*</span>
+                                    </label>
+                                    <input type="text" name="folio" id="ai-ext-folio" placeholder="Ej: 001234"
+                                        style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                                </div>
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Fecha y hora de emisión <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="datetime-local" name="fecha_emision" id="ai-ext-fecha"
+                                    max="{{ date('Y-m-d\TH:i') }}"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                            </div>
                         </div>
 
                         {{-- Separador con selector de método de carga --}}
@@ -1317,15 +1318,7 @@ function escHtmlGm(str) {
                                 <input type="file" name="boleta_sicd" id="ai-boleta-masiva-input" accept=".pdf,.jpg,.jpeg,.png"
                                     style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
                             </div>
-                            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; padding:0.5rem 0.65rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.5rem;">
-                                <input type="checkbox" name="vincular_oc" id="ai-vincular-oc" value="1"
-                                    onchange="aiToggleBoleta('masiva')"
-                                    style="width:1rem; height:1rem; accent-color:#16a34a; cursor:pointer;">
-                                <span style="font-size:0.78rem; font-weight:600; color:#166534;">
-                                    Continuar con asignación a Orden de Compra
-                                </span>
-                                <span style="font-size:0.72rem; color:#4ade80; margin-left:auto;">Opcional</span>
-                            </label>
+                            <input type="checkbox" name="vincular_oc" id="ai-vincular-oc" value="1" style="display:none;">
                         </div>
 
                         {{-- Panel Carga manual --}}
@@ -1365,15 +1358,7 @@ function escHtmlGm(str) {
                             <p id="ai-sin-items-manual" style="font-size:0.75rem; color:#9ca3af; text-align:center; display:none;">
                                 Agrega al menos un producto para continuar.
                             </p>
-                            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; padding:0.5rem 0.65rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.5rem;">
-                                <input type="checkbox" name="vincular_oc_manual" id="ai-vincular-oc-manual" value="1"
-                                    onchange="aiToggleBoleta('manual')"
-                                    style="width:1rem; height:1rem; accent-color:#16a34a; cursor:pointer;">
-                                <span style="font-size:0.78rem; font-weight:600; color:#166534;">
-                                    Continuar con asignación a Orden de Compra
-                                </span>
-                                <span style="font-size:0.72rem; color:#4ade80; margin-left:auto;">Opcional</span>
-                            </label>
+                            <input type="checkbox" name="vincular_oc_manual" id="ai-vincular-oc-manual" value="1" style="display:none;">
                         </div>
 
                     </div>
@@ -1399,6 +1384,48 @@ function escHtmlGm(str) {
                 </div>
             </form>
 
+            {{-- Modal SICD ya ingresada --}}
+            <div id="ai-modal-dup" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.55); border-radius:1rem; z-index:20; align-items:center; justify-content:center;">
+                <div style="background:#fff; border-radius:1rem; padding:2rem; max-width:460px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,0.3); animation:dupIn .25s cubic-bezier(.22,.68,0,1.2) both;">
+                    {{-- Icono + título --}}
+                    <div style="text-align:center; margin-bottom:1.25rem;">
+                        <div style="width:3.5rem; height:3.5rem; border-radius:9999px; background:#fef3c7; display:flex; align-items:center; justify-content:center; margin:0 auto 0.75rem;">
+                            <svg style="width:1.75rem;height:1.75rem;" fill="none" stroke="#d97706" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                            </svg>
+                        </div>
+                        <p style="font-size:1.05rem; font-weight:700; color:#1e293b; margin:0;">SICD ya ingresada en el sistema</p>
+                        <p style="font-size:0.82rem; color:#6b7280; margin:0.3rem 0 0;">Código: <strong id="ai-dup-codigo" style="color:#4f46e5; font-family:monospace;"></strong></p>
+                    </div>
+                    {{-- Cuerpo --}}
+                    <div style="background:#fffbeb; border:1px solid #fcd34d; border-radius:0.625rem; padding:0.9rem 1rem; margin-bottom:1.25rem;">
+                        <p style="font-size:0.85rem; color:#374151; margin:0 0 0.4rem; line-height:1.6;">
+                            Esta SICD <strong>no puede ingresarse nuevamente</strong> porque ya existe en el sistema.
+                        </p>
+                        <p style="font-size:0.82rem; color:#92400e; margin:0 0 0.6rem;">
+                            Estado actual: <strong id="ai-dup-estado"></strong>
+                        </p>
+                        <p style="font-size:0.82rem; color:#374151; margin:0; line-height:1.5;">
+                            Si deseas <strong>agregar, editar o eliminar productos</strong> de esta SICD, puedes hacerlo desde el apartado de la SICD usando el botón <strong>"Ir a SICD"</strong>.
+                        </p>
+                    </div>
+                    {{-- Botones --}}
+                    <div style="display:flex; gap:0.6rem; justify-content:flex-end;">
+                        <button type="button" onclick="document.getElementById('ai-modal-dup').style.display='none';"
+                                style="padding:0.55rem 1.1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:0.5rem; cursor:pointer; transition:background .15s;"
+                                onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">
+                            Cerrar
+                        </button>
+                        <a id="ai-dup-ir-btn" href="#" target="_blank"
+                           style="padding:0.55rem 1.25rem; font-size:0.875rem; font-weight:600; color:#fff; background:#4f46e5; border-radius:0.5rem; text-decoration:none; display:inline-flex; align-items:center; gap:0.5rem; transition:background .15s;"
+                           onmouseover="this.style.background='#4338ca'" onmouseout="this.style.background='#4f46e5'">
+                            <svg style="width:1rem;height:1rem;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                            Ir a SICD
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             {{-- Confirmación salida con SICD enlazado --}}
             <div id="ai-confirm-salida" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.45); border-radius:1rem; z-index:10; align-items:center; justify-content:center;">
                 <div style="background:#fff; border-radius:0.75rem; padding:1.5rem; max-width:360px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.2); text-align:center;">
@@ -1423,6 +1450,7 @@ function escHtmlGm(str) {
 @push('head')
 <style>
     @keyframes traslado-in { from { opacity:0; transform:scale(.94); } to { opacity:1; transform:scale(1); } }
+    @keyframes dupIn { from { opacity:0; transform:scale(.92) translateY(-16px); } to { opacity:1; transform:none; } }
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes ai-spin { to { transform: rotate(360deg); } }
     @keyframes btn-breathe-green { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.7)} 50%{box-shadow:0 0 0 6px rgba(22,163,74,0)} }
@@ -1973,6 +2001,9 @@ window.addEventListener('DOMContentLoaded', function() {
 @endif
 
 var _aiSicdEnlazadoId = null;
+var _aiSicdDupUrl     = null;
+var _aiSicdDupEstado  = null;
+var _aiSicdDupCodigo  = null;
 
 (function() {
     var csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -2119,14 +2150,35 @@ function aiCambiarTipo(tipo) {
     var local = document.getElementById('ai-seccion-local');
     var externa = document.getElementById('ai-seccion-externa');
     local.style.display = (tipo === 'local') ? 'flex' : 'none';
-    externa.style.display = (tipo === 'externa') ? 'flex' : 'none';
+    externa.style.display = (tipo === 'externa' || tipo === 'licitacion') ? 'flex' : 'none';
+
+    var boletaDatos  = document.getElementById('ai-ext-boleta-datos');
+    var chkMasiva    = document.getElementById('ai-vincular-oc');
+    var chkManual    = document.getElementById('ai-vincular-oc-manual');
+    var boletaMasiva = document.getElementById('ai-boleta-masiva');
+    var boletaManual = document.getElementById('ai-boleta-manual');
+
+    if (tipo === 'licitacion') {
+        if (boletaDatos)  boletaDatos.style.display  = 'none';
+        if (chkMasiva)    { chkMasiva.checked = true;  }
+        if (chkManual)    { chkManual.checked = true;  }
+        if (boletaMasiva) boletaMasiva.style.display  = 'none';
+        if (boletaManual) boletaManual.style.display  = 'none';
+    } else if (tipo === 'externa') {
+        if (boletaDatos)  boletaDatos.style.display  = '';
+        if (chkMasiva)    { chkMasiva.checked = false; }
+        if (chkManual)    { chkManual.checked = false; }
+        if (boletaMasiva) boletaMasiva.style.display  = 'flex';
+        if (boletaManual) boletaManual.style.display  = 'flex';
+    }
+
     var btn = document.getElementById('ai-btn-submit');
     if (tipo === 'local') {
         btn.disabled = false;
         btn.style.background = '#d97706';
         btn.style.cursor = 'pointer';
         btn.textContent = 'Registrar compra local';
-    } else if (tipo === 'externa') {
+    } else if (tipo === 'externa' || tipo === 'licitacion') {
         aiActualizarBtnExterna(aiMetodoCargaActual);
     } else {
         btn.disabled = true;
@@ -2152,6 +2204,15 @@ function aiEnviar() {
     var tipo = document.getElementById('ai-tipo').value;
     if (!tipo) { aiError('Selecciona el tipo de ingreso.'); return; }
 
+    // Bloquear envío si la SICD ya está ingresada
+    if (tipo === 'externa' && _aiSicdDupUrl) {
+        document.getElementById('ai-dup-codigo').textContent  = _aiSicdDupCodigo || '';
+        document.getElementById('ai-dup-estado').textContent  = _aiSicdDupEstado || '—';
+        document.getElementById('ai-dup-ir-btn').href         = _aiSicdDupUrl;
+        document.getElementById('ai-modal-dup').style.display = 'flex';
+        return;
+    }
+
     if (tipo === 'local') {
         var rut = document.getElementById('ai-rut').value.trim();
         var folio = document.getElementById('ai-folio').value.trim();
@@ -2163,7 +2224,15 @@ function aiEnviar() {
         if (!doc)   { aiError('La boleta PDF es obligatoria.'); return; }
         if (aiItems.length === 0) { aiError('Agrega al menos un producto.', 'ai-buscador'); return; }
         aiForm.action = aiUrlLocal;
-    } else if (tipo === 'externa') {
+    } else if (tipo === 'externa' || tipo === 'licitacion') {
+        if (tipo === 'externa') {
+            var extRut   = document.getElementById('ai-ext-rut').value.trim();
+            var extFolio = document.getElementById('ai-ext-folio').value.trim();
+            var extFecha = document.getElementById('ai-ext-fecha').value;
+            if (!extRut)   { aiError('El RUT del proveedor es obligatorio.', 'ai-ext-rut'); return; }
+            if (!extFolio) { aiError('El folio es obligatorio.', 'ai-ext-folio'); return; }
+            if (!extFecha) { aiError('La fecha de emisión es obligatoria.', 'ai-ext-fecha'); return; }
+        }
         var codigoSicd = document.getElementById('ai-codigo-sicd').value.trim();
         if (!codigoSicd) {
             aiError('El código SICD es obligatorio.', 'ai-codigo-sicd');
@@ -2192,13 +2261,31 @@ function aiEnviar() {
         }
     }
 
-    // Deshabilitar el input de boleta del panel inactivo para que no pise el del panel activo
-    if (aiMetodoCargaActual === 'masiva') {
-        var inactivo = document.getElementById('ai-boleta-manual-input');
-        if (inactivo) inactivo.disabled = true;
+    // Deshabilitar todos los inputs del panel inactivo para que no pisen los del activo
+    var tipo = document.getElementById('ai-tipo').value;
+    if (tipo === 'local') {
+        // Deshabilitar campos de la sección externa que tienen el mismo name
+        ['ai-ext-rut', 'ai-ext-folio', 'ai-ext-fecha',
+         'ai-boleta-masiva-input', 'ai-boleta-manual-input',
+         'ai-codigo-sicd', 'ai-descripcion',
+         'ai-vincular-oc', 'ai-vincular-oc-manual'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.disabled = true;
+        });
     } else {
-        var inactivo = document.getElementById('ai-boleta-masiva-input');
-        if (inactivo) inactivo.disabled = true;
+        // Deshabilitar campos de la sección local
+        ['ai-rut', 'ai-folio', 'ai-fecha', 'ai-doc'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.disabled = true;
+        });
+        // Deshabilitar boleta del panel inactivo
+        if (aiMetodoCargaActual === 'masiva') {
+            var inactivo = document.getElementById('ai-boleta-manual-input');
+            if (inactivo) inactivo.disabled = true;
+        } else {
+            var inactivo = document.getElementById('ai-boleta-masiva-input');
+            if (inactivo) inactivo.disabled = true;
+        }
     }
 
     sessionStorage.removeItem('ai_sicd_pending');
@@ -2210,7 +2297,7 @@ function aiEnviar() {
 // Envío cuando el usuario confirma un duplicado desde el banner de sesión
 document.getElementById('form-agregar-inv').addEventListener('submit-confirmed', function() {
     var tipo = document.getElementById('ai-tipo').value;
-    if (tipo === 'externa') {
+    if (tipo === 'externa' || tipo === 'licitacion') {
         if (aiMetodoCargaActual === 'masiva') {
             aiForm.action = aiUrlMasiva;
         } else {
@@ -2385,22 +2472,27 @@ function aiValidarCodigo(codigo) {
                 document.getElementById('ai-codigo-sicd').style.borderColor = '#16a34a';
 
                 // Verificar si esta SICD ya existe en el sistema interno
-                var advertenciaEl  = document.getElementById('ai-sicd-ya-ingresada');
-                var advertenciaOk  = false;
+                _aiSicdDupUrl    = null;
+                _aiSicdDupEstado = null;
+                _aiSicdDupCodigo = null;
                 fetch('{{ route("admin.sicd.buscar-por-codigo") }}?codigo=' + encodeURIComponent(codigoFinal))
                     .then(function(r) { return r.json(); })
                     .then(function(interno) {
+                        var warnEl = document.getElementById('ai-sicd-ya-ingresada');
                         if (interno.encontrado && interno.tiene_detalles) {
                             var estadosLabel = { recibido:'Recibida', pendiente:'Pendiente / En OC' };
-                            var estadoText   = estadosLabel[interno.estado] || interno.estado || '—';
-                            document.getElementById('ai-sicd-ya-estado').textContent = 'Estado: ' + estadoText;
-                            document.getElementById('ai-sicd-ya-ver').href = interno.url;
-                            advertenciaEl.style.display = 'block';
+                            _aiSicdDupUrl    = interno.url;
+                            _aiSicdDupEstado = estadosLabel[interno.estado] || interno.estado || '—';
+                            _aiSicdDupCodigo = codigoFinal;
+                            var leve = document.getElementById('ai-sicd-ya-estado-leve');
+                            if (leve) leve.textContent = _aiSicdDupEstado;
+                            if (warnEl) warnEl.style.display = 'flex';
                         } else {
-                            advertenciaEl.style.display = 'none';
+                            _aiSicdDupUrl = null; _aiSicdDupEstado = null; _aiSicdDupCodigo = null;
+                            if (warnEl) warnEl.style.display = 'none';
                         }
                     })
-                    .catch(function() { advertenciaEl.style.display = 'none'; });
+                    .catch(function() { _aiSicdDupUrl = null; if (document.getElementById('ai-sicd-ya-ingresada')) document.getElementById('ai-sicd-ya-ingresada').style.display = 'none'; });
 
                 info.style.display = 'block';
                 var sicdEstadoLabels = {
@@ -2517,7 +2609,7 @@ function aiValidarCodigo(codigo) {
 }
 
 function aiOcultarAdvertenciaSicd() {
-    document.getElementById('ai-sicd-ya-ingresada').style.display = 'none';
+    _aiSicdDupUrl = null; _aiSicdDupEstado = null; _aiSicdDupCodigo = null;
 }
 
 document.getElementById('ai-codigo-sicd').addEventListener('input', function() {
@@ -2525,7 +2617,9 @@ document.getElementById('ai-codigo-sicd').addEventListener('input', function() {
     this.style.borderColor = '#d1d5db';
     document.getElementById('ai-codigo-hint').innerHTML = '';
     document.getElementById('ai-sicd-info').style.display = 'none';
-    document.getElementById('ai-sicd-ya-ingresada').style.display = 'none';
+    _aiSicdDupUrl = null; _aiSicdDupEstado = null; _aiSicdDupCodigo = null;
+    var warnEl = document.getElementById('ai-sicd-ya-ingresada');
+    if (warnEl) warnEl.style.display = 'none';
     aiSicdValido = false;
     clearTimeout(aiSicdValidTimer);
     if (codigo.length >= 3) {
@@ -2731,16 +2825,21 @@ function aiRenderFila(idx, id, nombre) {
         + '<span style="font-size:0.8rem;font-weight:500;color:#1f2937;">' + escHtmlAi(nombre) + '</span>'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" name="items[' + idx + '][cantidad]" value="1" min="1"'
+        + '<input type="number" id="ai-cant-' + idx + '" name="items[' + idx + '][cantidad]" value="1" min="1"'
+        + ' oninput="aiRecalcTotal(' + idx + ')"'
         + ' style="width:60px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
         + '<input type="number" name="items[' + idx + '][monto]" placeholder="0" min="0" step="1"'
-        + ' style="width:95px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + ' style="width:90px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" name="items[' + idx + '][precio_neto]" placeholder="0" min="0" step="1"'
-        + ' style="width:105px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '<input type="number" id="ai-pneto-' + idx + '" name="items[' + idx + '][precio_neto]" placeholder="0" min="0" step="1"'
+        + ' oninput="aiRecalcTotal(' + idx + ')"'
+        + ' style="width:95px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.6rem;text-align:center;">'
+        + '<span id="ai-tneto-' + idx + '" style="font-size:0.8rem;font-weight:600;color:#111827;">—</span>'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;">'
         + '<select name="items[' + idx + '][contenedor_id]"'
@@ -2751,6 +2850,21 @@ function aiRenderFila(idx, id, nombre) {
         + '<button type="button" onclick="aiQuitar(' + idx + ')" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;">&#x2715;</button>'
         + '</td>';
     tbody.appendChild(tr);
+}
+
+function aiRecalcTotal(idx) {
+    var cant  = parseFloat(document.getElementById('ai-cant-' + idx)?.value)  || 0;
+    var pneto = parseFloat(document.getElementById('ai-pneto-' + idx)?.value) || 0;
+    var span  = document.getElementById('ai-tneto-' + idx);
+    if (!span) return;
+    if (cant > 0 && pneto > 0) {
+        var total = cant * pneto;
+        span.textContent = '$' + total.toLocaleString('es-CL');
+        span.style.color = '#111827';
+    } else {
+        span.textContent = '—';
+        span.style.color = '#9ca3af';
+    }
 }
 
 function aiQuitar(idx) {

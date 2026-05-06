@@ -8,6 +8,7 @@ use App\Models\Factura;
 use App\Models\GuiaDespacho;
 use App\Models\HistorialCambio;
 use App\Models\OrdenCompra;
+use App\Models\Precio;
 use App\Models\Sicd;
 use App\Models\SicdExterno;
 use App\Services\MercadoPublicoService;
@@ -45,7 +46,13 @@ class OrdenCompraController extends Controller
 
     public function create()
     {
-        $sicdsPendientes = Sicd::where('estado', 'pendiente')
+        $sicdsPendientes = Sicd::where(function ($q) {
+                $q->where('estado', 'pendiente')
+                  ->orWhere(function ($q2) {
+                      $q2->where('permite_mas_oc', true)
+                         ->whereNotIn('estado', ['cancelado']);
+                  });
+            })
             ->with('detalles')
             ->orderByDesc('created_at')
             ->get();
@@ -82,7 +89,9 @@ class OrdenCompraController extends Controller
             $rutaOc   = $archivo->store('documentos/oc', 'local');
         }
 
-        DB::transaction(function () use ($data, $rutaOc, $nombreOc) {
+        $permiteMasOc = $request->boolean('permite_mas_oc');
+
+        DB::transaction(function () use ($data, $rutaOc, $nombreOc, $permiteMasOc) {
             $oc = OrdenCompra::create([
                 'numero_oc'      => strtoupper(trim($data['numero_oc'])),
                 'archivo_nombre' => $nombreOc,
@@ -92,7 +101,11 @@ class OrdenCompraController extends Controller
             ]);
 
             $oc->sicds()->attach($data['sicd_ids']);
-            Sicd::whereIn('id', $data['sicd_ids'])->update(['estado' => 'agrupado']);
+
+            Sicd::whereIn('id', $data['sicd_ids'])->update([
+                'estado'         => 'agrupado',
+                'permite_mas_oc' => $permiteMasOc,
+            ]);
         });
 
         $oc = OrdenCompra::where('numero_oc', strtoupper(trim($data['numero_oc'])))->first();
@@ -243,11 +256,6 @@ class OrdenCompraController extends Controller
             return back()->with('error', 'Sube la factura antes de procesar la recepción.');
         }
 
-        if (!$oc->tieneGuia()) {
-            \Log::info('procesarRecepcion: sin guia');
-            return back()->with('error', 'Sube la guía de despacho antes de procesar la recepción.');
-        }
-
         $userName = Auth::user()->name;
         $userId   = Auth::id();
 
@@ -302,6 +310,20 @@ class OrdenCompraController extends Controller
                             'origen'       => 'sicd',
                             'origen_id'    => $sicd->id,
                         ]);
+
+                        if ($detalle->precio_neto && $detalle->precio_neto > 0) {
+                            Precio::registrar(
+                                producto:    $detalle->producto,
+                                precioNeto:  (float) $detalle->precio_neto,
+                                cantidad:    $recibido,
+                                fuente:      'sicd_masiva',
+                                origenId:    $sicd->id,
+                                origenTipo:  'Sicd',
+                                precioTotal: $detalle->total_neto ? (float) $detalle->total_neto : null,
+                                notas:       "OC {$oc->numero_oc} · SICD {$sicd->codigo_sicd}",
+                                usuarioId:   $userId,
+                            );
+                        }
                     }
                 }
 
@@ -407,7 +429,21 @@ class OrdenCompraController extends Controller
         $orden->increment('api_intentos');
 
         try {
-            $data = $mp->consultarOC($orden->numero_oc);
+            $data = null;
+            $intentos = 0;
+            while ($intentos <= 3) {
+                try {
+                    $data = $mp->consultarOC($orden->numero_oc);
+                    break;
+                } catch (\App\Exceptions\MercadoPublicoException $e) {
+                    if ($intentos < 3 && str_contains($e->getMessage(), 'simultáneas')) {
+                        $intentos++;
+                        usleep(1_000_000 * $intentos); // 1s, 2s, 3s
+                        continue;
+                    }
+                    throw $e;
+                }
+            }
 
             if (!$data) {
                 $orden->update(['api_error' => 'OC no encontrada en Mercado Público.']);
@@ -469,7 +505,7 @@ class OrdenCompraController extends Controller
     public function estadoApi()
     {
         abort_unless(auth()->user()->tienePermiso('ordenes'), 403);
-        $viva = app(MercadoPublicoService::class)->ping();
+        $viva = Cache::remember('mp_api_ping', 60, fn() => app(MercadoPublicoService::class)->ping());
         return response()->json(['activa' => $viva]);
     }
 
@@ -527,7 +563,7 @@ class OrdenCompraController extends Controller
                     if ($data['total_neto'] < $utm * 100) {
                         $tipoInfo = ['label' => 'Compra Ágil', 'icono' => '⚡', 'clase' => 'bg-green-100 text-green-800 border-green-200'];
                     } else {
-                        $tipoInfo = ['label' => 'Orden de Compra', 'icono' => '📋', 'clase' => 'bg-indigo-100 text-indigo-800 border-indigo-200'];
+                        $tipoInfo = ['label' => 'Licitación', 'icono' => '📋', 'clase' => 'bg-indigo-100 text-indigo-800 border-indigo-200'];
                     }
                 }
             }

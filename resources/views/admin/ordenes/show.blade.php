@@ -119,41 +119,96 @@
             </div>
         @endforeach
 
-        {{-- ── Estado MP cuando no hay datos ── --}}
+
+        {{-- Botón validar cuando aún no hay datos MP --}}
         @if(!$oc->api_validado_at && $oc->estado !== 'recibido')
         <div class="bg-white rounded-xl shadow overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100">
-                <h2 class="text-base font-semibold text-gray-700">Validación Mercado Público</h2>
-            </div>
-            <div class="px-5 py-6 flex flex-col items-center gap-3 text-center">
+            <div class="px-5 py-4 flex items-center gap-3">
                 @if($oc->api_error)
-                    <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-                    </svg>
-                    <p class="text-sm font-semibold text-red-700">Error al conectar con Mercado Público</p>
-                    <p class="text-xs text-gray-500">{{ $oc->api_error }}</p>
+                <div class="flex-1 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+                    <p class="font-semibold mb-0.5">Error en última validación:</p>
+                    <p>{{ $oc->api_error }}</p>
+                </div>
                 @else
-                    <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
-                    </svg>
-                    <p class="text-sm text-gray-500">Esta OC aún no ha sido validada en Mercado Público.</p>
+                <p class="text-sm text-gray-400 flex-1">Esta OC aún no ha sido validada en Mercado Público.</p>
                 @endif
-                <button onclick="validarMPShow()"
-                        class="inline-flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2 rounded-lg transition"
-                        style="background:{{ $oc->api_error ? '#dc2626' : '#4f46e5' }};"
+                <div id="mp-show-error" style="display:none;"
+                     class="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700"></div>
+                <button id="btn-validar-mp-show" onclick="validarMPShow()"
+                        style="padding:0.45rem 1rem; font-size:0.78rem; font-weight:600; color:#fff; background:{{ $oc->api_error ? '#dc2626' : '#4f46e5' }}; border:none; border-radius:0.5rem; cursor:pointer; white-space:nowrap;"
                         onmouseover="this.style.background='{{ $oc->api_error ? '#b91c1c' : '#4338ca' }}'"
                         onmouseout="this.style.background='{{ $oc->api_error ? '#dc2626' : '#4f46e5' }}'">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                    {{ $oc->api_error ? 'Reintentar' : 'Validar en Mercado Público' }}
+                    🔄 Validar en Mercado Público
                 </button>
+                <p id="mp-api-badge" class="text-xs text-gray-400 whitespace-nowrap">Verificando…</p>
             </div>
         </div>
         @endif
 
         {{-- ── Detalle de ítems Mercado Público ── --}}
         @if($oc->api_validado_at && !empty($oc->api_items))
+
+        {{-- Info MP encima de la tabla --}}
+        <div class="bg-white rounded-xl shadow overflow-hidden">
+            <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+                <h2 class="text-sm font-semibold text-gray-700 shrink-0">Mercado Público</h2>
+                <div class="flex items-center gap-2 ml-auto">
+                    <span class="text-[10px] text-gray-400 whitespace-nowrap">Validado {{ $oc->api_validado_at->format('d/m/Y H:i') }}</span>
+                    <p id="mp-api-badge" class="text-xs text-gray-400 whitespace-nowrap">Verificando…</p>
+                    @if($oc->estado !== 'recibido')
+                    <div id="mp-show-error" style="display:none;"
+                         class="bg-red-50 border border-red-200 rounded-lg px-2 py-1 text-xs text-red-700"></div>
+                    <button id="btn-validar-mp-show" onclick="validarMPShow()"
+                            style="padding:0.3rem 0.75rem; font-size:0.72rem; font-weight:600; color:#fff; background:#4f46e5; border:none; border-radius:0.4rem; cursor:pointer; white-space:nowrap;"
+                            onmouseover="this.style.background='#4338ca'"
+                            onmouseout="this.style.background='#4f46e5'">
+                        🔄 Re-validar
+                    </button>
+                    @else
+                    <div id="mp-show-error" style="display:none;"></div>
+                    @endif
+                </div>
+            </div>
+            <div class="px-5 py-3 grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                <div>
+                    <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Proveedor</p>
+                    <p class="text-gray-800 font-semibold mt-0.5">{{ $oc->api_proveedor_nombre ?? '—' }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Estado</p>
+                    <p class="text-gray-700 mt-0.5">{{ $oc->api_estado_mp ?? '—' }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">RUT</p>
+                    <p class="text-gray-700 mt-0.5">{{ $oc->api_proveedor_rut ?? '—' }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Total</p>
+                    <p class="text-green-700 font-bold mt-0.5">{{ $oc->totalFormateado() }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Tipo</p>
+                    <p class="text-gray-700 mt-0.5">{{ $oc->api_tipo ?? '—' }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Fecha envío</p>
+                    <p class="text-gray-700 mt-0.5">{{ $oc->api_fecha_envio ? \Carbon\Carbon::parse($oc->api_fecha_envio)->format('d/m/Y H:i') : '—' }}</p>
+                </div>
+                @if($oc->api_licitacion_codigo)
+                <div>
+                    <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Licitación</p>
+                    <p class="font-mono font-semibold text-indigo-600 mt-0.5">{{ $oc->api_licitacion_codigo }}</p>
+                </div>
+                @endif
+                @if($oc->api_contacto)
+                <div>
+                    <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Contacto</p>
+                    <p class="text-gray-700 mt-0.5">{{ $oc->api_contacto }}</p>
+                </div>
+                @endif
+            </div>
+        </div>
+
         <div class="bg-white rounded-xl shadow overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
@@ -220,6 +275,37 @@
 
     {{-- COLUMNA DERECHA: documentos + recepción --}}
     <div class="space-y-4">
+
+        {{-- MÁS ÓRDENES DE COMPRA --}}
+        @if($oc->sicds->contains('permite_mas_oc', true))
+        <div class="bg-white rounded-xl shadow overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+                <span style="font-size:0.9rem;">➕</span>
+                <h3 class="text-sm font-semibold text-gray-700">Más Órdenes de Compra</h3>
+                <span style="font-size:0.65rem; font-weight:700; padding:2px 8px; border-radius:9999px; background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; margin-left:auto;">+ OC habilitado</span>
+            </div>
+            <div class="px-5 py-4">
+                <p class="text-xs text-gray-500 mb-3">
+                    Los SICDs de esta OC permiten asociar más Órdenes de Compra.
+                    Al crear la nueva OC, selecciona los mismos SICDs.
+                </p>
+                <a href="{{ route('admin.ordenes.create') }}"
+                   style="display:block; width:100%; padding:0.5rem; font-size:0.8rem; font-weight:700; color:#fff; background:#4f46e5; border-radius:0.5rem; text-align:center; text-decoration:none; transition:background .15s;"
+                   onmouseover="this.style.background='#4338ca'"
+                   onmouseout="this.style.background='#4f46e5'">
+                    Crear nueva OC asociada →
+                </a>
+                <div style="margin-top:0.75rem; border-top:1px solid #f3f4f6; padding-top:0.75rem;">
+                    <p style="font-size:0.7rem; font-weight:600; color:#6b7280; margin-bottom:0.4rem;">SICDs disponibles:</p>
+                    @foreach($oc->sicds->where('permite_mas_oc', true) as $sicdOc)
+                        <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.3rem;">
+                            <span style="font-size:0.72rem; font-weight:700; color:#4f46e5; font-family:monospace;">{{ $sicdOc->codigo_sicd }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+        @endif
 
         {{-- FACTURA --}}
         <div class="bg-white rounded-xl shadow overflow-hidden">
@@ -321,137 +407,17 @@
             </div>
         </div>
 
-        {{-- MERCADO PÚBLICO --}}
-        <div class="bg-white rounded-xl shadow overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                    <h2 class="text-base font-semibold text-gray-700">Mercado Público</h2>
-                    <p id="mp-api-badge" class="text-xs text-gray-400 mt-0.5">Verificando API…</p>
-                </div>
-                @if($oc->api_validado_at)
-                    <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                @elseif($oc->api_error)
-                    <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
-                @else
-                    <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
-                @endif
-            </div>
-            <div class="px-5 py-4 space-y-3">
-
-                @if($oc->api_validado_at)
-                    <div class="space-y-2 text-xs">
-                        <div>
-                            <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Proveedor</p>
-                            <p class="text-gray-800 font-semibold mt-0.5">{{ $oc->api_proveedor_nombre ?? '—' }}</p>
-                        </div>
-                        <div class="grid grid-cols-2 gap-x-3 gap-y-2">
-                            <div>
-                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">RUT</p>
-                                <p class="text-gray-700 mt-0.5">{{ $oc->api_proveedor_rut ?? '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Estado</p>
-                                <p class="text-gray-700 mt-0.5">{{ $oc->api_estado_mp ?? '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Tipo</p>
-                                <p class="text-gray-700 mt-0.5">{{ $oc->api_tipo ?? '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Moneda</p>
-                                <p class="text-gray-700 mt-0.5">{{ $oc->api_tipo_moneda ?? '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Fecha envío</p>
-                                <p class="text-gray-700 mt-0.5">
-                                    {{ $oc->api_fecha_envio ? \Carbon\Carbon::parse($oc->api_fecha_envio)->format('d/m/Y H:i') : '—' }}
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Total</p>
-                                <p class="text-green-700 font-bold mt-0.5">{{ $oc->totalFormateado() }}</p>
-                            </div>
-                        </div>
-                        @if($oc->api_licitacion_codigo)
-                        <div>
-                            <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Licitación</p>
-                            <p class="font-mono font-semibold text-indigo-600 mt-0.5">{{ $oc->api_licitacion_codigo }}</p>
-                        </div>
-                        @endif
-                        @if($oc->api_contacto)
-                        <div>
-                            <p class="text-gray-400 uppercase tracking-wide text-[10px] font-medium">Contacto</p>
-                            <p class="text-gray-700 mt-0.5">{{ $oc->api_contacto }}</p>
-                        </div>
-                        @endif
-                    </div>
-                    <p class="text-[10px] text-gray-400">
-                        Validado {{ $oc->api_validado_at->format('d/m/Y H:i') }}
-                        @if($oc->api_intentos > 1) · {{ $oc->api_intentos }} intentos @endif
-                    </p>
-                @elseif($oc->api_error)
-                    <div class="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
-                        <p class="font-semibold mb-0.5">Error en última validación:</p>
-                        <p>{{ $oc->api_error }}</p>
-                        @if($oc->api_intentos)
-                            <p class="mt-1 text-red-400">Intentos: {{ $oc->api_intentos }}</p>
-                        @endif
-                    </div>
-                    @if($oc->estado !== 'recibido')
-                        <button onclick="validarMPShow()"
-                                style="width:100%; margin-top:0.5rem; padding:0.45rem; font-size:0.75rem; font-weight:600; color:#fff; background:#dc2626; border:none; border-radius:0.5rem; cursor:pointer;"
-                                onmouseover="this.style.background='#b91c1c'"
-                                onmouseout="this.style.background='#dc2626'">
-                            🔄 Reintentar validación
-                        </button>
-                    @endif
-                @else
-                    <p class="text-sm text-gray-400 mb-2">Esta OC aún no ha sido validada contra Mercado Público.</p>
-                    @if($oc->estado !== 'recibido')
-                        <button onclick="validarMPShow()"
-                                style="width:100%; padding:0.45rem; font-size:0.75rem; font-weight:600; color:#fff; background:#4f46e5; border:none; border-radius:0.5rem; cursor:pointer;"
-                                onmouseover="this.style.background='#4338ca'"
-                                onmouseout="this.style.background='#4f46e5'">
-                            Validar en Mercado Público
-                        </button>
-                    @endif
-                @endif
-
-                <div id="mp-show-error" style="display:none;"
-                     class="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700"></div>
-
-                @if($oc->estado !== 'recibido')
-                    <button id="btn-validar-mp-show"
-                            onclick="validarMPShow()"
-                            style="width:100%; padding:0.5rem; font-size:0.75rem; font-weight:600;
-                                   color:#fff; background:#4f46e5; border:none; border-radius:0.5rem; cursor:pointer;"
-                            onmouseover="this.style.background='#4338ca'"
-                            onmouseout="this.style.background='#4f46e5'">
-                        {{ $oc->api_validado_at ? 'Re-validar en Mercado Público' : 'Validar en Mercado Público' }}
-                    </button>
-                @endif
-            </div>
-        </div>
-
         {{-- BOTÓN RECEPCIÓN --}}
         @if($oc->estado !== 'recibido')
             @php
-                $puedeRecepcionar = $oc->factura && $oc->guia;
+                $puedeRecepcionar = (bool) $oc->factura;
             @endphp
             <div class="bg-white rounded-xl shadow p-5">
                 <h3 class="text-sm font-semibold text-gray-700 mb-3">Registrar Recepción</h3>
 
-                @if(!$oc->factura && !$oc->guia)
+                @if(!$oc->factura)
                     <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                        Sube la <strong>factura</strong> y la <strong>guía de despacho</strong> antes de registrar la recepción.
-                    </div>
-                @elseif(!$oc->factura)
-                    <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                        Falta subir la <strong>factura</strong> para continuar.
-                    </div>
-                @elseif(!$oc->guia)
-                    <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                        Falta subir la <strong>guía de despacho</strong> para continuar.
+                        Sube la <strong>factura</strong> antes de registrar la recepción.
                     </div>
                 @endif
 
@@ -472,6 +438,7 @@
                 </p>
             </div>
         @endif
+
     </div>
 
 </div>
@@ -482,23 +449,31 @@ const RUTA_VALIDAR_MP = '{{ route("admin.ordenes.validar-mp", $oc->id) }}';
 const RUTA_API_STATUS = '{{ route("admin.ordenes.api-status") }}';
 const CSRF = '{{ csrf_token() }}';
 
-// Verificar estado API al cargar
-fetch(RUTA_API_STATUS, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(r => r.json())
-    .then(data => {
-        const badge = document.getElementById('mp-api-badge');
-        if (badge) {
-            badge.textContent = data.activa ? '● API activa' : '● API inactiva';
-            badge.style.color = data.activa ? '#15803d' : '#dc2626';
-        }
-    })
-    .catch(() => {});
+let _mpValidando = false;
+
+// Verificar estado API con delay para no colisionar con validaciones en vuelo
+setTimeout(function () {
+    if (_mpValidando) return;
+    fetch(RUTA_API_STATUS, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => {
+            const badge = document.getElementById('mp-api-badge');
+            if (badge) {
+                badge.textContent = data.activa ? '● API activa' : '● API inactiva';
+                badge.style.color = data.activa ? '#15803d' : '#dc2626';
+            }
+        })
+        .catch(() => {});
+}, 3000);
 
 function validarMPShow() {
+    if (_mpValidando) return;
+    _mpValidando = true;
+
     const btn    = document.getElementById('btn-validar-mp-show');
     const errDiv = document.getElementById('mp-show-error');
     errDiv.style.display = 'none';
-    btn.disabled = true;
+    btn.disabled    = true;
     btn.textContent = 'Validando…';
 
     fetch(RUTA_VALIDAR_MP, {
@@ -515,16 +490,18 @@ function validarMPShow() {
             window.location.reload();
         } else {
             errDiv.style.display = 'block';
-            errDiv.textContent = data.mensaje || 'Error al validar.';
-            btn.disabled = false;
+            errDiv.textContent   = data.mensaje || 'Error al validar.';
+            btn.disabled    = false;
             btn.textContent = 'Reintentar validación';
+            _mpValidando    = false;
         }
     })
     .catch(() => {
         errDiv.style.display = 'block';
-        errDiv.textContent = 'Error de conexión.';
-        btn.disabled = false;
+        errDiv.textContent   = 'Error de conexión.';
+        btn.disabled    = false;
         btn.textContent = 'Validar en Mercado Público';
+        _mpValidando    = false;
     });
 }
 </script>

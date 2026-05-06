@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Container;
 use App\Models\GastoMenor;
 use App\Models\HistorialCambio;
+use App\Models\Precio;
 use App\Models\Producto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -201,6 +202,19 @@ class GastoMenorController extends Controller
 
                 $gasto->historial_cambio_id = $historial->id;
                 $gasto->save();
+
+                if (!empty($item['precio_neto']) && (float)$item['precio_neto'] > 0) {
+                    Precio::registrar(
+                        producto:    $producto,
+                        precioNeto:  (float) $item['precio_neto'],
+                        cantidad:    (int) $item['cantidad'],
+                        fuente:      'boleta_local',
+                        origenId:    $gasto->id,
+                        origenTipo:  'GastoMenor',
+                        precioTotal: (float)$item['precio_neto'] * (int)$item['cantidad'],
+                        notas:       "Folio {$request->folio} · RUT {$request->rut_proveedor}",
+                    );
+                }
             }
         });
 

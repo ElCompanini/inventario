@@ -24,7 +24,8 @@ class ProductoController extends Controller
         ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
         ->orderBy('nombre')->get();
 
-        $containers = Container::orderBy('id')
+        $containers = Container::with('centroCosto:id,acronimo')
+            ->orderBy('nombre')
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get();
 

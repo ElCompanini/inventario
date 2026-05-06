@@ -37,7 +37,7 @@
                 @endphp
                 <tr>
                     <td class="px-4 py-3 font-mono font-semibold text-indigo-700">{{ $sicd->codigo_sicd }}</td>
-                    <td class="px-4 py-3 text-gray-600">{{ $sicd->detalles->count() }} producto(s)</td>
+                    <td class="px-4 py-3 text-gray-600">{{ $sicd->detalles_count }} producto(s)</td>
                     <td class="px-4 py-3">
                         @if($sicd->estado === 'recibido')
                             <span class="inline-flex items-center bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">✓ Recibido</span>
@@ -47,14 +47,11 @@
                             <span class="inline-flex items-center bg-yellow-100 text-yellow-700 text-xs font-semibold px-2.5 py-1 rounded-full">⏳ Pendiente</span>
                         @endif
                     </td>
-                    @php
-                        $estNum = $estadosExternos[$sicd->codigo_sicd] ?? null;
-                        $estExt = \App\Models\SicdExterno::etiquetaEstado($estNum);
-                    @endphp
                     <td class="px-4 py-3">
-                        <span class="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
-                              style="background:{{ $estExt['bg'] }}; color:{{ $estExt['color'] }};">
-                            {{ $estExt['texto'] }}
+                        <span class="sicd-est-externo inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
+                              data-codigo="{{ $sicd->codigo_sicd }}"
+                              style="background:#f3f4f6; color:#9ca3af;">
+                            …
                         </span>
                     </td>
                     <td class="px-4 py-3 text-gray-600">
@@ -85,6 +82,26 @@
         </tbody>
     </table>
 </div>
+
+{{-- Paginación --}}
+@if($sicds->hasPages())
+<div class="mt-4 flex justify-center gap-1">
+    @foreach($sicds->links()->offsetGet('elements') ?? [] as $element)
+        @if(is_string($element))
+            <span style="padding:0.35rem 0.6rem; font-size:0.78rem; color:#9ca3af;">{{ $element }}</span>
+        @elseif(is_array($element))
+            @foreach($element as $page => $url)
+                @if($page == $sicds->currentPage())
+                    <span style="padding:0.35rem 0.75rem; font-size:0.78rem; font-weight:700; background:#2563eb; color:#fff; border-radius:0.4rem;">{{ $page }}</span>
+                @else
+                    <a href="{{ $url }}" style="padding:0.35rem 0.75rem; font-size:0.78rem; font-weight:600; background:#eff6ff; color:#2563eb; border-radius:0.4rem; text-decoration:none;"
+                       onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">{{ $page }}</a>
+                @endif
+            @endforeach
+        @endif
+    @endforeach
+</div>
+@endif
 
 @push('head')
 <style>
@@ -117,6 +134,33 @@
         });
         $('#buscador-sicds').on('input', function () { table.search(this.value).draw(); });
     });
+
+    // Cargar estados externos de forma asíncrona para no bloquear el render
+    (function () {
+        var badges = document.querySelectorAll('.sicd-est-externo');
+        if (!badges.length) return;
+        var codigos = Array.from(badges).map(function (el) { return el.dataset.codigo; });
+        var params  = codigos.map(function (c) { return 'codigos[]=' + encodeURIComponent(c); }).join('&');
+        fetch('{{ route("admin.sicd.estados-externos") }}?' + params)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                badges.forEach(function (el) {
+                    var est = data[el.dataset.codigo];
+                    if (est) {
+                        el.textContent         = est.texto;
+                        el.style.background    = est.bg;
+                        el.style.color         = est.color;
+                    } else {
+                        el.textContent      = '—';
+                        el.style.background = '#f3f4f6';
+                        el.style.color      = '#9ca3af';
+                    }
+                });
+            })
+            .catch(function () {
+                badges.forEach(function (el) { el.textContent = '—'; });
+            });
+    })();
 </script>
 @endpush
 
