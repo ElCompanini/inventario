@@ -152,6 +152,49 @@
         const productosMap = @json($productosMapData);
 
         // ── Child rows: expandir/contraer productos ──
+        // Colores adaptativos según dark/light mode
+        function ctColors() {
+            const dark = document.documentElement.classList.contains('dark');
+            return {
+                wrap:       dark ? '#162032'  : '#f5f7ff',
+                thead:      dark ? '#1e1b4b'  : '#e0e7ff',
+                theadTx:    dark ? '#a5b4fc'  : '#3730a3',
+                rowOdd:     dark ? '#1e293b'  : '#ffffff',
+                rowEven:    dark ? '#162032'  : '#f1f5ff',
+                tdTx:       dark ? '#cbd5e1'  : '#374151',
+                tdCat:      dark ? '#818cf8'  : '#4f46e5',
+                tdStock:    dark ? '#4ade80'  : '#166534',
+                emptyTx:    dark ? '#64748b'  : '#6b7280',
+                rowHl:      dark ? '#1e1b4b'  : '#dbeafe',
+            };
+        }
+
+        function ctBuildHtml(productos) {
+            const c = ctColors();
+            let html = '<div class="child-row-inner" style="padding:0.5rem 1rem 1rem 3.5rem;background:' + c.wrap + ';">';
+            if (!productos.length) {
+                html += '<p style="color:' + c.emptyTx + ';font-size:0.8rem;padding-top:0.5rem;">Sin productos en este container.</p>';
+            } else {
+                html += '<table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:0.5rem;">';
+                html += '<thead><tr style="background:' + c.thead + ';color:' + c.theadTx + ';">'
+                      + '<th style="padding:6px 12px;text-align:left;">Descripción</th>'
+                      + '<th style="padding:6px 12px;text-align:left;">Categoría</th>'
+                      + '<th style="padding:6px 12px;text-align:center;">Stock</th>'
+                      + '</tr></thead><tbody>';
+                productos.forEach(function (p, i) {
+                    const bg = i % 2 === 0 ? c.rowOdd : c.rowEven;
+                    html += '<tr style="background:' + bg + ';">'
+                          + '<td style="padding:6px 12px;color:' + c.tdTx    + ';">'                        + (p.nombre || '—') + '</td>'
+                          + '<td style="padding:6px 12px;color:' + c.tdCat   + ';font-weight:600;">'        + p.categoria + '</td>'
+                          + '<td style="padding:6px 12px;text-align:center;font-weight:700;color:' + c.tdStock + ';">' + p.stock + '</td>'
+                          + '</tr>';
+                });
+                html += '</tbody></table>';
+            }
+            html += '</div>';
+            return html;
+        }
+
         $('#tabla-containers tbody').on('click', 'tr.fila-container', function (e) {
             if ($(e.target).closest('button, form, a, select').length) return;
 
@@ -169,32 +212,9 @@
                 setTimeout(function() { row.child.hide(); }, 280);
             } else {
                 const productos = productosMap[containerId] || [];
-                let html = '<div class="child-row-inner" style="padding:0.5rem 1rem 1rem 3.5rem; background:#f5f7ff;">';
-
-                if (!productos.length) {
-                    html += '<p style="color:#6b7280;font-size:0.8rem;padding-top:0.5rem;">Sin productos en este container.</p>';
-                } else {
-                    html += '<table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:0.5rem;">';
-                    html += '<thead><tr style="background:#e0e7ff;color:#3730a3;">'
-                          + '<th style="padding:6px 12px;text-align:left;">Descripción</th>'
-                          + '<th style="padding:6px 12px;text-align:left;">Categoría</th>'
-                          + '<th style="padding:6px 12px;text-align:center;">Stock</th>'
-                          + '</tr></thead><tbody>';
-                    productos.forEach(function (p, i) {
-                        const bg = i % 2 === 0 ? '#fff' : '#f1f5ff';
-                        html += '<tr style="background:' + bg + ';">'
-                              + '<td style="padding:6px 12px;color:#374151;">'       + (p.nombre || '—') + '</td>'
-                              + '<td style="padding:6px 12px;color:#4f46e5;font-weight:600;">' + p.categoria + '</td>'
-                              + '<td style="padding:6px 12px;text-align:center;font-weight:700;color:#166534;">' + p.stock + '</td>'
-                              + '</tr>';
-                    });
-                    html += '</tbody></table>';
-                }
-                html += '</div>';
-
-                row.child(html).show();
+                row.child(ctBuildHtml(productos)).show();
                 tr.addClass('bg-indigo-50');
-                tr.css('background', '#dbeafe');
+                tr.css('background', ctColors().rowHl);
                 chevron.css('transform', 'rotate(90deg)');
             }
         });
@@ -206,7 +226,7 @@
                 setTimeout(function() {
                     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     target.style.transition = 'background .3s';
-                    target.style.background = '#e0e7ff';
+                    target.style.background = ctColors().thead;
                     setTimeout(function() { target.style.background = ''; }, 2000);
 
                     const tr          = $(target);
@@ -215,24 +235,7 @@
                     const containerId = tr.data('container-id');
                     if (!row.child.isShown()) {
                         const productos = productosMap[containerId] || [];
-                        let html = '<div class="child-row-inner" style="padding:0.5rem 1rem 1rem 3.5rem; background:#f5f7ff;">';
-                        if (!productos.length) {
-                            html += '<p style="color:#6b7280;font-size:0.8rem;padding-top:0.5rem;">Sin productos en este container.</p>';
-                        } else {
-                            html += '<table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:0.5rem;">';
-                            html += '<thead><tr style="background:#e0e7ff;color:#3730a3;"><th style="padding:6px 12px;text-align:left;">Descripción</th><th style="padding:6px 12px;text-align:left;">Categoría</th><th style="padding:6px 12px;text-align:center;">Stock</th></tr></thead><tbody>';
-                            productos.forEach(function(p, i) {
-                                const bg = i % 2 === 0 ? '#fff' : '#f1f5ff';
-                                html += '<tr style="background:' + bg + ';">'
-                                      + '<td style="padding:6px 12px;color:#374151;">' + (p.nombre || '—') + '</td>'
-                                      + '<td style="padding:6px 12px;color:#4f46e5;font-weight:600;">' + p.categoria + '</td>'
-                                      + '<td style="padding:6px 12px;text-align:center;font-weight:700;color:#166534;">' + p.stock + '</td>'
-                                      + '</tr>';
-                            });
-                            html += '</tbody></table>';
-                        }
-                        html += '</div>';
-                        row.child(html).show();
+                        row.child(ctBuildHtml(productos)).show();
                         tr.addClass('bg-indigo-50');
                         chevron.css('transform', 'rotate(90deg)');
                     }

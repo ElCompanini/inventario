@@ -46,6 +46,18 @@
     #tabla-usuarios tbody tr:hover {
         background-color: #f5f3ff !important;
     }
+    /* Dark mode — hover con alta especificidad para ganarle al !important de arriba */
+    html.dark #tabla-usuarios tbody tr:hover {
+        background-color: rgba(99,102,241,.12) !important;
+    }
+    html.dark .btn-usr-editar:hover {
+        background: #4f46e5 !important;
+        box-shadow: 0 0 10px 2px rgba(99,102,241,0.4) !important;
+    }
+    html.dark .btn-usr-eliminar:hover {
+        background: #dc2626 !important;
+        box-shadow: 0 0 10px 2px rgba(239,68,68,0.4) !important;
+    }
 </style>
 @endpush
 

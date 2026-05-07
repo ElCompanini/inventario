@@ -680,7 +680,8 @@ class SicdController extends Controller
         $incoming    = collect($request->detalles);
         $keepIds     = $incoming->pluck('id')->filter()->map(fn($v) => (int) $v)->toArray();
 
-        $sicd->detalles()->whereNotIn('id', $keepIds)->delete();
+        // Soft delete individual para respetar el trait SoftDeletes de SicdDetalle
+        $sicd->detalles()->whereNotIn('id', $keepIds)->get()->each(fn($d) => $d->delete());
 
         foreach ($incoming as $det) {
             $data = [
@@ -702,10 +703,18 @@ class SicdController extends Controller
 
     public function cancelar(int $id)
     {
+        // Soft delete: preserva trazabilidad y auditoría.
+        // El modelo Sicd usa SoftDeletes (deleted_at), igual que Boleta.
         $sicd = Sicd::with('boleta')->findOrFail($id);
-        $boleta = $sicd->boleta;
-        $sicd->delete();
-        if ($boleta) $boleta->delete();
+
+        $sicd->estado = 'cancelado';
+        $sicd->save();
+        $sicd->delete(); // sets deleted_at, no elimina físicamente
+
+        if ($sicd->boleta) {
+            $sicd->boleta->delete(); // soft delete también
+        }
+
         return response()->json(['ok' => true]);
     }
 

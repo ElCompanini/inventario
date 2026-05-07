@@ -19,6 +19,7 @@ class Precio extends Model
         'fuente',
         'origen_id',
         'origen_tipo',
+        'orden_compra_id',
         'notas',
     ];
 
@@ -48,8 +49,15 @@ class Precio extends Model
         return $this->belongsTo(User::class, 'usuario_id');
     }
 
+    public function ordenCompra()
+    {
+        return $this->belongsTo(OrdenCompra::class, 'orden_compra_id');
+    }
+
     /**
      * Registra un precio resolviendo familia/categoría desde el producto.
+     * El parámetro ordenCompraId permite vincular el precio a la OC específica
+     * que originó el ingreso (crítico para trazabilidad en multi-OC por SICD).
      */
     public static function registrar(
         Producto $producto,
@@ -61,6 +69,7 @@ class Precio extends Model
         ?float $precioTotal = null,
         ?string $notas = null,
         ?int $usuarioId = null,
+        ?int $ordenCompraId = null,
     ): self {
         $categoriaId = $producto->categoria_id ?? null;
         $familiaId   = null;
@@ -73,17 +82,18 @@ class Precio extends Model
         }
 
         return static::create([
-            'producto_id'  => $producto->id,
-            'familia_id'   => $familiaId,
-            'categoria_id' => $categoriaId,
-            'usuario_id'   => $usuarioId ?? auth()->id(),
-            'precio_neto'  => $precioNeto,
-            'precio_total' => $precioTotal ?? round($precioNeto * $cantidad, 2),
-            'cantidad'     => $cantidad,
-            'fuente'       => $fuente,
-            'origen_id'    => $origenId,
-            'origen_tipo'  => $origenTipo,
-            'notas'        => $notas,
+            'producto_id'     => $producto->id,
+            'familia_id'      => $familiaId,
+            'categoria_id'    => $categoriaId,
+            'usuario_id'      => $usuarioId ?? auth()->id(),
+            'precio_neto'     => $precioNeto,
+            'precio_total'    => $precioTotal ?? round($precioNeto * $cantidad, 2),
+            'cantidad'        => $cantidad,
+            'fuente'          => $fuente,
+            'origen_id'       => $origenId,
+            'origen_tipo'     => $origenTipo,
+            'orden_compra_id' => $ordenCompraId,
+            'notas'           => $notas,
         ]);
     }
 }

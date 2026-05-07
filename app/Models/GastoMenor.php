@@ -14,6 +14,7 @@ class GastoMenor extends Model
         'historial_cambio_id',
         'user_id',
         'rut_proveedor',
+        'proveedor_nombre',
         'folio',
         'monto',
         'cantidad',

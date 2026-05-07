@@ -12,6 +12,7 @@ class Producto extends Model
     protected $fillable = [
         'nombre',
         'unidad',
+        'unidad_medida_id',
         'codigo_barras',
         'stock_actual',
         'stock_minimo',
@@ -41,12 +42,29 @@ class Producto extends Model
 
     public function container()
     {
-        return $this->belongsTo(Container::class, 'contenedor');
+        // withoutGlobalScope('con_cc') para que containers sin CC asignado
+        // también se carguen correctamente en la relación
+        return $this->belongsTo(Container::class, 'contenedor')
+                    ->withoutGlobalScope('con_cc');
     }
 
     public function categoria()
     {
         return $this->belongsTo(Categoria::class);
+    }
+
+    public function unidadMedida()
+    {
+        return $this->belongsTo(UnidadMedida::class, 'unidad_medida_id');
+    }
+
+    /**
+     * Accessor backward-compatible: devuelve la abreviación de la unidad normalizada
+     * si existe el FK, de lo contrario el texto libre legacy.
+     */
+    public function getUnidadDisplayAttribute(): string
+    {
+        return $this->unidadMedida?->abreviacion ?? $this->attributes['unidad'] ?? '—';
     }
 
     public function solicitudes()

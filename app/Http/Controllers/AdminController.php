@@ -268,10 +268,14 @@ class AdminController extends Controller
             return back()->withErrors(['contenedor_destino' => 'El producto ya está en ese container.'])->withInput();
         }
 
-        $containerOrigen  = Container::withoutGlobalScope('con_cc')->find($producto->contenedor);
+        $containerOrigen  = $producto->contenedor
+            ? Container::withoutGlobalScope('con_cc')->find($producto->contenedor)
+            : null;
         $containerDestino = Container::withoutGlobalScope('con_cc')->findOrFail($data['contenedor_destino']);
 
-        DB::transaction(function () use ($producto, $data, $containerOrigen, $containerDestino) {
+        $origenNombre = $containerOrigen?->nombre ?? 'Sin container';
+
+        DB::transaction(function () use ($producto, $data, $origenNombre, $containerDestino) {
             $producto->contenedor = $data['contenedor_destino'];
             $producto->save();
 
@@ -281,7 +285,7 @@ class AdminController extends Controller
                 'contenedor_id'   => $containerDestino->id,
                 'cantidad'        => $producto->stock_actual,
                 'tipo'            => 'traslado',
-                'motivo'          => "Traslado de {$containerOrigen->nombre} a {$containerDestino->nombre}: {$data['motivo']}",
+                'motivo'          => "Traslado de {$origenNombre} a {$containerDestino->nombre}: {$data['motivo']}",
                 'aprobado_por' => Auth::user()->name,
                 'usuario_id'   => Auth::id(),
             ]);
@@ -698,10 +702,13 @@ class AdminController extends Controller
             'items_manual.*.cantidad.min'         => 'La cantidad debe ser al menos 1.',
         ]);
 
-        $codigoSicd   = strtoupper(trim($request->input('codigo_sicd', ''))) ?: null;
-        $descripcion  = trim($request->input('descripcion', '')) ?: null;
-        $vincularOc   = (bool) $request->input('vincular_oc_manual');
-        $permiteMasOc = (bool) $request->input('permite_mas_oc');
+        $codigoSicd      = strtoupper(trim($request->input('codigo_sicd', ''))) ?: null;
+        $descripcion     = trim($request->input('descripcion', '')) ?: null;
+        $vincularOc      = (bool) $request->input('vincular_oc_manual');
+        $permiteMasOc    = (bool) $request->input('permite_mas_oc');
+        $proveedorNombre = strtoupper(trim($request->input('proveedor_nombre', ''))) ?: null;
+        $rutProveedor    = trim($request->input('rut_proveedor', '')) ?: null;
+        $folio           = trim($request->input('folio', '')) ?: null;
 
         // Advertir si la SICD ya está ingresada en el sistema (tiene detalles)
         if ($codigoSicd && !$request->boolean('confirmar_duplicado')) {
@@ -741,20 +748,26 @@ class AdminController extends Controller
 
             if ($sicd) {
                 $sicd->fill([
-                    'boleta_id'      => $boletaId,
-                    'descripcion'    => $descripcion,
-                    'estado'         => $vincularOc ? 'pendiente' : 'recibido',
-                    'permite_mas_oc' => $permiteMasOc,
-                    'usuario_id'     => Auth::id(),
+                    'boleta_id'       => $boletaId,
+                    'descripcion'     => $descripcion,
+                    'estado'          => $vincularOc ? 'pendiente' : 'recibido',
+                    'permite_mas_oc'  => $permiteMasOc,
+                    'proveedor_nombre'=> $proveedorNombre,
+                    'rut_proveedor'   => $rutProveedor,
+                    'folio'           => $folio,
+                    'usuario_id'      => Auth::id(),
                 ])->save();
             } else {
                 $sicd = Sicd::create([
-                    'codigo_sicd'    => $codigoSicd,
-                    'boleta_id'      => $boletaId,
-                    'descripcion'    => $descripcion,
-                    'estado'         => $vincularOc ? 'pendiente' : 'recibido',
-                    'permite_mas_oc' => $permiteMasOc,
-                    'usuario_id'     => Auth::id(),
+                    'codigo_sicd'     => $codigoSicd,
+                    'boleta_id'       => $boletaId,
+                    'descripcion'     => $descripcion,
+                    'estado'          => $vincularOc ? 'pendiente' : 'recibido',
+                    'permite_mas_oc'  => $permiteMasOc,
+                    'proveedor_nombre'=> $proveedorNombre,
+                    'rut_proveedor'   => $rutProveedor,
+                    'folio'           => $folio,
+                    'usuario_id'      => Auth::id(),
                 ]);
             }
         }
@@ -860,27 +873,32 @@ class AdminController extends Controller
         abort_unless(auth()->user()->esAdmin(), 403);
 
         $request->validate([
-            'categoria_id'  => ['required', 'integer', 'exists:categorias,id'],
-            'nombre'        => ['required', 'string', 'max:500'],
-            'stock_minimo'  => ['nullable', 'integer', 'min:0'],
-            'stock_critico' => ['nullable', 'integer', 'min:0'],
+            'categoria_id'    => ['required', 'integer', 'exists:categorias,id'],
+            'nombre'          => ['required', 'string', 'max:500'],
+            'stock_minimo'    => ['nullable', 'integer', 'min:0'],
+            'stock_critico'   => ['nullable', 'integer', 'min:0'],
+            'unidad_medida_id'=> ['nullable', 'integer', 'exists:unidades_medida,id'],
         ]);
 
         $categoria = Categoria::findOrFail($request->categoria_id);
 
         $producto = \App\Models\Producto::create([
-            'nombre'          => trim($request->nombre),
-            'stock_actual'    => 0,
-            'stock_minimo'    => (int) ($request->stock_minimo ?? 0),
-            'stock_critico'   => (int) ($request->stock_critico ?? 0),
-            'contenedor'      => null,
-            'categoria_id'    => $categoria->id,
-            'centro_costo_id' => auth()->user()->centro_costo_id,
+            'nombre'           => trim($request->nombre),
+            'stock_actual'     => 0,
+            'stock_minimo'     => (int) ($request->stock_minimo ?? 0),
+            'stock_critico'    => (int) ($request->stock_critico ?? 0),
+            'contenedor'       => null,
+            'categoria_id'     => $categoria->id,
+            'centro_costo_id'  => auth()->user()->centro_costo_id,
+            'unidad_medida_id' => $request->unidad_medida_id ?: null,
         ]);
+
+        $producto->load('unidadMedida:id,abreviacion');
 
         return response()->json([
             'id'               => $producto->id,
             'nombre'           => $producto->nombre,
+            'unidad'           => $producto->unidadMedida?->abreviacion ?? '',
             'contenedor_id'    => null,
             'contenedor_nombre'=> '',
             'stock'            => 0,

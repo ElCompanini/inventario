@@ -5,7 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\CentroCosto;
 use App\Models\Container;
 use App\Models\Familia;
+use App\Models\GastoMenor;
+use App\Models\HistorialCambio;
+use App\Models\OrdenCompra;
+use App\Models\Precio;
 use App\Models\Producto;
+use App\Models\Sicd;
 
 class ProductoController extends Controller
 {
@@ -19,6 +24,7 @@ class ProductoController extends Controller
             'container',
             'categoria.familia',
             'centroCosto:id,acronimo',
+            'unidadMedida:id,nombre,abreviacion',
             'solicitudes' => fn($q) => $q->where('tipo', 'salida')->where('estado', 'pendiente')->with('usuario:id,name'),
         ])
         ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
@@ -38,5 +44,78 @@ class ProductoController extends Controller
             : collect();
 
         return view('dashboard', compact('productos', 'containers', 'familias', 'centrosCostoConProductos'));
+    }
+
+    public function show(int $id)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $producto = Producto::withoutGlobalScopes()
+            ->with([
+                'categoria.familia',
+                'container.centroCosto:id,acronimo,nombre_completo',
+                'centroCosto:id,acronimo,nombre_completo',
+                'unidadMedida:id,nombre,abreviacion',
+            ])
+            ->findOrFail($id);
+
+        $user = auth()->user();
+
+        // ── Tab: Movimientos ─────────────────────────────────────────────────
+        $movimientos = HistorialCambio::where('producto_id', $id)
+            ->with('usuario:id,name')
+            ->orderByDesc('created_at')
+            ->paginate(20, ['*'], 'mov_page');
+
+        // ── Tab: Costos (solo admins) ─────────────────────────────────────────
+        $precios       = collect();
+        $ultimoCosto   = null;
+        $costoPromedio = null;
+
+        if ($user->esAdmin()) {
+            $precios = Precio::where('producto_id', $id)
+                ->with('usuario:id,name')
+                ->orderByDesc('created_at')
+                ->paginate(20, ['*'], 'cost_page');
+
+            $ultimoCosto   = Precio::where('producto_id', $id)->latest()->value('precio_neto');
+            $costoPromedio = Precio::where('producto_id', $id)->avg('precio_neto');
+        }
+
+        // ── Tab: Documentos ──────────────────────────────────────────────────
+        // SICDs que tienen este producto en sus detalles
+        $sicds = Sicd::whereHas('detalles', fn($q) => $q->where('producto_id', $id))
+            ->with(['detalles' => fn($q) => $q->where('producto_id', $id)])
+            ->orderByDesc('created_at')
+            ->get();
+
+        // OCs relacionadas (via SICDs)
+        $sicdIds = $sicds->pluck('id');
+        $ordenes = OrdenCompra::whereHas('sicds', fn($q) => $q->whereIn('sicds.id', $sicdIds))
+            ->orderByDesc('created_at')
+            ->get();
+
+        // Gastos menores con este producto
+        $gastos = GastoMenor::where('producto_id', $id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        // ── Estadísticas de stock ─────────────────────────────────────────────
+        $totalEntradas = HistorialCambio::where('producto_id', $id)->where('tipo', 'entrada')->sum('cantidad');
+        $totalSalidas  = HistorialCambio::where('producto_id', $id)->where('tipo', 'salida')->sum('cantidad');
+
+        // ── Containers disponibles para traslado ─────────────────────────────
+        $containers = \App\Models\Container::withoutGlobalScope('con_cc')
+            ->with('centroCosto:id,acronimo')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'centro_costo_id']);
+
+        return view('admin.productos.show', compact(
+            'producto', 'movimientos', 'precios',
+            'ultimoCosto', 'costoPromedio',
+            'sicds', 'ordenes', 'gastos',
+            'totalEntradas', 'totalSalidas',
+            'containers',
+        ));
     }
 }

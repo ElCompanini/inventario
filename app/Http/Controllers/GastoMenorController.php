@@ -130,6 +130,7 @@ class GastoMenorController extends Controller
         abort_unless(auth()->user()->esAdmin(), 403);
 
         $request->validate([
+            'proveedor_nombre'  => ['required', 'string', 'min:3', 'max:300'],
             'rut_proveedor'     => ['required', 'string', 'max:20'],
             'folio'             => ['required', 'string', 'max:50', 'unique:gastos_menores,folio'],
             'fecha_emision'     => ['required', 'date', 'before_or_equal:now'],
@@ -141,7 +142,9 @@ class GastoMenorController extends Controller
             'items.*.precio_neto'   => ['nullable', 'numeric', 'min:0'],
             'items.*.contenedor_id' => ['nullable', 'integer', 'exists:containers,id'],
         ], [
-            'rut_proveedor.required'       => 'El RUT del proveedor es obligatorio.',
+            'proveedor_nombre.required'     => 'El nombre del proveedor es obligatorio.',
+            'proveedor_nombre.min'          => 'El nombre del proveedor debe tener al menos 3 caracteres.',
+            'rut_proveedor.required'        => 'El RUT del proveedor es obligatorio.',
             'folio.required'               => 'El folio de la boleta es obligatorio.',
             'folio.unique'                 => 'El folio ingresado ya existe en el sistema.',
             'fecha_emision.required'       => 'La fecha de emisión es obligatoria.',
@@ -168,7 +171,24 @@ class GastoMenorController extends Controller
 
         DB::transaction(function () use ($request, $rutaDoc, $nextNumero) {
             foreach ($request->items as $item) {
-                $producto = Producto::findOrFail($item['producto_id']);
+                $producto     = Producto::findOrFail($item['producto_id']);
+                $contenedorId = !empty($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
+
+                // Si el usuario seleccionó un container diferente al actual,
+                // buscar si ya existe ese producto en el container destino;
+                // si no, asignar el container al producto actual.
+                if ($contenedorId && (int)$producto->contenedor !== $contenedorId) {
+                    $enDestino = Producto::withoutGlobalScopes()
+                        ->where('nombre', $producto->nombre)
+                        ->where('contenedor', $contenedorId)
+                        ->first();
+                    if ($enDestino) {
+                        $producto = $enDestino;
+                    } else {
+                        $producto->contenedor = $contenedorId;
+                    }
+                }
+
                 $producto->stock_actual += (int) $item['cantidad'];
                 $producto->actualizarFechasStock();
                 $producto->save();
@@ -178,8 +198,9 @@ class GastoMenorController extends Controller
                     'id_gm'         => $nextNumero,
                     'producto_id'   => $producto->id,
                     'user_id'       => Auth::id(),
-                    'rut_proveedor' => $request->rut_proveedor,
-                    'folio'         => $request->folio,
+                    'proveedor_nombre' => strtoupper(trim($request->proveedor_nombre)),
+                    'rut_proveedor'    => $request->rut_proveedor,
+                    'folio'            => $request->folio,
                     'monto'         => $item['monto'],
                     'cantidad'      => $item['cantidad'],
                     'precio_neto'   => $item['precio_neto'] ?? null,
@@ -190,7 +211,7 @@ class GastoMenorController extends Controller
                 $historial = HistorialCambio::create([
                     'producto_id'     => $producto->id,
                     'nombre_producto' => $producto->nombre,
-                    'contenedor_id'   => $item['contenedor_id'] ?? $producto->contenedor,
+                    'contenedor_id'   => $producto->contenedor,
                     'cantidad'     => $item['cantidad'],
                     'tipo'         => 'entrada',
                     'motivo'       => "Compra de gasto menor — Folio {$request->folio}",
@@ -211,8 +232,8 @@ class GastoMenorController extends Controller
                         fuente:      'boleta_local',
                         origenId:    $gasto->id,
                         origenTipo:  'GastoMenor',
-                        precioTotal: (float)$item['precio_neto'] * (int)$item['cantidad'],
-                        notas:       "Folio {$request->folio} · RUT {$request->rut_proveedor}",
+                        precioTotal: !empty($item['monto']) ? (float) $item['monto'] : null,
+                        notas:       "Folio {$request->folio} · {$gasto->proveedor_nombre} · RUT {$request->rut_proveedor}",
                     );
                 }
             }

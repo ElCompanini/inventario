@@ -350,29 +350,20 @@
 </style>
 @endpush
 
-    {{-- COLUMNA DERECHA: OC asociada --}}
+    {{-- COLUMNA DERECHA: OCs asociadas (relación many-to-many) --}}
     <div class="space-y-4">
         <div class="bg-white rounded-xl shadow overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100">
-                <h2 class="text-base font-semibold text-gray-700">Orden de Compra</h2>
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-base font-semibold text-gray-700">Órdenes de Compra Asociadas</h2>
+                @if($sicd->ordenesCompra->isNotEmpty())
+                    <span style="font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:9999px; background:#eff6ff; color:#2563eb;">
+                        {{ $sicd->ordenesCompra->count() }} OC(s)
+                    </span>
+                @endif
             </div>
-            <div class="px-5 py-4">
-                @php $oc = $sicd->ordenesCompra->first(); @endphp
-                @if($oc)
-                    <p class="text-sm font-mono font-semibold text-indigo-700 mb-1">{{ $oc->numero_oc }}</p>
-                    <p class="text-xs text-gray-500 mb-3">
-                        Estado:
-                        @if($oc->estado === 'recibido')
-                            <span class="text-green-600 font-semibold">Recibido</span>
-                        @else
-                            <span class="text-yellow-600 font-semibold">Pendiente</span>
-                        @endif
-                    </p>
-                    <a href="{{ route('admin.ordenes.show', $oc->id) }}"
-                       class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium">
-                        Ver OC →
-                    </a>
-                @else
+
+            @if($sicd->ordenesCompra->isEmpty())
+                <div class="px-5 py-4">
                     <p class="text-sm text-gray-400">Aún no asignado a ninguna OC.</p>
                     @if($sicd->estado === 'pendiente')
                         <a href="{{ route('admin.ordenes.create') }}"
@@ -380,9 +371,81 @@
                             Crear OC y agrupar →
                         </a>
                     @endif
+                </div>
+            @else
+                <div class="divide-y divide-gray-100">
+                    @foreach($sicd->ordenesCompra as $oc)
+                    @php
+                        $estadoColor = match($oc->estado) {
+                            'recibido' => ['bg' => '#dcfce7', 'color' => '#15803d', 'texto' => '✓ Recibido'],
+                            'validado' => ['bg' => '#dbeafe', 'color' => '#1e40af', 'texto' => '✓ Validado'],
+                            default    => ['bg' => '#fef3c7', 'color' => '#92400e', 'texto' => '⏳ Pendiente'],
+                        };
+                    @endphp
+                    <div class="px-5 py-3 flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-sm font-mono font-bold text-indigo-700 truncate">{{ $oc->numero_oc }}</p>
+                            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                <span style="font-size:.68rem; font-weight:700; padding:1px 7px; border-radius:9999px; white-space:nowrap;
+                                             background:{{ $estadoColor['bg'] }}; color:{{ $estadoColor['color'] }};">
+                                    {{ $estadoColor['texto'] }}
+                                </span>
+                                @if($oc->api_proveedor_nombre)
+                                    <span class="text-xs text-gray-500 truncate">{{ $oc->api_proveedor_nombre }}</span>
+                                @endif
+                            </div>
+                            @if($oc->api_total)
+                                <p class="text-xs text-gray-400 mt-0.5">
+                                    Total: <span class="font-semibold text-gray-600">{{ $oc->totalFormateado() }}</span>
+                                </p>
+                            @endif
+                        </div>
+                        <a href="{{ route('admin.ordenes.show', $oc->id) }}"
+                           class="flex-shrink-0 text-xs font-semibold text-indigo-600 hover:text-indigo-800 whitespace-nowrap">
+                            Ver →
+                        </a>
+                    </div>
+                    @endforeach
+                </div>
+
+                @if($sicd->permite_mas_oc)
+                <div class="px-5 py-3 border-t border-gray-100 bg-green-50">
+                    <div class="flex items-center gap-2">
+                        <span style="font-size:.65rem; font-weight:700; padding:1px 7px; border-radius:9999px; background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;">
+                            + OC habilitado
+                        </span>
+                        <span class="text-xs text-green-700">Se pueden asociar más órdenes de compra.</span>
+                    </div>
+                    <a href="{{ route('admin.ordenes.create') }}"
+                       class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline">
+                        Crear nueva OC asociada →
+                    </a>
+                </div>
                 @endif
-            </div>
+            @endif
         </div>
+
+        {{-- Progreso de recepción --}}
+        @if($sicd->ordenesCompra->isNotEmpty())
+        @php
+            $totalOcs    = $sicd->ordenesCompra->count();
+            $recibidasOcs = $sicd->ordenesCompra->where('estado', 'recibido')->count();
+            $pctRecibidas = $totalOcs > 0 ? round($recibidasOcs / $totalOcs * 100) : 0;
+        @endphp
+        <div class="bg-white rounded-xl shadow p-4">
+            <p class="text-xs font-semibold text-gray-600 mb-2">Progreso de recepción</p>
+            <div class="flex items-center gap-3">
+                <div style="flex:1; background:#f3f4f6; border-radius:9999px; height:8px; overflow:hidden;">
+                    <div style="width:{{ $pctRecibidas }}%; height:100%; background:{{ $pctRecibidas === 100 ? '#22c55e' : '#4f46e5' }}; border-radius:9999px; transition:width .4s;"></div>
+                </div>
+                <span class="text-xs font-bold text-gray-600 whitespace-nowrap">{{ $recibidasOcs }}/{{ $totalOcs }}</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">
+                {{ $recibidasOcs }} OC(s) recibida(s) de {{ $totalOcs }} asociada(s)
+                @if($sicd->permite_mas_oc) · <span class="text-green-600">Abierta para más OCs</span> @endif
+            </p>
+        </div>
+        @endif
     </div>
 
 </div>
@@ -563,7 +626,7 @@ function detPickerAgregarProducto(p) {
         '<td class="px-4 py-2.5">'
         + '<input type="text" data-field="nombre" value="' + escDetHtml(p.nombre) + '" class="det-input det-inp-text" placeholder="Descripción"></td>'
         + '<td class="px-3 py-2.5" style="text-align:center;">'
-        + '<input type="text" data-field="unidad" value="' + escDetHtml(p.unidad || '') + '" class="det-input det-inp-sm" style="text-align:center;" placeholder="Unid."></td>'
+        + '<input type="text" data-field="unidad" value="' + escDetHtml(p.unidad || '') + '" class="det-input det-inp-sm" style="text-align:center;" placeholder="—"></td>'
         + '<td class="px-3 py-2.5" style="text-align:center;">'
         + '<input type="number" data-field="cantidad_solicitada" value="1" min="0" class="det-input det-inp-sm det-cant" style="text-align:center;"></td>'
         + '<td class="px-3 py-2.5" style="text-align:right;">'

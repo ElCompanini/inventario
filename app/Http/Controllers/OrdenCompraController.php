@@ -302,32 +302,48 @@ class OrdenCompraController extends Controller
                             'producto_id'     => $detalle->producto_id,
                             'nombre_producto' => $detalle->producto->nombre,
                             'contenedor_id'   => $detalle->producto->contenedor,
-                            'cantidad'     => $recibido,
-                            'tipo'         => 'entrada',
-                            'motivo'       => $motivoBase,
-                            'aprobado_por' => $userName,
-                            'usuario_id'   => $userId,
-                            'origen'       => 'sicd',
-                            'origen_id'    => $sicd->id,
+                            'cantidad'        => $recibido,
+                            'tipo'            => 'entrada',
+                            'motivo'          => $motivoBase,
+                            'aprobado_por'    => $userName,
+                            'usuario_id'      => $userId,
+                            'origen'          => 'sicd',
+                            'origen_id'       => $sicd->id,
+                            'orden_compra_id' => $oc->id,   // ← OC específica que originó este ingreso
                         ]);
 
                         if ($detalle->precio_neto && $detalle->precio_neto > 0) {
                             Precio::registrar(
-                                producto:    $detalle->producto,
-                                precioNeto:  (float) $detalle->precio_neto,
-                                cantidad:    $recibido,
-                                fuente:      'sicd_masiva',
-                                origenId:    $sicd->id,
-                                origenTipo:  'Sicd',
-                                precioTotal: $detalle->total_neto ? (float) $detalle->total_neto : null,
-                                notas:       "OC {$oc->numero_oc} · SICD {$sicd->codigo_sicd}",
-                                usuarioId:   $userId,
+                                producto:      $detalle->producto,
+                                precioNeto:    (float) $detalle->precio_neto,
+                                cantidad:      $recibido,
+                                fuente:        'sicd_masiva',
+                                origenId:      $sicd->id,
+                                origenTipo:    'Sicd',
+                                precioTotal:   $detalle->total_neto ? (float) $detalle->total_neto : null,
+                                notas:         "OC {$oc->numero_oc} · SICD {$sicd->codigo_sicd}",
+                                usuarioId:     $userId,
+                                ordenCompraId: $oc->id,   // ← vínculo granular a la OC específica
                             );
                         }
                     }
                 }
 
-                $sicd->estado = 'recibido';
+                // Solo marcar la SICD como 'recibido' si:
+                // 1. NO tiene el flag permite_mas_oc activo (no se esperan más OCs)
+                // 2. TODAS las demás OCs asociadas a esta SICD ya están recibidas
+                //    (la OC actual se contará como recibida justo debajo)
+                $ocsPendientesEnSicd = $sicd->ordenesCompra()
+                    ->where('ordenes_compra.id', '!=', $oc->id)
+                    ->whereNotIn('ordenes_compra.estado', ['recibido'])
+                    ->count();
+
+                if (!$sicd->permite_mas_oc && $ocsPendientesEnSicd === 0) {
+                    $sicd->estado = 'recibido';
+                } else {
+                    // Quedan OCs pendientes o se esperan más → recepción parcial
+                    $sicd->estado = 'agrupado';
+                }
                 $sicd->save();
             }
 

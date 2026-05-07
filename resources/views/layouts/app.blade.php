@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name') }} — @yield('title', 'Inicio')</title>
+    {{-- Dark mode: apply class before paint to avoid flash --}}
+    <script>if(localStorage.getItem('darkMode')==='1')document.documentElement.classList.add('dark');</script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     {{-- DataTables + Buttons (Tailwind CSS) --}}
     <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.tailwindcss.min.css">
@@ -94,8 +96,63 @@
 
     /* Toggle button — size set inline, no override needed */
 
-    /* No stray shadows */
-    #sidebar { box-shadow: none !important; border-right: none !important; }
+    /* No stray shadows — dark mode keeps these overrides */
+    html.dark #sidebar { box-shadow: none !important; border-right: none !important; }
+
+    /* Transición suave al cambiar tema — solo propiedades visuales */
+    body, #main-wrapper, .bg-white, .bg-gray-50, .bg-gray-100,
+    input, select, textarea, th, td, table, #sidebar {
+        transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+    }
+
+    /* ══ SIDEBAR LIGHT MODE ══════════════════════════════════════
+       Cuando NO hay html.dark, el sidebar cambia a tema claro.   */
+    html:not(.dark) #sidebar {
+        background-color: #f1f5f9 !important;
+        border-right: 1px solid #d1d5db !important;
+        box-shadow: 2px 0 8px rgba(0,0,0,.06) !important;
+    }
+    html:not(.dark) #sidebar .sb-header-row,
+    html:not(.dark) #sidebar .sb-user-block  { border-color: #d1d5db !important; }
+    html:not(.dark) #sidebar .sb-link:not(.bg-indigo-600) { color: #374151 !important; }
+    html:not(.dark) #sidebar .sb-section-title { color: #6b7280 !important; }
+    html:not(.dark) #sidebar .sb-app-name  { color: #1e1b4b !important; }
+    html:not(.dark) #sidebar .sb-footer-text p:last-child { color: #6b7280 !important; }
+    html:not(.dark) #sb-tooltip { background: #374151 !important; }
+    html:not(.dark) #sidebar #sb-toggle,
+    html:not(.dark) #sidebar #dm-toggle { color: #6b7280 !important; }
+    html:not(.dark) #sidebar #sb-toggle:hover,
+    html:not(.dark) #sidebar #dm-toggle:hover {
+        background: rgba(99,102,241,.15) !important;
+        color: #4f46e5 !important;
+    }
+    /* Link hover light mode */
+    html:not(.dark) #sidebar .sb-link:not(.bg-indigo-600):hover {
+        background-color: rgba(99,102,241,.12) !important;
+        color: #4f46e5 !important;
+    }
+    /* collapsed — bordes light */
+    html:not(.dark) body.sb-collapsed .sb-header-row,
+    html:not(.dark) body.sb-collapsed .sb-user-block {
+        border-color: #d1d5db !important;
+    }
+
+    /* ══ DARK MODE nombre app ══════════════════════════════════ */
+    .sb-app-name           { color: #1e1b4b; }   /* light mode: dark navy */
+    html.dark .sb-app-name { color: #e2e8f0 !important; }  /* dark mode: slate-200 */
+
+    /* ── Dark mode toggle button ── */
+    #dm-toggle {
+        width: 32px; height: 32px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 8px;
+        color: #94a3b8;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background .18s, color .18s;
+        border: none; background: none;
+    }
+    #dm-toggle:hover { background: rgba(99,102,241,0.25); color: #c7d2fe; }
 
     .sb-label, .sb-section-title, .sb-badge {
         transition: opacity .2s, max-width .25s, height .2s;
@@ -224,7 +281,7 @@
     <div class="sb-header-row flex items-center px-3 py-2.5 border-b border-slate-700/60 flex-shrink-0 gap-2">
         <img src="{{ asset('images/hospital.jpg') }}"
              class="sb-label w-8 h-8 rounded-md object-cover flex-shrink-0" alt="Logo">
-        <span class="sb-label flex-1 font-bold text-base truncate" style="color:#00004f;">{{ config('app.name') }}</span>
+        <span class="sb-label sb-app-name flex-1 font-bold text-base truncate">{{ config('app.name') }}</span>
         <button id="sb-toggle"
                 title="Colapsar menú"
                 class="flex-shrink-0 rounded-md text-slate-400"
@@ -247,6 +304,18 @@
                 <p class="text-sm font-medium truncate leading-tight" style="color:#818cf8;">{{ $u->name }}</p>
                 <p class="text-xs text-slate-400 truncate leading-tight">{{ $u->esDev() ? 'Super Administrador' : ($u->esAdmin() ? 'Administrador' : 'Usuario') }}</p>
             </div>
+            {{-- Dark mode toggle --}}
+            <button id="dm-toggle" class="sb-logout-btn" title="Modo oscuro/claro" onclick="dmToggle()">
+                {{-- Sun icon (shown in dark mode) --}}
+                <svg id="dm-icon-sun" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                     style="display:none">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m8.66-9h-1M4.34 12h-1m15.07-6.07-.7.7M6.34 17.66l-.7.7m12.73 0-.7-.7M6.34 6.34l-.7-.7M12 7a5 5 0 100 10A5 5 0 0012 7z"/>
+                </svg>
+                {{-- Moon icon (shown in light mode) --}}
+                <svg id="dm-icon-moon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                </svg>
+            </button>
             <form method="POST" action="{{ route('logout') }}" class="sb-logout-btn flex-shrink-0">
                 @csrf
                 <button type="submit" title="Cerrar sesión"
@@ -354,7 +423,7 @@
         @endif
 
         {{-- ── Logística y Compras ── --}}
-        @if($u->tienePermiso('sicd') || $u->tienePermiso('ordenes') || $u->tienePermiso('containers'))
+        @if($u->tienePermiso('sicd') || $u->tienePermiso('ordenes') || $u->tienePermiso('containers') || $u->esAdmin())
         <div class="px-3">
             <p class="sb-section-title text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-2 mb-1">
                 Logística y Compras
@@ -363,7 +432,7 @@
             @if($u->tienePermiso('sicd'))
                 <a href="{{ route('admin.sicd.index') }}" data-tip="SICD"
                    class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
-                          {{ request()->routeIs('admin.sicd.*') ? 'bg-indigo-600 text-white' : 'text-slate-300 text-slate-300' }}">
+                          {{ request()->routeIs('admin.sicd.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                     </svg>
@@ -374,7 +443,7 @@
             @if($u->tienePermiso('ordenes'))
                 <a href="{{ route('admin.ordenes.index') }}" data-tip="Órdenes de Compra"
                    class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
-                          {{ request()->routeIs('admin.ordenes.*') ? 'bg-indigo-600 text-white' : 'text-slate-300 text-slate-300' }}">
+                          {{ request()->routeIs('admin.ordenes.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
                     </svg>
@@ -385,11 +454,22 @@
             @if($u->tienePermiso('containers'))
                 <a href="{{ route('admin.containers.index') }}" data-tip="Containers"
                    class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
-                          {{ request()->routeIs('admin.containers.*') ? 'bg-indigo-600 text-white' : 'text-slate-300 text-slate-300' }}">
+                          {{ request()->routeIs('admin.containers.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
                     </svg>
                     <span class="sb-label">Containers</span>
+                </a>
+            @endif
+
+            @if($u->esAdmin())
+                <a href="{{ route('admin.gastos-menores.index') }}" data-tip="Gastos Menores"
+                   class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
+                          {{ request()->routeIs('admin.gastos-menores.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                    </svg>
+                    <span class="sb-label">Gastos Menores</span>
                 </a>
             @endif
         </div>
@@ -402,28 +482,37 @@
                 Administración
             </p>
 
-            <a href="{{ route('admin.gastos-menores.index') }}" data-tip="Gastos Menores"
+            <a href="{{ route('admin.reportes.index') }}" data-tip="Reportes"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
-                      {{ request()->routeIs('admin.gastos-menores.*') ? 'bg-indigo-600 text-white' : 'text-slate-300 text-slate-300' }}">
+                      {{ request()->routeIs('admin.reportes.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
-                <span class="sb-label">Gastos Menores</span>
+                <span class="sb-label">Reportes</span>
             </a>
 
             <a href="{{ route('admin.usuarios.index') }}" data-tip="Usuarios"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
-                      {{ request()->routeIs('admin.usuarios.*') ? 'bg-indigo-600 text-white' : 'text-slate-300 text-slate-300' }}">
+                      {{ request()->routeIs('admin.usuarios.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                 </svg>
                 <span class="sb-label">Usuarios</span>
             </a>
 
+            <a href="{{ route('admin.catalogo.unidades.index') }}" data-tip="Unidades de Medida"
+               class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
+                      {{ request()->routeIs('admin.catalogo.unidades.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 12h18M3 18h18"/>
+                </svg>
+                <span class="sb-label">Unidades de Medida</span>
+            </a>
+
             @if($u->esDev())
             <a href="{{ route('admin.productos.catalogo') }}" data-tip="Catálogo de Productos"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
-                      {{ request()->routeIs('admin.productos.catalogo*') ? 'bg-indigo-600 text-white' : 'text-slate-300 text-slate-300' }}">
+                      {{ request()->routeIs('admin.productos.catalogo*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                 </svg>
@@ -478,6 +567,24 @@
 
 {{-- ── Scripts ── --}}
 <script>
+// ── Dark mode ──
+function dmToggle() {
+    var isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('darkMode', isDark ? '1' : '0');
+    document.getElementById('dm-icon-sun').style.display  = isDark ? '' : 'none';
+    document.getElementById('dm-icon-moon').style.display = isDark ? 'none' : '';
+}
+// Sync icon with current state on load
+(function() {
+    var isDark = document.documentElement.classList.contains('dark');
+    var sun  = document.getElementById('dm-icon-sun');
+    var moon = document.getElementById('dm-icon-moon');
+    if (sun && moon) {
+        sun.style.display  = isDark ? '' : 'none';
+        moon.style.display = isDark ? 'none' : '';
+    }
+})();
+
 // Apply saved state BEFORE paint — disable transitions so nothing animates on load
 (function () {
     if (localStorage.getItem('sbCollapsed') === '1') {

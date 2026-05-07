@@ -14,6 +14,9 @@ use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\CentroCostoController;
 use App\Http\Controllers\GastoMenorController;
 use App\Http\Controllers\CatalogoController;
+use App\Http\Controllers\PrecioController;
+use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\UnidadMedidaController;
 
 // Raíz → login
 Route::get('/', fn() => redirect()->route('login'));
@@ -51,9 +54,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/solicitudes/{id}/aprobar', [AdminController::class, 'aprobar'])->name('solicitudes.aprobar');
     Route::post('/solicitudes/{id}/rechazar', [AdminController::class, 'rechazar'])->name('solicitudes.rechazar');
     Route::get('/historial', [AdminController::class, 'historial'])->name('historial');
-    Route::get('/productos/{id}/editar', [AdminController::class, 'editarStock'])->name('productos.editar');
-    Route::post('/productos/{id}/stock', [AdminController::class, 'modificarStock'])->name('productos.stock');
-    Route::post('/productos/{id}/trasladar', [AdminController::class, 'trasladarContainer'])->name('productos.trasladar');
+    // Rutas estáticas de productos PRIMERO (antes del wildcard {id})
     Route::post('/productos/carga-masiva', [AdminController::class, 'cargaMasiva'])->name('productos.carga.masiva');
     Route::get('/productos/carga-masiva/resolver', [AdminController::class, 'resolverCargaMasiva'])->name('productos.carga.masiva.resolver');
     Route::post('/productos/carga-masiva/confirmar', [AdminController::class, 'confirmarCargaMasiva'])->name('productos.carga.masiva.confirmar');
@@ -61,6 +62,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/productos/carga-masiva/contenedores/confirmar', [AdminController::class, 'confirmarContenedoresMasiva'])->name('productos.carga.masiva.contenedores.confirmar');
     Route::post('/productos/carga-manual', [AdminController::class, 'cargaManual'])->name('productos.carga.manual');
     Route::post('/productos/crear-rapido', [AdminController::class, 'crearProductoRapido'])->name('productos.crear.rapido');
+    // Wildcard {id} al final para no capturar rutas estáticas
+    Route::get('/productos/{id}', [ProductoController::class, 'show'])->name('productos.show')->where('id', '[0-9]+');
+    Route::get('/productos/{id}/editar', [AdminController::class, 'editarStock'])->name('productos.editar');
+    Route::post('/productos/{id}/stock', [AdminController::class, 'modificarStock'])->name('productos.stock');
+    Route::post('/productos/{id}/trasladar', [AdminController::class, 'trasladarContainer'])->name('productos.trasladar');
 
     // SICD
     Route::get('/sicd/validar', [SicdController::class, 'validarCodigo'])->name('sicd.validar');
@@ -114,6 +120,20 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Gastos Menores
     Route::get('/gastos-menores', [GastoMenorController::class, 'index'])->name('gastos-menores.index');
+    Route::get('/precios', [PrecioController::class, 'index'])->name('precios.index');
+
+    // Unidades de Medida
+    Route::get('/catalogo/unidades',                   [UnidadMedidaController::class, 'index'])->name('catalogo.unidades.index');
+    Route::post('/catalogo/unidades',                  [UnidadMedidaController::class, 'store'])->name('catalogo.unidades.store');
+    Route::put('/catalogo/unidades/{unidad}',          [UnidadMedidaController::class, 'update'])->name('catalogo.unidades.update');
+    Route::delete('/catalogo/unidades/{unidad}',       [UnidadMedidaController::class, 'destroy'])->name('catalogo.unidades.destroy');
+    Route::get('/catalogo/unidades/listar',            [UnidadMedidaController::class, 'listar'])->name('catalogo.unidades.listar');
+
+    // Reportería BINCARD
+    Route::get('/reportes',              [ReporteController::class, 'index'])->name('reportes.index');
+    Route::get('/reportes/bincard',      [ReporteController::class, 'bincard'])->name('reportes.bincard');
+    Route::get('/reportes/bincard/excel',[ReporteController::class, 'exportExcel'])->name('reportes.bincard.excel');
+    Route::get('/reportes/bincard/pdf',  [ReporteController::class, 'exportPdf'])->name('reportes.bincard.pdf');
     Route::post('/gastos-menores', [GastoMenorController::class, 'store'])->name('gastos-menores.store');
     Route::get('/gastos-menores/{id}/boleta', [GastoMenorController::class, 'descargarBoleta'])->name('gastos-menores.boleta');
     Route::patch('/gastos-menores/{id}/contenedor', [GastoMenorController::class, 'actualizarContenedor'])->name('gastos-menores.contenedor');

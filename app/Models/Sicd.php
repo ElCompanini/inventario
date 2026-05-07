@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Sicd extends Model
 {
+    use SoftDeletes;
     protected $table = 'sicds';
 
     protected $fillable = [
@@ -14,6 +16,9 @@ class Sicd extends Model
         'documento_blob',
         'documento_mime',
         'descripcion',
+        'rut_proveedor',
+        'proveedor_nombre',
+        'folio',
         'estado',
         'permite_mas_oc',
         'usuario_id',

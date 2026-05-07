@@ -22,6 +22,7 @@ class HistorialCambio extends Model
         'usuario_id',
         'origen',
         'origen_id',
+        'orden_compra_id',
     ];
 
     public function producto()
@@ -31,7 +32,8 @@ class HistorialCambio extends Model
 
     public function container()
     {
-        return $this->belongsTo(\App\Models\Container::class, 'contenedor_id');
+        return $this->belongsTo(\App\Models\Container::class, 'contenedor_id')
+                    ->withoutGlobalScope('con_cc');
     }
 
     public function usuario()
@@ -42,5 +44,10 @@ class HistorialCambio extends Model
     public function sicd()
     {
         return $this->belongsTo(\App\Models\Sicd::class, 'origen_id');
+    }
+
+    public function ordenCompra()
+    {
+        return $this->belongsTo(\App\Models\OrdenCompra::class, 'orden_compra_id');
     }
 }

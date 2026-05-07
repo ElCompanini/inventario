@@ -258,6 +258,14 @@
     .dt-btn-pdf:hover { background:#b91c1c; transform:translateY(-1px); animation:btn-breathe-red 1.6s ease-in-out infinite; }
     tr.fila-grupo { background:#fafafe; }
     tr.fila-grupo.shown, tr.dt-hasChild { background:#eef2ff !important; }
+
+    /* Dark mode — fila-grupo: light colors override to dark */
+    html.dark tr.fila-grupo                      { background:#1a2540 !important; }
+    html.dark tr.fila-grupo.shown,
+    html.dark tr.dt-hasChild                     { background:rgba(99,102,241,.18) !important; }
+    html.dark tr.fila-grupo:hover                { background:rgba(99,102,241,.25) !important; }
+    html.dark tr.fila-grupo.shown td,
+    html.dark tr.dt-hasChild td                  { background:transparent !important; }
 </style>
 @endpush
 

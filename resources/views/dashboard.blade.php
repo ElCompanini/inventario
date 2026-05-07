@@ -76,8 +76,7 @@
 
         @if(auth()->user()->esAdmin())
         <button type="button" id="btn-agregar-inventario"
-            style="background:#2563eb; color:#fff; font-size:0.82rem; font-weight:600; padding:0.5rem 1.1rem; border-radius:0.5rem; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:0.4rem; transition:background .15s; white-space:nowrap;"
-            onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+            class="btn-agregar-inv inline-flex items-center gap-1.5 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
             </svg>
@@ -85,14 +84,14 @@
         </button>
         @endif
 
-        {{-- Leyenda de colores --}}
+        {{-- Leyenda de colores — bg-red-50/yellow-50/white coinciden con los rowClass de la tabla --}}
         <div class="flex items-center gap-4 text-xs text-gray-600">
             <span class="flex items-center gap-1.5">
-                <span class="inline-block w-4 h-4 rounded bg-red-200 border border-red-300"></span>
+                <span class="inline-block w-4 h-4 rounded bg-red-50 border border-red-300"></span>
                 Stock crítico
             </span>
             <span class="flex items-center gap-1.5">
-                <span class="inline-block w-4 h-4 rounded bg-yellow-100 border border-yellow-300"></span>
+                <span class="inline-block w-4 h-4 rounded bg-yellow-50 border border-yellow-300"></span>
                 Stock mínimo
             </span>
             <span class="flex items-center gap-1.5">
@@ -260,15 +259,15 @@
             @php
             $estado = $producto->estadoStock();
             $rowClass = match($estado) {
-            'critico' => 'bg-red-50',
-            'minimo' => 'bg-yellow-50',
-            default => 'bg-white',
+                'critico' => 'bg-red-50',
+                'minimo'  => 'bg-yellow-50',
+                default   => 'bg-white hover:brightness-95',
             };
             @endphp
             @php
                 $pendienteSalida = $producto->solicitudes->sum('cantidad');
             @endphp
-            <tr class="{{ $rowClass }} hover:brightness-95 transition"
+            <tr class="{{ $rowClass }} transition"
                 data-contenedor="{{ $producto->contenedor }}"
                 data-estado="{{ $estado }}"
                 data-cc-id="{{ $producto->centro_costo_id }}"
@@ -309,7 +308,7 @@
                         <span>{{ $producto->nombre }}</span>
                     </div>
                 </td>
-                <td class="px-2 py-3 text-gray-500 text-xs whitespace-nowrap">{{ $producto->unidad ?? '—' }}</td>
+                <td class="px-2 py-3 text-gray-500 text-xs whitespace-nowrap">{{ $producto->unidadMedida?->abreviacion ?? $producto->unidad ?? '—' }}</td>
                 <td class="px-2 py-3 text-gray-500 text-xs">{{ $producto->categoria->familia->nombre ?? '—' }}</td>
                 <td class="px-2 py-3 text-gray-500 text-xs">{{ $producto->categoria->nombre ?? '—' }}</td>
                 <td class="px-2 py-3" style="text-align:center; vertical-align:middle;">
@@ -395,6 +394,14 @@
                 <td class="px-2 py-3 text-center">
                     <div class="flex flex-col items-center gap-1.5">
                         @if(auth()->user()->esAdmin())
+                        {{-- Admin: ver detalle del producto --}}
+                        <a href="{{ route('admin.productos.show', $producto->id) }}"
+                            class="btn-accion-indigo inline-flex items-center gap-1 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg whitespace-nowrap">
+                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            Ver
+                        </a>
                         {{-- Admin: modificar stock directamente --}}
                         <a href="{{ route('admin.productos.editar', $producto->id) }}"
                             class="btn-accion-indigo inline-flex items-center gap-1 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg whitespace-nowrap">
@@ -1138,6 +1145,14 @@ function escHtmlGm(str) {
                             </p>
                         </div>
 
+                        <div>
+                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                Nombre del Proveedor <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="text" name="proveedor_nombre" id="ai-prov-nombre" placeholder="Ej: COMERCIALIZADORA TECNO SUR SPA"
+                                style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; text-transform:uppercase;">
+                        </div>
+
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
                             <div>
                                 <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
@@ -1190,14 +1205,14 @@ function escHtmlGm(str) {
                         <div id="ai-tabla-wrap" style="display:none;">
                             <table style="width:100%; font-size:0.78rem; border-collapse:collapse;">
                                 <thead>
-                                    <tr style="background:#fef3c7; color:#92400e;">
+                                    <tr style="background:#f3e8ff; color:#6b21a8;">
                                         <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600;">Producto</th>
-                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:70px;">Cant.</th>
-                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:110px;">Monto ($)</th>
-                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:110px;">P. Neto s/IVA</th>
-                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:110px;">Total Neto</th>
-                                        <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; width:140px;">Contenedor</th>
-                                        <th style="padding:0.4rem 0.6rem; width:36px;"></th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:80px;">Cantidad</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:80px;">Unidad</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:100px;">Precio Neto($)</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:center; font-weight:600; width:110px;">Total Neto($)</th>
+                                        <th style="padding:0.4rem 0.6rem; text-align:left; font-weight:600; width:150px;">Contenedor</th>
+                                        <th style="padding:0.4rem 0.6rem; width:60px;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="ai-items"></tbody>
@@ -1246,6 +1261,13 @@ function escHtmlGm(str) {
 
                         {{-- Datos de boleta (ocultos para Licitación) --}}
                         <div id="ai-ext-boleta-datos">
+                            <div style="margin-bottom:0.75rem;">
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Nombre del Proveedor <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="text" name="proveedor_nombre" id="ai-ext-prov-nombre" placeholder="Ej: COMERCIALIZADORA TECNO SUR SPA"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; text-transform:uppercase;">
+                            </div>
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
                                 <div>
                                     <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
@@ -1539,6 +1561,31 @@ function escHtmlGm(str) {
     label:has(.fil-prod-estado[value="normal"]:checked)  { background:#f0fdf4 !important; outline:1px solid #bbf7d0; }
     label:has(.fil-prod-estado[value="minimo"]:checked)  { background:#fefce8 !important; outline:1px solid #fde047; }
     label:has(.fil-prod-estado[value="critico"]:checked) { background:#fef2f2 !important; outline:1px solid #fca5a5; }
+
+    /* Dark mode — filtros checked */
+    html.dark label:has(.fil-prod-contenedor:checked),
+    html.dark label:has(.fil-prod-familia-padre:checked),
+    html.dark label:has(.fil-prod-desc:checked)          { background:#1e1b4b !important; outline:1px solid #3730a3; }
+    html.dark label:has(.fil-prod-estado[value="normal"]:checked)  { background:#052e16 !important; outline:1px solid #166534; }
+    html.dark label:has(.fil-prod-estado[value="minimo"]:checked)  { background:#1c1500 !important; outline:1px solid #854d0e; }
+    html.dark label:has(.fil-prod-estado[value="critico"]:checked) { background:#2d0a0a !important; outline:1px solid #7f1d1d; }
+
+    /* Dark mode — acordeón filtro activo */
+    html.dark .acc-prod.is-open,
+    html.dark .acc-prod.has-active { background:#1e1b4b; color:#a5b4fc; }
+
+    /* Botón Agregar Inventario */
+    .btn-agregar-inv { background:#2563eb; }
+    .btn-agregar-inv:hover { background:#1d4ed8; }
+    html.dark .btn-agregar-inv { background:#3b82f6; }
+    html.dark .btn-agregar-inv:hover { background:#2563eb; }
+
+    /* Dark mode — btn-accion hover: en light usan colores claros "glow",
+       en dark deben ser colores sólidos más oscuros/saturados */
+    html.dark .btn-accion-indigo:hover { background:#4f46e5 !important; box-shadow:0 0 14px 4px rgba(99,102,241,0.4) !important; }
+    html.dark .btn-accion-blue:hover   { background:#2563eb !important; box-shadow:0 0 14px 4px rgba(37,99,235,0.4) !important; }
+    html.dark .btn-accion-green:hover  { background:#16a34a !important; box-shadow:0 0 14px 4px rgba(22,163,74,0.4) !important; }
+    html.dark .btn-accion-orange:hover { background:#ea580c !important; box-shadow:0 0 14px 4px rgba(234,88,12,0.4) !important; }
 </style>
 @endpush
 
@@ -1567,14 +1614,17 @@ function escHtmlGm(str) {
             ],
             columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
             drawCallback: function() {
+                var isDark = document.documentElement.classList.contains('dark');
+                var bg     = isDark ? '#4f46e5' : '#3b82f6';
+                var bgCur  = isDark ? '#312e81' : '#1d4ed8';
+                var shadow = isDark ? '0 0 0 3px rgba(99,102,241,.35)' : '0 0 0 3px rgba(59,130,246,.35)';
                 $('#tabla-inventario_paginate button, #tabla-inventario_paginate .dt-paging-button').css({
-                    'background':'#3b82f6','color':'#fff','border':'1px solid #3b82f6',
+                    'background': bg, 'color':'#fff', 'border':'1px solid ' + bg,
                     'border-radius':'0.375rem','font-weight':'600','min-width':'2rem',
                     'height':'2rem','padding':'0 0.6rem','font-size':'0.8rem'
                 });
                 $('#tabla-inventario_paginate button.current, #tabla-inventario_paginate .dt-paging-button.current').css({
-                    'background':'#1d4ed8','border-color':'#1d4ed8',
-                    'box-shadow':'0 0 0 3px rgba(59,130,246,.35)'
+                    'background': bgCur, 'border-color': bgCur, 'box-shadow': shadow
                 });
             },
         });
@@ -1810,6 +1860,21 @@ function escHtmlGm(str) {
     @keyframes pulso-minimo  { 0%,100% { box-shadow:0 0 0 0 rgba(234,179,8,.5); } 50% { box-shadow:0 0 0 6px rgba(234,179,8,0); } }
     .estado-pulso-critico { animation: pulso-critico 1.5s ease-in-out infinite; }
     .estado-pulso-minimo  { animation: pulso-minimo  1.5s ease-in-out infinite; }
+
+    /* Dark mode — paginación DataTables */
+    html.dark .dt-paging button,
+    html.dark .dt-paging .dt-paging-button {
+        background:#4f46e5 !important; border-color:#4f46e5 !important; color:#fff !important;
+    }
+    html.dark .dt-paging button:hover:not([disabled]):not(.current),
+    html.dark .dt-paging .dt-paging-button:hover:not(.disabled):not(.current) {
+        background:#6366f1 !important; border-color:#6366f1 !important;
+    }
+    html.dark .dt-paging button.current,
+    html.dark .dt-paging .dt-paging-button.current {
+        background:#312e81 !important; border-color:#312e81 !important;
+    }
+    html.dark .dt-info { color:#64748b !important; }
 </style>
 @endpush
 
@@ -1823,6 +1888,13 @@ function escHtmlGm(str) {
                 <p id="ai-crear-nombre-display" style="font-size:0.8rem; color:#374151; margin:0; font-weight:500; word-break:break-word;"></p>
             </div>
             <button type="button" onclick="aiCerrarModalCrear()" style="flex-shrink:0; color:#9ca3af; background:none; border:none; cursor:pointer; font-size:1.25rem; line-height:1; padding:0.1rem;">✕</button>
+        </div>
+
+        {{-- Campo nombre (visible solo cuando se abre desde boleta local) --}}
+        <div id="ai-crear-nombre-wrap" style="display:none; margin-bottom:0.85rem;">
+            <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.4rem;">Nombre del producto <span style="color:#ef4444;">*</span></label>
+            <input type="text" id="ai-crear-nombre-input" placeholder="Ej: Disco Duro 1TB"
+                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
         </div>
 
         <div style="margin-bottom:0.85rem;">
@@ -1879,6 +1951,19 @@ function escHtmlGm(str) {
             @endif
         </div>
 
+        <div style="margin-bottom:0.85rem;">
+            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
+                Unidad de Medida <span style="color:#ef4444;">*</span>
+            </label>
+            <select id="ai-crear-unidad-id"
+                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.6rem; font-size:0.875rem; outline:none; box-sizing:border-box; background:#fff;">
+                <option value="">— Selecciona —</option>
+                @foreach(\App\Models\UnidadMedida::activas()->orderBy('nombre')->get() as $um)
+                    <option value="{{ $um->id }}">{{ $um->nombre }} ({{ $um->abreviacion }})</option>
+                @endforeach
+            </select>
+        </div>
+
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.85rem;">
             <div>
                 <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
@@ -1919,8 +2004,9 @@ $aiProductosJson = json_encode(
         'id'             => $p->id,
         'nombre'         => $p->nombre,
         'stock'          => $p->stock_actual,
-        'contenedor_id'  => $p->contenedor,
-        'contenedor_nombre' => $p->container?->nombre ?? '—',
+        'contenedor_id'    => $p->contenedor,
+        'contenedor_nombre'=> $p->container?->nombre ?? '—',
+        'unidad'           => $p->unidadMedida?->abreviacion ?? $p->unidad ?? '',
     ])->values(),
     JSON_HEX_TAG | JSON_HEX_AMP
 );
@@ -2214,10 +2300,12 @@ function aiEnviar() {
     }
 
     if (tipo === 'local') {
-        var rut = document.getElementById('ai-rut').value.trim();
+        var provNombre = document.getElementById('ai-prov-nombre').value.trim();
+        var rut   = document.getElementById('ai-rut').value.trim();
         var folio = document.getElementById('ai-folio').value.trim();
         var fecha = document.getElementById('ai-fecha').value;
-        var doc = document.getElementById('ai-doc').files.length;
+        var doc   = document.getElementById('ai-doc').files.length;
+        if (!provNombre){ aiError('El nombre del proveedor es obligatorio.', 'ai-prov-nombre'); return; }
         if (!rut)   { aiError('El RUT del proveedor es obligatorio.', 'ai-rut'); return; }
         if (!folio) { aiError('El folio es obligatorio.', 'ai-folio'); return; }
         if (!fecha) { aiError('La fecha de emisión es obligatoria.', 'ai-fecha'); return; }
@@ -2226,9 +2314,11 @@ function aiEnviar() {
         aiForm.action = aiUrlLocal;
     } else if (tipo === 'externa' || tipo === 'licitacion') {
         if (tipo === 'externa') {
-            var extRut   = document.getElementById('ai-ext-rut').value.trim();
-            var extFolio = document.getElementById('ai-ext-folio').value.trim();
-            var extFecha = document.getElementById('ai-ext-fecha').value;
+            var extProvNombre = document.getElementById('ai-ext-prov-nombre').value.trim();
+            var extRut        = document.getElementById('ai-ext-rut').value.trim();
+            var extFolio      = document.getElementById('ai-ext-folio').value.trim();
+            var extFecha      = document.getElementById('ai-ext-fecha').value;
+            if (!extProvNombre){ aiError('El nombre del proveedor es obligatorio.', 'ai-ext-prov-nombre'); return; }
             if (!extRut)   { aiError('El RUT del proveedor es obligatorio.', 'ai-ext-rut'); return; }
             if (!extFolio) { aiError('El folio es obligatorio.', 'ai-ext-folio'); return; }
             if (!extFecha) { aiError('La fecha de emisión es obligatoria.', 'ai-ext-fecha'); return; }
@@ -2265,7 +2355,7 @@ function aiEnviar() {
     var tipo = document.getElementById('ai-tipo').value;
     if (tipo === 'local') {
         // Deshabilitar campos de la sección externa que tienen el mismo name
-        ['ai-ext-rut', 'ai-ext-folio', 'ai-ext-fecha',
+        ['ai-ext-prov-nombre', 'ai-ext-rut', 'ai-ext-folio', 'ai-ext-fecha',
          'ai-boleta-masiva-input', 'ai-boleta-manual-input',
          'ai-codigo-sicd', 'ai-descripcion',
          'ai-vincular-oc', 'ai-vincular-oc-manual'].forEach(function(id) {
@@ -2274,7 +2364,7 @@ function aiEnviar() {
         });
     } else {
         // Deshabilitar campos de la sección local
-        ['ai-rut', 'ai-folio', 'ai-fecha', 'ai-doc'].forEach(function(id) {
+        ['ai-prov-nombre', 'ai-rut', 'ai-folio', 'ai-fecha', 'ai-doc'].forEach(function(id) {
             var el = document.getElementById(id);
             if (el) el.disabled = true;
         });
@@ -2495,6 +2585,30 @@ function aiValidarCodigo(codigo) {
                     .catch(function() { _aiSicdDupUrl = null; if (document.getElementById('ai-sicd-ya-ingresada')) document.getElementById('ai-sicd-ya-ingresada').style.display = 'none'; });
 
                 info.style.display = 'block';
+
+                // Paleta adaptativa según dark/light mode
+                var _dm = document.documentElement.classList.contains('dark');
+                var _sc = {
+                    infoBg:    _dm ? '#162032'              : '#f0fdf4',
+                    infoBd:    _dm ? '#334155'              : '#bbf7d0',
+                    infoTx:    _dm ? '#94a3b8'              : '',
+                    theadBg:   _dm ? '#052e16'              : '#dcfce7',
+                    theadTx:   _dm ? '#86efac'              : '#14532d',
+                    theadBd:   _dm ? '#166534'              : '#bbf7d0',
+                    rowOdd:    _dm ? '#162032'              : '#f0fdf4',
+                    rowEven:   _dm ? '#1e293b'              : '#ffffff',
+                    estadoBg:  _dm ? '#1e1b4b'              : '#eff6ff',
+                    estadoTx:  _dm ? '#93c5fd'              : '#1d4ed8',
+                    estadoBd:  _dm ? '#3730a3'              : '#bfdbfe',
+                    pdfBg:     _dm ? '#1c1100'              : '#fff7ed',
+                    pdfBd:     _dm ? '#78350f'              : '#fed7aa',
+                    pdfTx:     _dm ? '#fb923c'              : '#c2410c',
+                };
+                // Aplicar el fondo del info box
+                info.style.background = _sc.infoBg;
+                info.style.borderColor = _sc.infoBd;
+                if (_sc.infoTx) info.style.color = _sc.infoTx;
+
                 var sicdEstadoLabels = {
                     1: 'Ingresada', 2: 'Enviada', 3: 'Aprobada',
                     4: 'Rechazada', 5: 'En despacho', 6: 'Recibida'
@@ -2502,7 +2616,7 @@ function aiValidarCodigo(codigo) {
                 var fmtEstado = function(val) {
                     var n = parseInt(val, 10);
                     var label = sicdEstadoLabels[n] || 'Desconocido';
-                    return '<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:4px;padding:1px 6px;font-weight:600;white-space:nowrap;">' + n + ' — ' + label + '</span>';
+                    return '<span style="background:' + _sc.estadoBg + ';color:' + _sc.estadoTx + ';border:1px solid ' + _sc.estadoBd + ';border-radius:4px;padding:1px 6px;font-weight:600;white-space:nowrap;">' + n + ' — ' + label + '</span>';
                 };
                 var estadoGeneral = data.estado != null ? fmtEstado(data.estado) : '—';
                 var html = '<strong>Centro de costo:</strong> ' + (data.centro_costo || '—')
@@ -2511,16 +2625,16 @@ function aiValidarCodigo(codigo) {
                 if (data.detalles && data.detalles.length > 0) {
                     html += '<div style="margin-top:0.45rem;overflow-x:auto;">';
                     html += '<table style="width:100%;border-collapse:collapse;font-size:0.7rem;">';
-                    html += '<thead><tr style="background:#dcfce7;color:#14532d;">'
-                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid #bbf7d0;">Ítem</th>'
-                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid #bbf7d0;">Detalle</th>'
-                          + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid #bbf7d0;">Cant.</th>'
-                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid #bbf7d0;">Unidad</th>'
-                          + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid #bbf7d0;">V. Unit.</th>'
-                          + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid #bbf7d0;">Total Neto</th>'
+                    html += '<thead><tr style="background:' + _sc.theadBg + ';color:' + _sc.theadTx + ';">'
+                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid ' + _sc.theadBd + ';">Ítem</th>'
+                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid ' + _sc.theadBd + ';">Detalle</th>'
+                          + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid ' + _sc.theadBd + ';">Cant.</th>'
+                          + '<th style="padding:3px 6px;text-align:left;border-bottom:1px solid ' + _sc.theadBd + ';">Unidad</th>'
+                          + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid ' + _sc.theadBd + ';">V. Unit.</th>'
+                          + '<th style="padding:3px 6px;text-align:right;border-bottom:1px solid ' + _sc.theadBd + ';">Total Neto</th>'
                           + '</tr></thead><tbody>';
                     data.detalles.forEach(function(d, i) {
-                        var bg = i % 2 === 0 ? '#f0fdf4' : '#ffffff';
+                        var bg = i % 2 === 0 ? _sc.rowOdd : _sc.rowEven;
                         html += '<tr style="background:' + bg + ';">'
                               + '<td style="padding:3px 6px;">' + (d.item_presup || '—') + '</td>'
                               + '<td style="padding:3px 6px;">' + ((d.detalle || '').replace(/(\s+UND)+$/i, '').trim() || '—') + '</td>'
@@ -2535,9 +2649,9 @@ function aiValidarCodigo(codigo) {
                     html += '<br><em style="color:#6b7280;">Sin detalles de compra registrados.</em>';
                 }
                 // Banner PDF: spinner mientras carga, luego resultado
-                html += '<div id="ai-pdf-banner" style="margin-top:0.6rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:0.6rem;padding:0.5rem 0.85rem;display:flex;align-items:center;gap:0.5rem;">'
-                      + '<svg style="width:15px;height:15px;flex-shrink:0;animation:spin 1s linear infinite;color:#ea580c;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v3m6.364 1.636-2.121 2.121M21 12h-3m-1.636 6.364-2.121-2.121M12 21v-3m-6.364-1.636 2.121-2.121M3 12h3m1.636-6.364 2.121 2.121"/></svg>'
-                      + '<span style="font-size:0.72rem;color:#c2410c;font-weight:500;">Verificando archivo asociado...</span>'
+                html += '<div id="ai-pdf-banner" style="margin-top:0.6rem;background:' + _sc.pdfBg + ';border:1px solid ' + _sc.pdfBd + ';border-radius:0.6rem;padding:0.5rem 0.85rem;display:flex;align-items:center;gap:0.5rem;">'
+                      + '<svg style="width:15px;height:15px;flex-shrink:0;animation:spin 1s linear infinite;color:' + _sc.pdfTx + ';" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v3m6.364 1.636-2.121 2.121M21 12h-3m-1.636 6.364-2.121-2.121M12 21v-3m-6.364-1.636 2.121-2.121M3 12h3m1.636-6.364 2.121 2.121"/></svg>'
+                      + '<span style="font-size:0.72rem;color:' + _sc.pdfTx + ';font-weight:500;">Verificando archivo asociado...</span>'
                       + '</div>';
                 info.innerHTML = html;
 
@@ -2569,7 +2683,9 @@ function aiValidarCodigo(codigo) {
                                                     link.href = sicdData.url;
                                                     link.target = '_blank';
                                                     link.textContent = '✓ Ver SICD enlazado';
-                                                    link.style.cssText = 'font-size:0.7rem;font-weight:600;background:#dcfce7;color:#166534;padding:3px 12px;border-radius:5px;text-decoration:none;';
+                                                    var enlazBg = _dm ? '#052e16' : '#dcfce7';
+                                                    var enlazTx = _dm ? '#86efac' : '#166534';
+                                                    link.style.cssText = 'font-size:0.7rem;font-weight:600;background:' + enlazBg + ';color:' + enlazTx + ';padding:3px 12px;border-radius:5px;text-decoration:none;';
                                                     btn.replaceWith(link);
                                                 }
                                             }
@@ -2577,14 +2693,16 @@ function aiValidarCodigo(codigo) {
                                     })
                                     .catch(function() {});
 
+                                var enlazarBg = _dm ? '#1e1b4b' : '#e0e7ff';
+                                var enlazarTx = _dm ? '#a5b4fc' : '#3730a3';
                                 banner.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;width:100%;">'
                                     + '<div style="display:flex;align-items:center;gap:0.45rem;">'
-                                    + '<svg style="width:15px;height:15px;flex-shrink:0;color:#ea580c;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>'
-                                    + '<span style="font-size:0.72rem;font-weight:700;color:#c2410c;">ARCHIVO ASOCIADO ENCONTRADO</span>'
+                                    + '<svg style="width:15px;height:15px;flex-shrink:0;color:' + _sc.pdfTx + ';" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>'
+                                    + '<span style="font-size:0.72rem;font-weight:700;color:' + _sc.pdfTx + ';">ARCHIVO ASOCIADO ENCONTRADO</span>'
                                     + '</div>'
                                     + '<div style="display:flex;gap:0.4rem;align-items:center;">'
                                     + '<a href="' + urlPdf + '" target="_blank" style="font-size:0.7rem;font-weight:600;background:#ea580c;color:#fff;padding:3px 12px;border-radius:5px;text-decoration:none;">Ver PDF</a>'
-                                    + '<button id="ai-btn-enlazar" onclick="aiEnlazarSolicitud()" style="font-size:0.7rem;font-weight:600;background:#e0e7ff;color:#3730a3;padding:3px 12px;border-radius:5px;border:none;cursor:pointer;">Enlazar PDF SICD</button>'
+                                    + '<button id="ai-btn-enlazar" onclick="aiEnlazarSolicitud()" style="font-size:0.7rem;font-weight:600;background:' + enlazarBg + ';color:' + enlazarTx + ';padding:3px 12px;border-radius:5px;border:none;cursor:pointer;">Enlazar PDF SICD</button>'
                                     + '</div>'
                                     + '</div>';
                         } else {
@@ -2628,14 +2746,15 @@ document.getElementById('ai-codigo-sicd').addEventListener('input', function() {
 });
 
 document.getElementById('ai-buscador').addEventListener('input', function() {
-    var q = this.value.trim().toLowerCase();
-    var res = document.getElementById('ai-resultados');
+    var qOrig = this.value.trim();
+    var q     = qOrig.toLowerCase();
+    var res   = document.getElementById('ai-resultados');
     if (q.length < 1) { res.style.display = 'none'; return; }
     var matches = aiProductos.filter(function(p) {
         return p.nombre.toLowerCase().indexOf(q) >= 0;
     }).slice(0, 10);
-    if (!matches.length) { res.style.display = 'none'; return; }
-    res.innerHTML = matches.map(function(p) {
+
+    var html = matches.map(function(p) {
         return '<div onclick="aiAgregar(' + p.id + ',\'' + p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')"'
             + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;"'
             + ' onmouseover="this.style.background=\'#fef3c7\'" onmouseout="this.style.background=\'\'">'
@@ -2643,6 +2762,19 @@ document.getElementById('ai-buscador').addEventListener('input', function() {
             + '<p style="font-size:0.72rem;color:#6b7280;">Stock: ' + p.stock + '</p>'
             + '</div>';
     }).join('');
+
+    if (AI_IS_ADMIN) {
+        var qEsc = qOrig.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        html += '<div data-crear-nombre="' + qEsc + '" onclick="aiCrearContexto=\'local\'; aiAbrirModalCrear(this.dataset.crearNombre)"'
+            + ' style="padding:0.5rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;border-top:1px solid #e5e7eb;background:#f0fdf4;"'
+            + ' onmouseover="this.style.background=\'#dcfce7\'" onmouseout="this.style.background=\'#f0fdf4\'">'
+            + '<span style="font-size:1rem;line-height:1;">➕</span>'
+            + '<p style="font-size:0.8rem;font-weight:700;color:#16a34a;">Crear producto «' + qEsc + '»</p>'
+            + '</div>';
+    }
+
+    if (!html) { res.style.display = 'none'; return; }
+    res.innerHTML = html;
     res.style.display = 'block';
 });
 
@@ -2732,7 +2864,7 @@ function aiRenderFilaManual(idx, id, nombre, contenedorId) {
         + ' style="width:62px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="text" name="items_manual[' + idx + '][unidad]" placeholder="Unid."'
+        + '<input type="text" name="items_manual[' + idx + '][unidad]" value="' + escHtmlAi(aiGetUnidad(id)) + '" placeholder="—"'
         + ' style="width:68px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
@@ -2825,46 +2957,48 @@ function aiRenderFila(idx, id, nombre) {
         + '<span style="font-size:0.8rem;font-weight:500;color:#1f2937;">' + escHtmlAi(nombre) + '</span>'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" id="ai-cant-' + idx + '" name="items[' + idx + '][cantidad]" value="1" min="1"'
-        + ' oninput="aiRecalcTotal(' + idx + ')"'
-        + ' style="width:60px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
-        + '</td>'
-        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" name="items[' + idx + '][monto]" placeholder="0" min="0" step="1"'
-        + ' style="width:90px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
-        + '</td>'
-        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" id="ai-pneto-' + idx + '" name="items[' + idx + '][precio_neto]" placeholder="0" min="0" step="1"'
-        + ' oninput="aiRecalcTotal(' + idx + ')"'
-        + ' style="width:95px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '<input type="number" id="ai-loc-cant-' + idx + '" name="items[' + idx + '][cantidad]" value="1" min="1"'
+        + ' style="width:62px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.6rem;text-align:center;">'
-        + '<span id="ai-tneto-' + idx + '" style="font-size:0.8rem;font-weight:600;color:#111827;">—</span>'
+        + '<span style="font-size:.8rem;font-weight:600;color:#4f46e5;font-family:monospace;">' + escHtmlAi(aiGetUnidad(id)) + '</span>'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
+        + '<input type="number" id="ai-loc-neto-' + idx + '" name="items[' + idx + '][precio_neto]" placeholder="0" min="0" step="any"'
+        + ' style="width:88px;text-align:right;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '</td>'
+        + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
+        + '<input type="number" id="ai-loc-total-' + idx + '" name="items[' + idx + '][monto]" placeholder="0" min="0" step="1"'
+        + ' style="width:88px;text-align:right;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;">'
         + '<select name="items[' + idx + '][contenedor_id]"'
         + ' style="width:100%;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.78rem;background:#fff;">'
         + contOpts + '</select>'
         + '</td>'
-        + '<td style="padding:0.4rem 0.3rem;text-align:center;">'
-        + '<button type="button" onclick="aiQuitar(' + idx + ')" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;">&#x2715;</button>'
+        + '<td style="padding:0.4rem 0.3rem;text-align:center;white-space:nowrap;">'
+        + '<button type="button" onclick="aiQuitar(' + idx + ')" title="Quitar" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;">&#x2715;</button>'
         + '</td>';
     tbody.appendChild(tr);
-}
 
-function aiRecalcTotal(idx) {
-    var cant  = parseFloat(document.getElementById('ai-cant-' + idx)?.value)  || 0;
-    var pneto = parseFloat(document.getElementById('ai-pneto-' + idx)?.value) || 0;
-    var span  = document.getElementById('ai-tneto-' + idx);
-    if (!span) return;
-    if (cant > 0 && pneto > 0) {
-        var total = cant * pneto;
-        span.textContent = '$' + total.toLocaleString('es-CL');
-        span.style.color = '#111827';
-    } else {
-        span.textContent = '—';
-        span.style.color = '#9ca3af';
-    }
+    var inpCant  = document.getElementById('ai-loc-cant-'  + idx);
+    var inpNeto  = document.getElementById('ai-loc-neto-'  + idx);
+    var inpTotal = document.getElementById('ai-loc-total-' + idx);
+
+    inpNeto.addEventListener('input', function() {
+        var cant = parseFloat(inpCant.value) || 1;
+        var neto = parseFloat(this.value);
+        inpTotal.value = isNaN(neto) ? '' : Math.round(neto * cant);
+    });
+    inpTotal.addEventListener('input', function() {
+        var cant  = parseFloat(inpCant.value) || 1;
+        var total = parseFloat(this.value);
+        inpNeto.value = isNaN(total) ? '' : (Math.round(total / cant * 100) / 100);
+    });
+    inpCant.addEventListener('input', function() {
+        var neto = parseFloat(inpNeto.value);
+        if (!isNaN(neto)) inpTotal.value = Math.round(neto * (parseFloat(this.value) || 1));
+    });
 }
 
 function aiQuitar(idx) {
@@ -2884,6 +3018,11 @@ function aiActualizarTabla() {
 function escHtmlAi(str) {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+function aiGetUnidad(productoId) {
+    var p = (typeof aiProductos !== 'undefined' ? aiProductos : []).find(function(x) { return x.id === productoId; });
+    return p ? (p.unidad || '—') : '—';
+}
 } // end if btn-agregar-inventario
 
 // ── Modal crear producto rápido (dev) — fuera del if para ser global ──────────
@@ -2892,6 +3031,20 @@ var aiCrearFamiliaId = null;
 var aiCrearCatId     = null;
 var aiCrearNombre    = '';
 var aiEditandoIdx    = null;
+
+var aiCrearContexto = 'manual'; // 'manual' | 'local'
+
+function aiAbrirModalCrearLocal() {
+    if (!AI_IS_ADMIN) return;
+    aiCrearContexto = 'local';
+    aiAbrirModalCrear('', null);
+    var wrap = document.getElementById('ai-crear-nombre-wrap');
+    var display = document.getElementById('ai-crear-nombre-display');
+    if (wrap) wrap.style.display = '';
+    if (display) display.style.display = 'none';
+    var input = document.getElementById('ai-crear-nombre-input');
+    if (input) { input.value = document.getElementById('ai-buscador')?.value.trim() || ''; input.focus(); }
+}
 
 function aiAbrirModalCrear(nombre, editIdx) {
     if (!AI_IS_ADMIN) return;
@@ -2903,8 +3056,12 @@ function aiAbrirModalCrear(nombre, editIdx) {
     document.getElementById('ai-crear-cat-wrapper').style.display = 'none';
     document.getElementById('ai-crear-stock-minimo').value  = '0';
     document.getElementById('ai-crear-stock-critico').value = '0';
+    var selUm = document.getElementById('ai-crear-unidad-id');
+    if (selUm) selUm.value = '';
+    var nombreWrap = document.getElementById('ai-crear-nombre-wrap');
+    if (nombreWrap) nombreWrap.style.display = 'none';
     var nombreEl = document.getElementById('ai-crear-nombre-display');
-    if (nombreEl) nombreEl.textContent = nombre;
+    if (nombreEl) { nombreEl.textContent = nombre; nombreEl.style.display = ''; }
     var tituloEl = document.getElementById('ai-crear-titulo');
     if (tituloEl) tituloEl.textContent = aiEditandoIdx !== null ? 'Editar producto' : 'Nuevo producto';
     var res = document.getElementById('ai-resultados-manual');
@@ -2977,6 +3134,19 @@ function aiRenderCrearCategorias() {
 function aiConfirmarCrearProducto() {
     var errDiv = document.getElementById('ai-crear-error');
     errDiv.style.display = 'none';
+
+    // Si contexto es local, leer el nombre solo si el input está visible
+    // (cuando se abre via botón). Si se abrió desde el dropdown, aiCrearNombre
+    // ya viene del texto de búsqueda y el input está oculto.
+    if (aiCrearContexto === 'local') {
+        var nombreWrap  = document.getElementById('ai-crear-nombre-wrap');
+        var nombreInput = document.getElementById('ai-crear-nombre-input');
+        if (nombreWrap && nombreWrap.style.display !== 'none' && nombreInput) {
+            aiCrearNombre = nombreInput.value.trim();
+        }
+        if (!aiCrearNombre) { errDiv.textContent = 'Escribe el nombre del producto.'; errDiv.style.display = 'block'; return; }
+    }
+
     if (!aiCrearFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.style.display = 'block'; return; }
     if (!aiCrearCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.style.display = 'block'; return; }
 
@@ -2989,7 +3159,7 @@ function aiConfirmarCrearProducto() {
     fetch(AI_URL_CREAR, {
         method: 'POST',
         headers: { 'X-CSRF-TOKEN': AI_CSRF, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoria_id: aiCrearCatId, nombre: aiCrearNombre, stock_minimo: minimo, stock_critico: critico }),
+        body: JSON.stringify({ categoria_id: aiCrearCatId, nombre: aiCrearNombre, stock_minimo: minimo, stock_critico: critico, unidad_medida_id: parseInt(document.getElementById('ai-crear-unidad-id')?.value) || null }),
     })
     .then(function(res) { return res.json().then(function(p) { return { ok: res.ok, p: p }; }); })
     .then(function(data) {
@@ -3001,7 +3171,7 @@ function aiConfirmarCrearProducto() {
             _aiProductosCreados.push(p.id);
             try { sessionStorage.setItem('ai_prods_creados', JSON.stringify(_aiProductosCreados)); } catch(e) {}
             if (typeof aiProductos !== 'undefined') {
-                aiProductos.push({ id: p.id, nombre: p.nombre, contenedor_id: null, contenedor_nombre: '', stock: 0 });
+                aiProductos.push({ id: p.id, nombre: p.nombre, unidad: p.unidad || '', contenedor_id: null, contenedor_nombre: '', stock: 0 });
             }
             if (aiEditandoIdx !== null) {
                 var row = document.getElementById('ai-row-manual-' + aiEditandoIdx);
@@ -3016,10 +3186,16 @@ function aiConfirmarCrearProducto() {
                 if (item) { item.id = p.id; item.nombre = p.nombre; }
                 aiEditandoIdx = null;
             } else {
-                if (typeof aiAgregarManual === 'function') aiAgregarManual(p.id, p.nombre, null);
+                if (aiCrearContexto === 'local') {
+                    if (typeof aiAgregar === 'function') aiAgregar(p.id, p.nombre);
+                } else {
+                    if (typeof aiAgregarManual === 'function') aiAgregarManual(p.id, p.nombre, null);
+                }
             }
+            var buscadorId = aiCrearContexto === 'local' ? 'ai-buscador' : 'ai-buscador-manual';
+            aiCrearContexto = 'manual'; // reset
             aiCerrarModalCrear();
-            var buscador = document.getElementById('ai-buscador-manual');
+            var buscador = document.getElementById(buscadorId);
             if (buscador) buscador.value = '';
         }
     })

@@ -32,9 +32,7 @@
         </thead>
         <tbody>
             @foreach($sicds as $sicd)
-                @php
-                    $oc = $sicd->ordenesCompra->first();
-                @endphp
+                @php $ocs = $sicd->ordenesCompra; @endphp
                 <tr>
                     <td class="px-4 py-3 font-mono font-semibold text-indigo-700">{{ $sicd->codigo_sicd }}</td>
                     <td class="px-4 py-3 text-gray-600">{{ $sicd->detalles_count }} producto(s)</td>
@@ -55,8 +53,15 @@
                         </span>
                     </td>
                     <td class="px-4 py-3 text-gray-600">
-                        @if($oc)
-                            <a href="{{ route('admin.ordenes.show', $oc->id) }}" class="text-indigo-600 hover:underline font-mono text-xs">{{ $oc->numero_oc }}</a>
+                        @if($ocs->isNotEmpty())
+                            <div class="flex flex-col gap-0.5">
+                                @foreach($ocs as $oc)
+                                    <a href="{{ route('admin.ordenes.show', $oc->id) }}"
+                                       class="text-indigo-600 hover:underline font-mono text-xs whitespace-nowrap">
+                                        {{ $oc->numero_oc }}
+                                    </a>
+                                @endforeach
+                            </div>
                         @else
                             <span class="text-gray-400 text-xs">—</span>
                         @endif
