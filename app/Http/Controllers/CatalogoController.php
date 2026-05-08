@@ -6,6 +6,7 @@ use App\Models\Categoria;
 use App\Models\Container;
 use App\Models\Familia;
 use App\Models\Producto;
+use App\Models\UnidadMedida;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -34,9 +35,11 @@ class CatalogoController extends Controller
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get(['id', 'nombre']);
 
+        $unidades = UnidadMedida::orderBy('nombre')->get(['id', 'nombre', 'abreviacion']);
+
         $familiaActiva = (int) $request->get('familia', $familias->first()?->id ?? 0);
 
-        return view('admin.productos.catalogo', compact('familias', 'containers', 'familiaActiva'));
+        return view('admin.productos.catalogo', compact('familias', 'containers', 'unidades', 'familiaActiva'));
     }
 
     public function storeFamilia(Request $request)
@@ -191,27 +194,30 @@ class CatalogoController extends Controller
         abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $data = $request->validate([
-            'categoria_id'  => ['required', 'integer', 'exists:categorias,id'],
-            'stock_minimo'  => ['required', 'integer', 'min:0'],
-            'stock_critico' => ['required', 'integer', 'min:0'],
-            'contenedor'    => ['nullable', 'integer', 'exists:containers,id'],
-            'codigo_barras' => ['nullable', 'string', 'max:100', 'unique:productos,codigo_barras'],
+            'categoria_id'    => ['required', 'integer', 'exists:categorias,id'],
+            'stock_minimo'    => ['required', 'integer', 'min:0'],
+            'stock_critico'   => ['required', 'integer', 'min:0'],
+            'contenedor'      => ['required', 'integer', 'exists:containers,id'],
+            'unidad_medida_id'=> ['required', 'integer', 'exists:unidades_medida,id'],
+            'codigo_barras'   => ['nullable', 'string', 'max:100', 'unique:productos,codigo_barras'],
         ], [
-            'codigo_barras.unique' => 'Ese código de barras ya está asignado a otro producto.',
+            'codigo_barras.unique'      => 'Ese código de barras ya está asignado a otro producto.',
+            'unidad_medida_id.required' => 'Debes seleccionar una unidad de medida.',
         ]);
 
         $categoria = Categoria::findOrFail($data['categoria_id']);
         $ccId      = $this->ccId();
 
         $producto = Producto::create([
-            'nombre'          => $categoria->nombre,
-            'codigo_barras'   => $data['codigo_barras'] ?? null,
-            'stock_actual'    => 0,
-            'stock_minimo'    => $data['stock_minimo'],
-            'stock_critico'   => $data['stock_critico'],
-            'contenedor'      => $data['contenedor'] ?? null,
-            'categoria_id'    => $data['categoria_id'],
-            'centro_costo_id' => $ccId,
+            'nombre'           => $categoria->nombre,
+            'codigo_barras'    => $data['codigo_barras'] ?? null,
+            'stock_actual'     => 0,
+            'stock_minimo'     => $data['stock_minimo'],
+            'stock_critico'    => $data['stock_critico'],
+            'contenedor'       => $data['contenedor'],
+            'unidad_medida_id' => $data['unidad_medida_id'],
+            'categoria_id'     => $data['categoria_id'],
+            'centro_costo_id'  => $ccId,
         ]);
 
         if ($request->ajax()) {

@@ -5,7 +5,7 @@
 
 <div class="mb-5">
     <a href="{{ route('admin.computadores.index') }}" class="text-sm text-indigo-600 hover:underline">← Volver a Armados</a>
-    <h1 class="text-2xl font-bold text-gray-800 mt-1">Nuevo Armado de Computadora</h1>
+    <h1 class="text-2xl font-bold text-gray-800 mt-1">Nuevo Armado de Equipo</h1>
 </div>
 
 <div class="bg-white rounded-xl shadow p-6 max-w-xl">

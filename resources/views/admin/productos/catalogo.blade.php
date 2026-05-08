@@ -295,6 +295,15 @@
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
             </div>
+
+            {{-- Contenedor: requerido al crear, oculto al editar --}}
+            <div id="prod-contenedor-wrapper">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Contenedor <span class="text-red-500">*</span></label>
+                <select id="prod-contenedor"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">— Selecciona un contenedor —</option>
+                </select>
+            </div>
         </div>
 
         <div class="flex justify-end gap-3 mt-5" style="border-top:1px solid #f3f4f6; padding-top:1rem;">
@@ -1041,6 +1050,12 @@ function prodRenderCategorias() {
 }
 
 function abrirModalProducto() {
+    // Bloquear si no hay contenedores
+    if (containersData.length === 0) {
+        alert('No hay contenedores disponibles. Crea al menos un contenedor antes de agregar productos.');
+        return;
+    }
+
     editandoProdId = null;
     // Pre-seleccionar familia y categoría si hay una activa
     if (catActualId) {
@@ -1058,6 +1073,18 @@ function abrirModalProducto() {
     document.getElementById('prod-stock-critico').value         = '0';
     document.getElementById('modal-prod-errors').classList.add('hidden');
     document.getElementById('modal-prod-success').classList.add('hidden');
+
+    // Poblar y mostrar select de contenedor
+    var sel = document.getElementById('prod-contenedor');
+    sel.innerHTML = '<option value="">— Selecciona un contenedor —</option>';
+    containersData.forEach(function(c) {
+        var opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.nombre;
+        sel.appendChild(opt);
+    });
+    document.getElementById('prod-contenedor-wrapper').style.display = 'block';
+
     prodRenderFamilias();
     prodRenderCategorias();
     abrirModal('modal-producto');
@@ -1076,6 +1103,7 @@ function editarProducto(prodId) {
     document.getElementById('prod-stock-critico').value         = prod.stock_critico;
     document.getElementById('modal-prod-errors').classList.add('hidden');
     document.getElementById('modal-prod-success').classList.add('hidden');
+    document.getElementById('prod-contenedor-wrapper').style.display = 'none';
     abrirModal('modal-producto');
     setTimeout(function() { document.getElementById('prod-stock-minimo').focus(); }, 50);
 }
@@ -1120,13 +1148,23 @@ async function guardarProducto() {
     if (!editandoProdId && !prodFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.classList.remove('hidden'); return; }
     if (!editandoProdId && !prodCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.classList.remove('hidden'); return; }
 
+    var contenedorId = document.getElementById('prod-contenedor')?.value ?? '';
+    if (!editandoProdId && !contenedorId) {
+        errDiv.textContent = 'Debes seleccionar un contenedor.';
+        errDiv.classList.remove('hidden');
+        return;
+    }
+
     var btn = document.getElementById('btn-guardar-prod');
     btn.disabled = true; btn.textContent = 'Guardando...';
     try {
         var url    = editandoProdId ? ROUTE_PROD_UPDATE(editandoProdId) : ROUTE_PROD_STORE;
         var method = editandoProdId ? 'PUT' : 'POST';
         var body   = new URLSearchParams({ _token: CSRF, stock_minimo, stock_critico });
-        if (!editandoProdId) body.append('categoria_id', prodCatId);
+        if (!editandoProdId) {
+            body.append('categoria_id', prodCatId);
+            body.append('contenedor', contenedorId);
+        }
         var res  = await fetch(url, { method, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
         var json = await res.json();
         if (!res.ok || !json.ok) {
