@@ -17,15 +17,28 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    // Permisos disponibles para usuarios no-admin
     public const PERMISOS_DISPONIBLES = [
-        'historial'           => 'Ver historial de cambios',
+        // Solicitudes
+        'historial'           => 'Historial de cambios',
         'solicitudes'         => 'Ver solicitudes pendientes',
         'aprobar_solicitudes' => 'Aprobar y rechazar solicitudes',
         'rechazadas'          => 'Ver solicitudes rechazadas',
-        'sicd'                => 'Ver y gestionar SICD',
-        'ordenes'             => 'Ver y gestionar órdenes de compra',
-        'containers'          => 'Ver contenedores',
+        // Logística y Compras
+        'sicd'                => 'SICD',
+        'ordenes'             => 'Órdenes de Compra',
+        'containers'          => 'Containers',
+        'gastos_menores'      => 'Gastos Menores',
+        // Administración
+        'reportes'            => 'Reportes y BINCARD',
+        'computadores'        => 'Armado de Computadoras',
+        'catalogo'            => 'Catálogo de Productos',
+        'usuarios'            => 'Gestión de Usuarios',
+    ];
+
+    public const PERMISOS_GRUPOS = [
+        'Flujo de Solicitudes' => ['historial', 'solicitudes', 'aprobar_solicitudes', 'rechazadas'],
+        'Logística y Compras'  => ['sicd', 'ordenes', 'containers', 'gastos_menores'],
+        'Administración'       => ['reportes', 'computadores', 'catalogo', 'usuarios'],
     ];
 
     protected $fillable = [
@@ -93,16 +106,17 @@ class User extends Authenticatable
 
     public function tienePermiso(string $permiso): bool
     {
-        if ($this->esAdmin()) return true;
-        $permisos = $this->permisos ?? [];
-        return in_array($permiso, $permisos);
+        if ($this->esDev()) return true;
+        // Admin sin restricciones explícitas: acceso completo
+        if ($this->esAdmin() && empty($this->permisos)) return true;
+        return in_array($permiso, $this->permisos ?? []);
     }
 
     public function tieneAlgunPermiso(): bool
     {
-        if ($this->esAdmin()) return true;
-        $permisos = $this->permisos ?? [];
-        return count($permisos) > 0;
+        if ($this->esDev()) return true;
+        if ($this->esAdmin() && empty($this->permisos)) return true;
+        return !empty($this->permisos);
     }
 
     public function solicitudes()

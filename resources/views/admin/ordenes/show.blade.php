@@ -70,11 +70,18 @@
                     <tbody class="divide-y divide-gray-100">
                         @foreach($sicd->detalles as $det)
                             @php
-                                $pendiente = $oc->estado === 'pendiente';
-                                $diferente = !$pendiente && $det->cantidad_recibida != $det->cantidad_solicitada;
+                                $pendiente     = $oc->estado === 'pendiente';
+                                $diferente     = !$pendiente && $det->cantidad_recibida != $det->cantidad_solicitada;
+
+                                // Estado de adjudicación de este detalle
+                                $esDeEstaOc  = in_array($det->id, $idsEstaOc);
+                                $otraOcNum   = $otraOcPorDetalle[$det->id] ?? null;
+                                $adjOtraOc   = !$esDeEstaOc && $otraOcNum;
+                                $sinAsignOc  = !$esDeEstaOc && !$otraOcNum;
                             @endphp
-                            <tr class="{{ $diferente ? 'bg-orange-50' : 'hover:bg-gray-50' }}">
+                            <tr class="{{ $adjOtraOc ? 'opacity-60' : ($diferente ? 'bg-orange-50' : 'hover:bg-gray-50') }}">
                                 <td class="px-4 py-2 text-gray-800">
+                                    {{-- Nombre del producto --}}
                                     @if($det->producto)
                                         {{ $det->producto->nombre }}
                                         @if($det->producto->nombre !== $det->nombre_producto_excel)
@@ -84,6 +91,20 @@
                                         {{ $det->nombre_producto_excel }}
                                         <span class="ml-1 text-xs text-amber-500">(sin enlace)</span>
                                     @endif
+
+                                    {{-- Badge de adjudicación --}}
+                                    @if($adjOtraOc)
+                                        <span class="inline-flex items-center gap-1 mt-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                                            🔒 Adjudicada a OC: {{ $otraOcNum }}
+                                        </span>
+                                    @elseif($sinAsignOc && count($idsEstaOc) > 0)
+                                        {{-- Solo mostrar si la OC ya tiene oc_detalles definidos (nuevo sistema) --}}
+                                        <span class="inline-flex items-center gap-1 mt-1 text-xs text-gray-400 italic">
+                                            Sin asignar a ninguna OC
+                                        </span>
+                                    @endif
+
+                                    {{-- Motivo diferencia recepción --}}
                                     @if($diferente && $det->motivo_recepcion)
                                         <span class="block mt-1 text-xs font-semibold" style="color:#c2410c;">
                                             ⚠ Motivo: {{ $det->motivo_recepcion }}
@@ -93,9 +114,13 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-2 text-center text-gray-600">{{ $det->unidad ?? '—' }}</td>
-                                <td class="px-4 py-2 text-center font-semibold text-gray-700">{{ $det->cantidad_solicitada }}</td>
+                                <td class="px-4 py-2 text-center font-semibold {{ $adjOtraOc ? 'text-gray-400' : 'text-gray-700' }}">
+                                    {{ $det->cantidad_solicitada }}
+                                </td>
                                 <td class="px-4 py-2 text-center font-semibold">
-                                    @if($pendiente)
+                                    @if($adjOtraOc)
+                                        <span class="text-xs text-purple-500 italic">En otra OC</span>
+                                    @elseif($pendiente)
                                         <span class="inline-flex items-center gap-1 bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">
                                             <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> Pendiente
                                         </span>
@@ -410,12 +435,18 @@
         {{-- BOTÓN RECEPCIÓN --}}
         @if($oc->estado !== 'recibido')
             @php
-                $puedeRecepcionar = (bool) $oc->factura;
+                $ocValidada       = $oc->estado === 'validado';
+                $puedeRecepcionar = $ocValidada && (bool) $oc->factura;
             @endphp
             <div class="bg-white rounded-xl shadow p-5">
                 <h3 class="text-sm font-semibold text-gray-700 mb-3">Registrar Recepción</h3>
 
-                @if(!$oc->factura)
+                @if(!$ocValidada)
+                    <div class="mb-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        <p class="font-semibold mb-0.5">OC no validada en Mercado Público</p>
+                        <p>Valida la OC correctamente antes de registrar la recepción.</p>
+                    </div>
+                @elseif(!$oc->factura)
                     <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                         Sube la <strong>factura</strong> antes de registrar la recepción.
                     </div>

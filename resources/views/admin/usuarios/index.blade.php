@@ -125,7 +125,9 @@
                         @endif
                     </td>
                     <td class="px-5 py-3">
-                        @if($u->esAdmin())
+                        @if($u->esDev())
+                            <span class="text-xs text-purple-400 italic">Acceso total (Dev)</span>
+                        @elseif($u->esAdmin() && empty($u->permisos))
                             <span class="text-xs text-indigo-400 italic">Acceso completo</span>
                         @elseif($u->permisos && count($u->permisos))
                             <div style="display:flex; flex-wrap:wrap; gap:4px;">

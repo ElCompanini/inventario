@@ -8,8 +8,10 @@ use App\Models\Factura;
 use App\Models\GuiaDespacho;
 use App\Models\HistorialCambio;
 use App\Models\OrdenCompra;
+use App\Models\OrdenCompraDetalle;
 use App\Models\Precio;
 use App\Models\Sicd;
+use App\Models\SicdDetalle;
 use App\Models\SicdExterno;
 use App\Services\MercadoPublicoService;
 use Illuminate\Http\Request;
@@ -53,7 +55,7 @@ class OrdenCompraController extends Controller
                          ->whereNotIn('estado', ['cancelado']);
                   });
             })
-            ->with('detalles')
+            ->with(['detalles.ocDetalles'])
             ->orderByDesc('created_at')
             ->get();
 
@@ -63,15 +65,33 @@ class OrdenCompraController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'numero_oc'  => ['required', 'string', 'max:100', 'unique:ordenes_compra,numero_oc'],
-            'sicd_ids'   => ['required', 'array', 'min:1'],
-            'sicd_ids.*' => ['integer', 'exists:sicds,id'],
-            'archivo_oc' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'numero_oc'                       => ['required', 'string', 'max:100', 'unique:ordenes_compra,numero_oc'],
+            'sicd_ids'                        => ['required', 'array', 'min:1'],
+            'sicd_ids.*'                      => ['integer', 'exists:sicds,id'],
+            'archivo_oc'                      => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'oc_detalles'                     => ['required', 'array', 'min:1'],
+            'oc_detalles.*.sicd_detalle_id'   => ['required', 'integer', 'exists:sicd_detalles,id'],
+            'oc_detalles.*.cantidad_asignada' => ['required', 'integer', 'min:1'],
+            'oc_detalles.*.precio_neto'       => ['nullable', 'numeric', 'min:0'],
+            'oc_detalles.*.total_neto'        => ['nullable', 'numeric', 'min:0'],
         ], [
-            'numero_oc.required' => 'El número de OC es obligatorio.',
-            'numero_oc.unique'   => 'Ya existe una OC con ese número.',
-            'sicd_ids.required'  => 'Debes seleccionar al menos un SICD.',
+            'numero_oc.required'                    => 'El número de OC es obligatorio.',
+            'numero_oc.unique'                      => 'Ya existe una OC con ese número.',
+            'sicd_ids.required'                     => 'Debes seleccionar al menos un SICD.',
+            'oc_detalles.required'                  => 'Debes asignar al menos un producto a esta OC.',
+            'oc_detalles.*.cantidad_asignada.min'   => 'La cantidad debe ser al menos 1.',
         ]);
+
+        // Validar que las cantidades no excedan el disponible en cada detalle
+        foreach ($data['oc_detalles'] as $det) {
+            $detalle = SicdDetalle::with('ocDetalles')->findOrFail($det['sicd_detalle_id']);
+            $disponible = $detalle->cantidad_disponible;
+            if ((int) $det['cantidad_asignada'] > $disponible) {
+                return back()->withErrors([
+                    'oc_detalles' => "El producto «{$detalle->nombre_producto_excel}» solo tiene {$disponible} unidad(es) disponible(s).",
+                ])->withInput();
+            }
+        }
 
         $rutaOc   = null;
         $nombreOc = null;
@@ -106,6 +126,17 @@ class OrdenCompraController extends Controller
                 'estado'         => 'agrupado',
                 'permite_mas_oc' => $permiteMasOc,
             ]);
+
+            // Guardar asignación granular de productos a esta OC
+            foreach ($data['oc_detalles'] as $det) {
+                OrdenCompraDetalle::create([
+                    'orden_compra_id'  => $oc->id,
+                    'sicd_detalle_id'  => $det['sicd_detalle_id'],
+                    'cantidad_asignada'=> (int) $det['cantidad_asignada'],
+                    'precio_neto'      => isset($det['precio_neto']) && $det['precio_neto'] !== '' ? (float) $det['precio_neto'] : null,
+                    'total_neto'       => isset($det['total_neto'])  && $det['total_neto']  !== '' ? (float) $det['total_neto']  : null,
+                ]);
+            }
         });
 
         $oc = OrdenCompra::where('numero_oc', strtoupper(trim($data['numero_oc'])))->first();
@@ -147,9 +178,30 @@ class OrdenCompraController extends Controller
 
     public function show(int $id)
     {
-        $oc = OrdenCompra::with(['usuario', 'sicds.detalles.producto', 'factura', 'guia'])->findOrFail($id);
+        $oc = OrdenCompra::with([
+            'usuario',
+            'sicds.detalles.producto',
+            'detalles',   // oc_detalles de ESTA OC
+            'factura',
+            'guia',
+        ])->findOrFail($id);
 
-        return view('admin.ordenes.show', compact('oc'));
+        // IDs de sicd_detalles asignados a ESTA OC
+        $idsEstaOc = $oc->detalles->pluck('sicd_detalle_id')->toArray();
+
+        // Para sicd_detalles de este mismo SICD que están en OTRA OC, obtener el número de OC
+        $allSicdDetalleIds = $oc->sicds
+            ->flatMap(fn($s) => $s->detalles->pluck('id'))
+            ->toArray();
+
+        $otraOcPorDetalle = OrdenCompraDetalle::whereNotIn('orden_compra_id', [$oc->id])
+            ->whereIn('sicd_detalle_id', $allSicdDetalleIds)
+            ->with('ordenCompra:id,numero_oc')
+            ->get()
+            ->groupBy('sicd_detalle_id')
+            ->map(fn($g) => $g->first()->ordenCompra->numero_oc ?? '—');
+
+        return view('admin.ordenes.show', compact('oc', 'idsEstaOc', 'otraOcPorDetalle'));
     }
 
     /**
@@ -222,11 +274,20 @@ class OrdenCompraController extends Controller
 
     public function recepcion(int $id)
     {
-        $oc = OrdenCompra::with(['sicds.detalles.producto', 'factura'])->findOrFail($id);
+        $oc = OrdenCompra::with([
+            'detalles.sicdDetalle.producto',
+            'detalles.sicdDetalle.sicd',
+            'factura',
+        ])->findOrFail($id);
 
         if ($oc->estado === 'recibido') {
             return redirect()->route('admin.ordenes.show', $oc->id)
                 ->with('error', 'Esta OC ya fue procesada.');
+        }
+
+        if ($oc->estado !== 'validado') {
+            return redirect()->route('admin.ordenes.show', $oc->id)
+                ->with('error', 'La OC debe estar validada en Mercado Público antes de poder recepcionar.');
         }
 
         if (!$oc->tieneFactura()) {
@@ -244,11 +305,21 @@ class OrdenCompraController extends Controller
         \Log::info('procesarRecepcion START', ['id' => $id, 'user' => Auth::id()]);
 
         try {
-        $oc = OrdenCompra::with(['sicds.detalles.producto', 'factura', 'guia'])->findOrFail($id);
+        $oc = OrdenCompra::with([
+            'detalles.sicdDetalle.producto',
+            'detalles.sicdDetalle.sicd',
+            'factura',
+            'guia',
+        ])->findOrFail($id);
 
         if ($oc->estado === 'recibido') {
             \Log::info('procesarRecepcion: ya recibido');
             return back()->with('error', 'Esta OC ya fue procesada.');
+        }
+
+        if ($oc->estado !== 'validado') {
+            \Log::info('procesarRecepcion: no validada en MP');
+            return back()->with('error', 'La OC debe estar validada en Mercado Público antes de procesar la recepción.');
         }
 
         if (!$oc->tieneFactura()) {
@@ -260,97 +331,124 @@ class OrdenCompraController extends Controller
         $userId   = Auth::id();
 
         DB::transaction(function () use ($oc, $request, $userName, $userId) {
-            foreach ($oc->sicds as $sicd) {
-                foreach ($sicd->detalles as $detalle) {
-                    $recibido = (int) $request->input("recibido.{$detalle->id}", 0);
+            // Agrupar los oc_detalles por SICD para poder actualizar el estado de cada SICD
+            $sicdIds = [];
 
-                    $detalle->cantidad_recibida = $recibido;
+            foreach ($oc->detalles as $ocDetalle) {
+                $detalle = $ocDetalle->sicdDetalle;
+                $sicd    = $detalle->sicd;
+                $recibido = (int) $request->input("recibido.{$ocDetalle->id}", 0);
 
-                    $precioRaw = preg_replace('/[^0-9]/', '', $request->input("precio_neto.{$detalle->id}", ''));
-                    $totalRaw  = preg_replace('/[^0-9]/', '', $request->input("total_neto.{$detalle->id}", ''));
-                    if ($precioRaw !== '') {
-                        $detalle->precio_neto = (float) $precioRaw;
+                $precioRaw = preg_replace('/[^0-9]/', '', $request->input("precio_neto.{$ocDetalle->id}", ''));
+                $totalRaw  = preg_replace('/[^0-9]/', '', $request->input("total_neto.{$ocDetalle->id}", ''));
+
+                // Guardar lo recibido en oc_detalle (para multi-OC: cada OC registra su parte)
+                $ocDetalle->cantidad_recibida = $recibido;
+                if ($precioRaw !== '') {
+                    $ocDetalle->precio_neto = (float) $precioRaw;
+                    $detalle->precio_neto   = (float) $precioRaw;
+                }
+                if ($totalRaw !== '') {
+                    $ocDetalle->total_neto = (float) $totalRaw;
+                    $detalle->total_neto   = (float) $totalRaw;
+                }
+                $ocDetalle->save();
+
+                // Calcular total recibido en sicd_detalle como suma de TODOS los oc_detalles
+                // (correcto para multi-OC: cada OC suma su parte, no se acumula sobre valor anterior)
+                $recibidoOtrosOcs = OrdenCompraDetalle::where('sicd_detalle_id', $detalle->id)
+                    ->where('orden_compra_id', '!=', $oc->id)
+                    ->whereNotNull('cantidad_recibida')
+                    ->sum('cantidad_recibida');
+
+                $detalle->cantidad_recibida = $recibidoOtrosOcs + $recibido;
+                $detalle->save();
+
+                $sicdIds[$sicd->id] = $sicd;
+
+                if ($recibido > 0 && $detalle->producto) {
+                    $detalle->producto->stock_actual += $recibido;
+
+                    $containerId = $request->input("container.{$ocDetalle->id}");
+                    if ($containerId && Container::withoutGlobalScope('con_cc')->find((int) $containerId)) {
+                        $detalle->producto->contenedor = (int) $containerId;
                     }
-                    if ($totalRaw !== '') {
-                        $detalle->total_neto = (float) $totalRaw;
+
+                    $detalle->producto->actualizarFechasStock();
+                    $detalle->producto->save();
+
+                    $motivoExtra = $request->input("motivo_recepcion.{$ocDetalle->id}");
+                    if ($motivoExtra) {
+                        $detalle->motivo_recepcion = $motivoExtra;
+                        $detalle->save();
+                    }
+                    $motivoBase = "OC {$oc->numero_oc} – SICD {$sicd->codigo_sicd}";
+                    if ($recibido != $ocDetalle->cantidad_asignada && $motivoExtra) {
+                        $motivoBase .= " (asignado: {$ocDetalle->cantidad_asignada}, recibido: {$recibido})";
                     }
 
-                    $detalle->save();
+                    HistorialCambio::create([
+                        'producto_id'     => $detalle->producto_id,
+                        'nombre_producto' => $detalle->producto->nombre,
+                        'contenedor_id'   => $detalle->producto->contenedor,
+                        'cantidad'        => $recibido,
+                        'tipo'            => 'entrada',
+                        'motivo'          => $motivoBase,
+                        'aprobado_por'    => $userName,
+                        'usuario_id'      => $userId,
+                        'origen'          => 'sicd',
+                        'origen_id'       => $sicd->id,
+                        'orden_compra_id' => $oc->id,
+                    ]);
 
-                    if ($recibido > 0 && $detalle->producto) {
-                        $detalle->producto->stock_actual += $recibido;
-
-                        $containerId = $request->input("container.{$detalle->id}");
-                        if ($containerId && Container::find((int) $containerId)) {
-                            $detalle->producto->contenedor = (int) $containerId;
-                        }
-
-                        $detalle->producto->actualizarFechasStock();
-                        $detalle->producto->save();
-
-                        $motivoExtra = $request->input("motivo_recepcion.{$detalle->id}");
-                        if ($motivoExtra) {
-                            $detalle->motivo_recepcion = $motivoExtra;
-                            $detalle->save();
-                        }
-                        $motivoBase = "OC {$oc->numero_oc} – SICD {$sicd->codigo_sicd}";
-                        if ($recibido != $detalle->cantidad_solicitada && $motivoExtra) {
-                            $motivoBase .= " (solicitado: {$detalle->cantidad_solicitada}, recibido: {$recibido})";
-                        }
-
-                        HistorialCambio::create([
-                            'producto_id'     => $detalle->producto_id,
-                            'nombre_producto' => $detalle->producto->nombre,
-                            'contenedor_id'   => $detalle->producto->contenedor,
-                            'cantidad'        => $recibido,
-                            'tipo'            => 'entrada',
-                            'motivo'          => $motivoBase,
-                            'aprobado_por'    => $userName,
-                            'usuario_id'      => $userId,
-                            'origen'          => 'sicd',
-                            'origen_id'       => $sicd->id,
-                            'orden_compra_id' => $oc->id,   // ← OC específica que originó este ingreso
-                        ]);
-
-                        if ($detalle->precio_neto && $detalle->precio_neto > 0) {
-                            Precio::registrar(
-                                producto:      $detalle->producto,
-                                precioNeto:    (float) $detalle->precio_neto,
-                                cantidad:      $recibido,
-                                fuente:        'sicd_masiva',
-                                origenId:      $sicd->id,
-                                origenTipo:    'Sicd',
-                                precioTotal:   $detalle->total_neto ? (float) $detalle->total_neto : null,
-                                notas:         "OC {$oc->numero_oc} · SICD {$sicd->codigo_sicd}",
-                                usuarioId:     $userId,
-                                ordenCompraId: $oc->id,   // ← vínculo granular a la OC específica
-                            );
-                        }
+                    $precioNeto = $ocDetalle->precio_neto ?? $detalle->precio_neto;
+                    $totalNeto  = $ocDetalle->total_neto  ?? $detalle->total_neto;
+                    if ($precioNeto && $precioNeto > 0) {
+                        Precio::registrar(
+                            producto:      $detalle->producto,
+                            precioNeto:    (float) $precioNeto,
+                            cantidad:      $recibido,
+                            fuente:        'sicd_masiva',
+                            origenId:      $sicd->id,
+                            origenTipo:    'Sicd',
+                            precioTotal:   $totalNeto ? (float) $totalNeto : null,
+                            notas:         "OC {$oc->numero_oc} · SICD {$sicd->codigo_sicd}",
+                            usuarioId:     $userId,
+                            ordenCompraId: $oc->id,
+                        );
                     }
                 }
-
-                // Solo marcar la SICD como 'recibido' si:
-                // 1. NO tiene el flag permite_mas_oc activo (no se esperan más OCs)
-                // 2. TODAS las demás OCs asociadas a esta SICD ya están recibidas
-                //    (la OC actual se contará como recibida justo debajo)
-                $ocsPendientesEnSicd = $sicd->ordenesCompra()
-                    ->where('ordenes_compra.id', '!=', $oc->id)
-                    ->whereNotIn('ordenes_compra.estado', ['recibido'])
-                    ->count();
-
-                if (!$sicd->permite_mas_oc && $ocsPendientesEnSicd === 0) {
-                    $sicd->estado = 'recibido';
-                } else {
-                    // Quedan OCs pendientes o se esperan más → recepción parcial
-                    $sicd->estado = 'agrupado';
-                }
-                $sicd->save();
             }
 
+            // Marcar la OC actual como recibida
             $oc->estado        = 'recibido';
             $oc->procesado_por = $userName;
             $oc->procesado_at  = now();
             $oc->save();
+
+            // Actualizar estado de cada SICD involucrado y auto-cerrar OCs hermanas
+            foreach ($sicdIds as $sicd) {
+                // ¿Están todos los sicd_detalles completamente recibidos?
+                $sicdCompleto = !$sicd->detalles()
+                    ->whereRaw('COALESCE(cantidad_recibida, 0) < cantidad_solicitada')
+                    ->exists();
+
+                if ($sicdCompleto) {
+                    $sicd->estado = 'recibido';
+                    // Auto-cerrar OCs hermanas que aún estén pendientes
+                    OrdenCompra::whereHas('sicds', fn($q) => $q->where('sicds.id', $sicd->id))
+                        ->where('id', '!=', $oc->id)
+                        ->whereNotIn('estado', ['recibido'])
+                        ->update([
+                            'estado'        => 'recibido',
+                            'procesado_por' => $userName,
+                            'procesado_at'  => now(),
+                        ]);
+                } else {
+                    $sicd->estado = 'agrupado';
+                }
+                $sicd->save();
+            }
         });
 
         \Log::info('procesarRecepcion OK', ['oc' => $oc->numero_oc]);

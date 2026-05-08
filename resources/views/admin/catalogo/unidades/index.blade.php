@@ -61,13 +61,10 @@
                             Editar
                         </button>
                         @if($u->productos()->count() === 0)
-                        <form method="POST" action="{{ route('admin.catalogo.unidades.destroy', $u->id) }}"
-                              onsubmit="return confirm('¿Eliminar la unidad {{ $u->nombre }}?')">
-                            @csrf @method('DELETE')
-                            <button type="submit" style="font-size:.75rem;font-weight:600;color:#ef4444;background:none;border:none;cursor:pointer;">
-                                Eliminar
-                            </button>
-                        </form>
+                        <button onclick="abrirEliminarUnidad({{ $u->id }}, '{{ addslashes($u->nombre) }}')"
+                                style="font-size:.75rem;font-weight:600;color:#ef4444;background:none;border:none;cursor:pointer;">
+                            Eliminar
+                        </button>
                         @endif
                     </div>
                 </td>
@@ -166,6 +163,38 @@
     </div>
 </div>
 
+{{-- Formulario DELETE oculto --}}
+<form id="form-eliminar-unidad" method="POST" style="display:none;">
+    @csrf @method('DELETE')
+</form>
+
+{{-- Modal: confirmar eliminación --}}
+<div id="modal-eliminar-unidad" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:1rem;box-shadow:0 24px 60px rgba(0,0,0,.25);width:400px;max-width:calc(100vw - 2rem);padding:1.5rem;">
+        <div style="display:flex;align-items:flex-start;gap:.75rem;margin-bottom:1.25rem;">
+            <div style="flex-shrink:0;width:2.5rem;height:2.5rem;border-radius:9999px;background:#fee2e2;display:flex;align-items:center;justify-content:center;">
+                <svg style="width:1.2rem;height:1.2rem;color:#dc2626;" fill="none" stroke="#dc2626" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </div>
+            <div>
+                <p style="font-size:.9375rem;font-weight:700;color:#1f2937;margin:0 0 .3rem;">Eliminar unidad</p>
+                <p style="font-size:.8125rem;color:#6b7280;margin:0;">¿Desactivar la unidad <span id="eliminar-unidad-nombre" style="font-weight:700;color:#374151;"></span>? Se realizará un soft delete; el historial se conserva.</p>
+            </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:.5rem;border-top:1px solid #f3f4f6;padding-top:1rem;">
+            <button type="button" onclick="cerrarEliminarUnidad()"
+                    style="padding:.4rem 1rem;font-size:.82rem;font-weight:600;color:#6b7280;background:#f3f4f6;border:none;border-radius:.5rem;cursor:pointer;">
+                Cancelar
+            </button>
+            <button type="button" id="btn-confirmar-eliminar-unidad" onclick="confirmarEliminarUnidad()"
+                    style="padding:.4rem 1.1rem;font-size:.82rem;font-weight:600;color:#fff;background:#dc2626;border:none;border-radius:.5rem;cursor:pointer;">
+                Eliminar
+            </button>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
 <script>
 function abrirEditarUnidad(id, nombre, abrev, desc, activo) {
@@ -177,6 +206,36 @@ function abrirEditarUnidad(id, nombre, abrev, desc, activo) {
     document.getElementById('edit-activo').checked     = activo;
     document.getElementById('modal-editar-unidad').style.display = 'flex';
 }
+
+var _eliminarUnidadId = null;
+
+function abrirEliminarUnidad(id, nombre) {
+    _eliminarUnidadId = id;
+    document.getElementById('eliminar-unidad-nombre').textContent = nombre;
+    var btn = document.getElementById('btn-confirmar-eliminar-unidad');
+    btn.disabled = false;
+    btn.textContent = 'Eliminar';
+    document.getElementById('modal-eliminar-unidad').style.display = 'flex';
+}
+
+function cerrarEliminarUnidad() {
+    document.getElementById('modal-eliminar-unidad').style.display = 'none';
+    _eliminarUnidadId = null;
+}
+
+function confirmarEliminarUnidad() {
+    if (!_eliminarUnidadId) return;
+    var form = document.getElementById('form-eliminar-unidad');
+    form.action = '/admin/catalogo/unidades/' + _eliminarUnidadId;
+    var btn = document.getElementById('btn-confirmar-eliminar-unidad');
+    btn.disabled = true;
+    btn.textContent = 'Eliminando...';
+    form.submit();
+}
+
+document.getElementById('modal-eliminar-unidad').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) cerrarEliminarUnidad();
+});
 </script>
 @endpush
 

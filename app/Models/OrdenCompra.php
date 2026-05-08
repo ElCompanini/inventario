@@ -88,4 +88,10 @@ class OrdenCompra extends Model
     {
         return $this->guia !== null;
     }
+
+    /** Productos asignados explícitamente a esta OC */
+    public function detalles()
+    {
+        return $this->hasMany(OrdenCompraDetalle::class);
+    }
 }

@@ -11,7 +11,7 @@ class UsuarioController extends Controller
 {
     public function index()
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('usuarios'), 403);
         $usuarios = User::with('centroCosto')->orderBy('name')->get();
         return view('admin.usuarios.index', compact('usuarios'));
     }
@@ -62,7 +62,7 @@ class UsuarioController extends Controller
 
     public function update(Request $request, int $id)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('usuarios'), 403);
         $usuario = User::findOrFail($id);
 
         $authUser = auth()->user();
@@ -88,13 +88,13 @@ class UsuarioController extends Controller
 
         // Permisos: solo dev puede modificarlos
         if ($authUser->esDev()) {
-            if ($usuario->rol === 0) {
+            if ($usuario->rol <= 1) { // admin o usuario (no dev)
                 $permisos = array_keys(array_filter(
                     $request->only(array_keys(User::PERMISOS_DISPONIBLES))
                 ));
                 $usuario->permisos = count($permisos) ? $permisos : null;
             } else {
-                $usuario->permisos = null;
+                $usuario->permisos = null; // dev nunca tiene permisos explícitos
             }
         }
 
@@ -106,7 +106,7 @@ class UsuarioController extends Controller
 
     public function destroy(int $id)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('usuarios'), 403);
         $usuario = User::findOrFail($id);
 
         if ($usuario->id === auth()->id()) {

@@ -129,6 +129,7 @@
 @else
     <div class="space-y-4" id="lista-solicitudes">
         @foreach($solicitudes as $solicitud)
+            @if(!$solicitud->producto) @continue @endif
             @php
                 $esEntrada = $solicitud->tipo === 'entrada';
                 $stockActual = $solicitud->producto->stock_actual;

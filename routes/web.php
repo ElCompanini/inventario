@@ -15,7 +15,9 @@ use App\Http\Controllers\CentroCostoController;
 use App\Http\Controllers\GastoMenorController;
 use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\PrecioController;
+use App\Http\Controllers\ComputadorController;
 use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\ReporteriaIndexController;
 use App\Http\Controllers\UnidadMedidaController;
 
 // Raíz → login
@@ -67,6 +69,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/productos/{id}/editar', [AdminController::class, 'editarStock'])->name('productos.editar');
     Route::post('/productos/{id}/stock', [AdminController::class, 'modificarStock'])->name('productos.stock');
     Route::post('/productos/{id}/trasladar', [AdminController::class, 'trasladarContainer'])->name('productos.trasladar');
+    Route::patch('/productos/{id}/deshabilitar', [AdminController::class, 'deshabilitarProducto'])->name('productos.deshabilitar');
 
     // SICD
     Route::get('/sicd/validar', [SicdController::class, 'validarCodigo'])->name('sicd.validar');
@@ -134,6 +137,23 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/reportes/bincard',      [ReporteController::class, 'bincard'])->name('reportes.bincard');
     Route::get('/reportes/bincard/excel',[ReporteController::class, 'exportExcel'])->name('reportes.bincard.excel');
     Route::get('/reportes/bincard/pdf',  [ReporteController::class, 'exportPdf'])->name('reportes.bincard.pdf');
+
+    // Armado de Computadoras
+    Route::get('/computadores',                                                  [ComputadorController::class, 'index'])->name('computadores.index');
+    Route::get('/computadores/crear',                                            [ComputadorController::class, 'create'])->name('computadores.create');
+    Route::post('/computadores',                                                 [ComputadorController::class, 'store'])->name('computadores.store');
+    Route::get('/computadores/{id}',                                             [ComputadorController::class, 'show'])->name('computadores.show');
+    Route::get('/computadores/{id}/editar',                                      [ComputadorController::class, 'edit'])->name('computadores.edit');
+    Route::put('/computadores/{id}',                                             [ComputadorController::class, 'update'])->name('computadores.update');
+    Route::delete('/computadores/{id}',                                          [ComputadorController::class, 'destroy'])->name('computadores.destroy');
+    Route::post('/computadores/{id}/componentes',                                [ComputadorController::class, 'agregarComponente'])->name('computadores.componentes.agregar');
+    Route::patch('/computadores/{computadorId}/componentes/{componenteId}/retirar', [ComputadorController::class, 'retirarComponente'])->name('computadores.componentes.retirar');
+    Route::post('/computadores/{id}/desarmar',                                   [ComputadorController::class, 'desarmar'])->name('computadores.desarmar');
+
+    // Historial de Reporterías
+    Route::get('/reportes/historial',                    [ReporteriaIndexController::class, 'index'])->name('reportes.historial');
+    Route::get('/reportes/historial/{id}/descargar',     [ReporteriaIndexController::class, 'descargar'])->name('reportes.historial.descargar');
+    Route::delete('/reportes/historial/{id}',            [ReporteriaIndexController::class, 'destroy'])->name('reportes.historial.destroy');
     Route::post('/gastos-menores', [GastoMenorController::class, 'store'])->name('gastos-menores.store');
     Route::get('/gastos-menores/{id}/boleta', [GastoMenorController::class, 'descargarBoleta'])->name('gastos-menores.boleta');
     Route::patch('/gastos-menores/{id}/contenedor', [GastoMenorController::class, 'actualizarContenedor'])->name('gastos-menores.contenedor');
@@ -145,6 +165,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/catalogo/familias', [CatalogoController::class, 'storeFamilia'])->name('catalogo.familias.store');
     Route::post('/catalogo/categorias', [CatalogoController::class, 'storeCategoria'])->name('catalogo.categorias.store');
     Route::put('/catalogo/categorias/{categoria}', [CatalogoController::class, 'updateCategoria'])->name('catalogo.categorias.update');
+    Route::delete('/catalogo/categorias/{categoria}', [CatalogoController::class, 'destroyCategoria'])->name('catalogo.categorias.destroy');
     Route::post('/catalogo/productos', [CatalogoController::class, 'storeProducto'])->name('catalogo.productos.store');
     Route::put('/catalogo/productos/{producto}', [CatalogoController::class, 'updateProducto'])->name('catalogo.productos.update');
     Route::get('/catalogo/barcode', [CatalogoController::class, 'buscarBarcode'])->name('catalogo.barcode');

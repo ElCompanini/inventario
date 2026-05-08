@@ -6,20 +6,17 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::table('boletas', function (Blueprint $table) {
-            $table->softDeletes()->after('updated_at');
+        Schema::table('oc_detalles', function (Blueprint $table) {
+            $table->integer('cantidad_recibida')->nullable()->after('cantidad_asignada');
         });
     }
 
     public function down(): void
     {
-        Schema::table('boletas', function (Blueprint $table) {
-            $table->dropSoftDeletes();
+        Schema::table('oc_detalles', function (Blueprint $table) {
+            $table->dropColumn('cantidad_recibida');
         });
     }
 };

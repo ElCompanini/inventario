@@ -1,0 +1,472 @@
+@extends('layouts.app')
+@section('title', $computador->codigo . ' — Armar Equipo')
+
+@section('content')
+
+@php
+    $estados     = \App\Models\ComputadorArmado::ESTADOS;
+    $tipos       = \App\Models\ComputadorArmado::TIPOS_COMPONENTE;
+    $tiposActivos = $computador->componentesActivos->pluck('tipo_componente')->unique()->toArray();
+    $statusClass = match($computador->estado) {
+        'listo'     => 'bg-green-100 text-green-700 border-green-300',
+        'en_uso'    => 'bg-blue-100 text-blue-700 border-blue-300',
+        'desarmado' => 'bg-gray-100 text-gray-500 border-gray-300',
+        default     => 'bg-yellow-100 text-yellow-700 border-yellow-300',
+    };
+@endphp
+
+{{-- Header ─────────────────────────────────────────────────────── --}}
+<div class="mb-5 flex items-center justify-between gap-4 flex-wrap">
+    <div>
+        <a href="{{ route('admin.computadores.index') }}" class="text-sm text-indigo-600 hover:underline">← Armar Equipo</a>
+        <div class="flex items-center gap-3 mt-1 flex-wrap">
+            <h1 class="text-2xl font-bold text-gray-800 font-mono">{{ $computador->codigo }}</h1>
+            <span class="text-lg font-medium text-gray-600">{{ $computador->nombre }}</span>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full border {{ $statusClass }}">
+                {{ $estados[$computador->estado] ?? $computador->estado }}
+            </span>
+        </div>
+        @if($computador->ubicacion || $computador->usuario_asignado)
+        <p class="text-xs text-gray-400 mt-0.5">
+            @if($computador->ubicacion) 📍 {{ $computador->ubicacion }} @endif
+            @if($computador->usuario_asignado) · 👤 {{ $computador->usuario_asignado }} @endif
+        </p>
+        @endif
+    </div>
+    <div class="flex items-center gap-2">
+        <a href="{{ route('admin.computadores.edit', $computador->id) }}"
+           class="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+            Editar equipo
+        </a>
+        @if($computador->componentesActivos->isNotEmpty() && $computador->estado !== 'desarmado')
+        <form method="POST" action="{{ route('admin.computadores.desarmar', $computador->id) }}"
+              onsubmit="return confirm('¿Desarmar completamente? Todos los componentes vuelven al stock.')">
+            @csrf
+            <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition">
+                Desarmar todo
+            </button>
+        </form>
+        @endif
+    </div>
+</div>
+
+@if(session('success'))
+<div class="mb-4 bg-green-50 border border-green-300 text-green-700 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>
+@endif
+@if($errors->any())
+<div class="mb-4 bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm">{{ $errors->first() }}</div>
+@endif
+
+<div class="flex gap-5 items-start">
+
+    {{-- ══ PANEL IZQUIERDO: Componentes instalados ══ --}}
+    <div class="space-y-4 flex-shrink-0" style="width:260px;">
+
+        {{-- Resumen visual --}}
+        <div class="bg-white rounded-xl shadow border border-gray-100 p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-semibold text-gray-700">Componentes instalados</h2>
+                <span class="text-xs font-bold text-indigo-600">{{ $computador->componentesActivos->count() }} piezas</span>
+            </div>
+            <div class="space-y-1">
+                @foreach($tipos as $tipoKey => $tipoLabel)
+                @php $comp = $computador->componentesActivos->where('tipo_componente', $tipoKey)->first(); @endphp
+                <div class="flex items-center gap-2 py-1 border-b border-gray-50 last:border-0">
+                    @if($comp)
+                        <span class="w-4 h-4 text-green-500 flex-shrink-0">
+                            <svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </span>
+                        <span class="text-xs font-semibold text-gray-700 flex-1">{{ $tipoLabel }}</span>
+                    @else
+                        <span class="w-4 h-4 text-gray-200 flex-shrink-0">
+                            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="9" stroke-dasharray="3"/>
+                            </svg>
+                        </span>
+                        <span class="text-xs text-gray-300 flex-1">{{ $tipoLabel }}</span>
+                    @endif
+                </div>
+                @endforeach
+            </div>
+
+            @if($computador->componentesActivos->isNotEmpty())
+            <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                <span class="text-xs text-gray-400">Valorización total</span>
+                <span class="text-sm font-bold text-indigo-700">${{ number_format($computador->valorizacionTotal(), 0, ',', '.') }}</span>
+            </div>
+            @endif
+        </div>
+
+        {{-- Historial reciente --}}
+        @if($computador->componentes->isNotEmpty())
+        <div class="bg-white rounded-xl shadow border border-gray-100 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h2 class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Historial de movimientos</h2>
+            </div>
+            <div class="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+                @foreach($computador->componentes->take(20) as $comp)
+                <div class="px-4 py-2.5 {{ $comp->activo ? '' : 'opacity-60' }}">
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 {{ $comp->activo ? 'bg-green-500' : 'bg-gray-300' }}"></span>
+                        <p class="text-xs font-medium text-gray-800 truncate flex-1">{{ $comp->producto?->nombre ?? '—' }}</p>
+                        <span class="text-xs {{ $comp->activo ? 'text-green-600' : 'text-gray-400' }}">
+                            {{ $comp->activo ? 'Instalado' : 'Retirado' }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-0.5 ml-3">
+                        {{ $comp->activo ? $comp->fecha_instalacion?->format('d/m/Y H:i') : $comp->fecha_retiro?->format('d/m/Y H:i') }}
+                        @if(!$comp->activo && $comp->motivo_retiro)
+                            · {{ $comp->motivo_retiro }}
+                        @endif
+                    </p>
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+    </div>
+
+    {{-- ══ PANEL DERECHO: Browser Categoría → Productos ══ --}}
+    <div class="flex-1 min-w-0">
+        @if($computador->estado === 'desarmado')
+            <div class="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+                <p class="font-semibold">Equipo desarmado — no se pueden agregar componentes.</p>
+            </div>
+        @else
+        <div class="bg-white rounded-xl shadow border border-gray-100 overflow-hidden">
+
+            {{-- Tabs de tipos de componente --}}
+            <div class="border-b border-gray-100">
+                <div class="px-4 pt-3 pb-0">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                        Selecciona el tipo de componente a agregar
+                    </p>
+                    <div id="cat-tabs" class="flex items-center gap-1.5 flex-wrap mb-2">
+                        {{-- Generado por JS --}}
+                    </div>
+                </div>
+            </div>
+
+            {{-- Grid de productos --}}
+            <div id="prod-grid" class="p-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto">
+                {{-- Generado por JS --}}
+            </div>
+
+            <div id="prod-vacio" class="p-10 text-center text-sm text-gray-400" style="display:none;">
+                Sin productos disponibles en esta categoría.
+            </div>
+
+        </div>
+        @endif
+    </div>
+
+</div>
+
+{{-- ══ MODAL: Agregar componente ══ --}}
+<div id="modal-agregar"
+     style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55);
+            align-items:center; justify-content:center; padding:1rem;">
+    <div id="modal-agregar-inner"
+         style="background:#fff; border-radius:1rem; box-shadow:0 24px 60px rgba(0,0,0,.3);
+                width:100%; max-width:480px; animation:eqIn .2s cubic-bezier(.22,.68,0,1.2) both;">
+
+        {{-- Header --}}
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;
+                    padding:1.1rem 1.25rem 0.75rem; border-bottom:1px solid #f3f4f6;">
+            <div>
+                <p style="font-size:0.7rem; font-weight:700; color:#6b7280; text-transform:uppercase;
+                           letter-spacing:0.05em; margin:0 0 0.2rem;">Armar Equipo · {{ $computador->codigo }}</p>
+                <p id="mag-nombre" style="font-size:0.95rem; font-weight:700; color:#111827; margin:0;"></p>
+                <div id="mag-info" style="font-size:0.75rem; color:#6b7280; margin-top:0.2rem; display:flex; gap:0.75rem; flex-wrap:wrap;"></div>
+            </div>
+            <button type="button" onclick="cerrarAgregar()"
+                    style="color:#9ca3af; font-size:1.25rem; border:none; background:none; cursor:pointer; line-height:1;">✕</button>
+        </div>
+
+        {{-- Form --}}
+        <form method="POST" action="{{ route('admin.computadores.componentes.agregar', $computador->id) }}"
+              id="form-agregar">
+            @csrf
+            <input type="hidden" id="mag-producto-id" name="producto_id">
+
+            <div style="padding:1rem 1.25rem; display:flex; flex-direction:column; gap:0.85rem;">
+
+                {{-- Tipo componente (auto desde tab seleccionado) --}}
+                <input type="hidden" name="tipo_componente" id="mag-tipo">
+                <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:0.5rem; padding:0.5rem 0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                    <span style="font-size:0.7rem; font-weight:700; color:#6366f1; text-transform:uppercase; letter-spacing:0.04em;">Tipo:</span>
+                    <span id="mag-tipo-display" style="font-size:0.82rem; font-weight:700; color:#312e81;">—</span>
+                </div>
+
+                {{-- Cantidad + Serial --}}
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.65rem;">
+                    <div>
+                        <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
+                            Cantidad <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="number" name="cantidad" id="mag-cantidad" value="1" min="1"
+                               style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.65rem;
+                                      font-size:0.82rem; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
+                            N° Serie <span style="color:#9ca3af; font-weight:400;">(opcional)</span>
+                        </label>
+                        <input type="text" name="serial" placeholder="SN12345"
+                               style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.65rem;
+                                      font-size:0.82rem; font-family:monospace; box-sizing:border-box;">
+                    </div>
+                </div>
+
+                {{-- Motivo obligatorio --}}
+                <div>
+                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
+                        Motivo del movimiento <span style="color:#ef4444;">*</span>
+                    </label>
+                    <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.45rem;" id="mag-motivos-chips">
+                        @foreach($motivos as $m)
+                        <button type="button" onclick="selMotivo('{{ $m }}')"
+                                class="motivo-chip"
+                                style="padding:3px 10px; font-size:0.7rem; font-weight:600; border-radius:9999px;
+                                       border:1px solid #e5e7eb; background:#f9fafb; color:#374151; cursor:pointer; transition:all .12s;">
+                            {{ $m }}
+                        </button>
+                        @endforeach
+                    </div>
+                    <input type="text" name="motivo" id="mag-motivo" required maxlength="200"
+                           placeholder="Selecciona o escribe el motivo..."
+                           style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.65rem;
+                                  font-size:0.82rem; box-sizing:border-box;">
+                </div>
+
+                {{-- Notas --}}
+                <div>
+                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
+                        Notas <span style="color:#9ca3af; font-weight:400;">(opcional)</span>
+                    </label>
+                    <input type="text" name="notas" maxlength="500" placeholder="Observaciones adicionales..."
+                           style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.65rem;
+                                  font-size:0.82rem; box-sizing:border-box;">
+                </div>
+            </div>
+
+            <div style="padding:0.75rem 1.25rem 1.25rem; display:flex; gap:0.5rem; justify-content:flex-end;">
+                <button type="button" onclick="cerrarAgregar()"
+                        style="padding:0.45rem 1rem; font-size:0.82rem; font-weight:600; color:#374151;
+                               background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        style="padding:0.45rem 1.25rem; font-size:0.82rem; font-weight:700; color:#fff;
+                               background:#4f46e5; border:none; border-radius:0.5rem; cursor:pointer; transition:background .15s;"
+                        onmouseover="this.style.background='#4338ca'" onmouseout="this.style.background='#4f46e5'">
+                    ✓ Instalar componente
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- ══ MODAL: Retirar componente ══ --}}
+<div id="modal-retirar"
+     style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55);
+            align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 60px rgba(0,0,0,.3);
+                width:100%; max-width:400px; animation:eqIn .2s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="padding:1.1rem 1.25rem 0.75rem; border-bottom:1px solid #f3f4f6;">
+            <p style="font-size:0.95rem; font-weight:700; color:#111827; margin:0 0 0.15rem;">Retirar componente</p>
+            <p id="retirar-nombre" style="font-size:0.82rem; color:#6b7280; margin:0;"></p>
+        </div>
+        <form id="form-retirar" method="POST" action="">
+            @csrf @method('PATCH')
+            <div style="padding:1rem 1.25rem;">
+                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.5rem;">
+                    Motivo del retiro <span style="color:#ef4444;">*</span>
+                </label>
+                <div style="display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.45rem;">
+                    @foreach(['REEMPLAZO COMPONENTE','MANTENIMIENTO','DIAGNÓSTICO','UPGRADE','DEVOLUCIÓN STOCK','OTRO'] as $mr)
+                    <button type="button" onclick="selMotivoRetiro('{{ $mr }}')"
+                            class="motivo-chip-r"
+                            style="padding:3px 10px; font-size:0.7rem; font-weight:600; border-radius:9999px;
+                                   border:1px solid #e5e7eb; background:#f9fafb; color:#374151; cursor:pointer; transition:all .12s;">
+                        {{ $mr }}
+                    </button>
+                    @endforeach
+                </div>
+                <input type="text" name="motivo_retiro" id="ret-motivo" required maxlength="500"
+                       placeholder="Selecciona o escribe el motivo..."
+                       style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.65rem;
+                              font-size:0.82rem; box-sizing:border-box;">
+            </div>
+            <div style="padding:0.5rem 1.25rem 1.25rem; display:flex; gap:0.5rem; justify-content:flex-end;">
+                <button type="button" onclick="cerrarRetirar()"
+                        style="padding:0.45rem 1rem; font-size:0.82rem; font-weight:600; color:#374151;
+                               background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">Cancelar</button>
+                <button type="submit"
+                        style="padding:0.45rem 1.1rem; font-size:0.82rem; font-weight:700; color:#fff;
+                               background:#ef4444; border:none; border-radius:0.5rem; cursor:pointer;">
+                    Confirmar retiro
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@push('head')
+<style>
+@keyframes eqIn { from { opacity:0; transform:scale(.93) translateY(-10px); } to { opacity:1; transform:none; } }
+.cat-tab          { border:1px solid #e5e7eb; background:#f9fafb; color:#374151; cursor:pointer; }
+.cat-tab.activo   { background:#4f46e5; color:#fff; border-color:#4f46e5; }
+.cat-tab:hover:not(.activo) { background:#eef2ff; border-color:#c7d2fe; color:#4338ca; }
+.prod-card        { border:1px solid #e5e7eb; border-radius:0.75rem; padding:0.85rem; background:#fff;
+                    transition:border-color .15s, box-shadow .15s; cursor:default; }
+.prod-card:hover  { border-color:#c7d2fe; box-shadow:0 2px 8px rgba(99,102,241,.1); }
+.btn-agregar-prod { border:none; border-radius:0.5rem; padding:0.35rem 0.85rem; font-size:0.72rem;
+                    font-weight:700; color:#fff; background:#4f46e5; cursor:pointer; transition:background .15s; white-space:nowrap; }
+.btn-agregar-prod:hover { background:#4338ca; }
+.btn-agregar-prod:disabled { background:#d1d5db; cursor:not-allowed; }
+.motivo-chip.sel, .motivo-chip-r.sel { background:#4f46e5; color:#fff; border-color:#4f46e5; }
+
+/* Dark mode modales */
+html.dark #modal-agregar-inner,
+html.dark #modal-retirar > div { background:var(--c-surface) !important; }
+html.dark .prod-card { background:var(--c-surface); border-color:var(--c-border); }
+html.dark .cat-tab   { background:var(--c-surface-2); color:var(--c-text-3); border-color:var(--c-border); }
+html.dark .cat-tab.activo { background:#4f46e5; color:#fff; border-color:#4f46e5; }
+</style>
+@endpush
+
+@push('scripts')
+<script>
+// Tipos de componente = igual que panel izquierdo
+var EQ_TIPOS     = @json(collect($tipos)->map(fn($label, $key) => ['key' => $key, 'label' => $label])->values());
+var EQ_PRODUCTOS = @json($productosJson);
+var tipoActivo   = EQ_TIPOS.length ? EQ_TIPOS[0] : null;
+
+// ── Renderizar tabs de tipos ──────────────────────────────────────────────
+function renderTipos() {
+    var tabs = document.getElementById('cat-tabs');
+    if (!tabs) return;
+    tabs.innerHTML = EQ_TIPOS.map(function(t) {
+        var esPrimero = tipoActivo && tipoActivo.key === t.key;
+        return '<button type="button" class="cat-tab px-3 py-1.5 text-xs font-semibold rounded-lg border transition mb-2' + (esPrimero ? ' activo' : '') + '"'
+             + ' data-tipo-key="' + t.key + '" onclick="seleccionarTipo(\'' + t.key + '\',\'' + t.label.replace(/'/g,"\\'") + '\')">'
+             + t.label + '</button>';
+    }).join('');
+}
+
+// ── Seleccionar tipo activo ──────────────────────────────────────────────
+function seleccionarTipo(key, label) {
+    tipoActivo = {key: key, label: label};
+    document.querySelectorAll('.cat-tab').forEach(function(t) { t.classList.remove('activo'); });
+    var tab = document.querySelector('.cat-tab[data-tipo-key="' + key + '"]');
+    if (tab) tab.classList.add('activo');
+    // Actualizar el badge del modal si está abierto
+    document.getElementById('mag-tipo-display').textContent = label;
+    document.getElementById('mag-tipo').value = key;
+}
+
+// ── Render productos en grid (todos, sin filtro por tipo) ─────────────────
+function renderProductos() {
+    var grid  = document.getElementById('prod-grid');
+    var vacio = document.getElementById('prod-vacio');
+    var dm    = document.documentElement.classList.contains('dark');
+    var prods = EQ_PRODUCTOS;
+
+    if (!prods.length) {
+        grid.innerHTML = '';
+        vacio.style.display = '';
+        return;
+    }
+    vacio.style.display = 'none';
+
+    grid.innerHTML = prods.map(function(p) {
+        var sinStock = p.stock <= 0;
+        var stockClr = sinStock ? (dm ? '#f87171' : '#dc2626') : (dm ? '#4ade80' : '#16a34a');
+        var precio   = p.precio > 0 ? '$' + Number(p.precio).toLocaleString('es-CL') : '—';
+        var nombre   = p.nombre.replace(/'/g,"\\'");
+        return '<div class="prod-card" style="position:relative;">'
+             + '<button type="button" onclick="deshabilitarProducto(' + p.id + ',\'' + nombre + '\',this)"'
+             + ' title="Deshabilitar producto" style="position:absolute;top:0.4rem;right:0.4rem;width:1.2rem;height:1.2rem;'
+             + 'border:none;background:none;cursor:pointer;color:#d1d5db;font-size:0.85rem;line-height:1;padding:0;">✕</button>'
+             + '<p style="font-size:0.8rem;font-weight:700;color:' + (dm?'#f1f5f9':'#111827') + ';margin:0 0 0.2rem;line-height:1.3;padding-right:1.2rem;">' + p.nombre + '</p>'
+             + '<p style="font-size:0.68rem;color:' + (dm?'#94a3b8':'#6b7280') + ';margin:0 0 0.4rem;">' + p.cat + '</p>'
+             + '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">'
+             + '<div style="display:flex;flex-direction:column;gap:1px;">'
+             + '<span style="font-size:0.7rem;color:' + stockClr + ';font-weight:700;">Stock: ' + p.stock + ' ' + p.unidad + '</span>'
+             + '<span style="font-size:0.7rem;color:' + (dm?'#94a3b8':'#9ca3af') + ';">Precio: ' + precio + '</span>'
+             + '</div>'
+             + '<button type="button" class="btn-agregar-prod" ' + (sinStock ? 'disabled' : '')
+             + ' onclick="abrirAgregar(' + p.id + ',\'' + nombre + '\',' + p.stock + ',\'' + p.unidad + '\',' + p.precio + ')">'
+             + (sinStock ? 'Sin stock' : '＋ Agregar')
+             + '</button>'
+             + '</div>'
+             + '</div>';
+    }).join('');
+}
+
+// ── Modal Agregar ────────────────────────────────────────────────────────
+function abrirAgregar(id, nombre, stock, unidad, precio) {
+    if (!tipoActivo) {
+        alert('Selecciona el tipo de componente en los tabs de arriba.');
+        return;
+    }
+    document.getElementById('mag-producto-id').value = id;
+    document.getElementById('mag-tipo').value         = tipoActivo.key;
+    document.getElementById('mag-tipo-display').textContent = tipoActivo.label;
+    document.getElementById('mag-nombre').textContent = nombre;
+    document.getElementById('mag-cantidad').max   = stock;
+    document.getElementById('mag-cantidad').value = 1;
+    document.getElementById('mag-motivo').value   = '';
+    document.querySelectorAll('.motivo-chip').forEach(function(c) { c.classList.remove('sel'); });
+
+    var info = '<span>Stock: <strong>' + stock + ' ' + unidad + '</strong></span>';
+    if (precio > 0) info += '<span>Precio: <strong>$' + Number(precio).toLocaleString('es-CL') + '</strong></span>';
+    document.getElementById('mag-info').innerHTML = info;
+
+    document.getElementById('modal-agregar').style.display = 'flex';
+    setTimeout(function() { document.getElementById('mag-motivo').focus(); }, 200);
+}
+function cerrarAgregar() {
+    document.getElementById('modal-agregar').style.display = 'none';
+}
+function selMotivo(val) {
+    document.getElementById('mag-motivo').value = val;
+    document.querySelectorAll('.motivo-chip').forEach(function(c) {
+        c.classList.toggle('sel', c.textContent.trim() === val);
+    });
+}
+
+// ── Deshabilitar producto (soft-delete vía activo=false) ──────────────────
+function deshabilitarProducto(id, nombre, btn) {
+    if (!confirm('¿Deshabilitar "' + nombre + '"? El producto quedará inactivo y no aparecerá en el inventario.')) return;
+    var card = btn.closest('.prod-card');
+    if (card) card.style.opacity = '0.4';
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/productos/' + id + '/deshabilitar';
+    form.innerHTML = '<input type="hidden" name="_token" value="{{ csrf_token() }}">'
+                   + '<input type="hidden" name="_method" value="PATCH">';
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// Cerrar modal con click fuera
+document.getElementById('modal-agregar').addEventListener('click', function(e) {
+    if (e.target === this) cerrarAgregar();
+});
+
+// ── Init ─────────────────────────────────────────────────────────────────
+renderTipos();
+renderProductos();
+// Pre-cargar tipo en el modal con el primer tab activo
+if (tipoActivo) {
+    document.getElementById('mag-tipo').value = tipoActivo.key;
+    document.getElementById('mag-tipo-display').textContent = tipoActivo.label;
+}
+</script>
+@endpush
+
+@endsection

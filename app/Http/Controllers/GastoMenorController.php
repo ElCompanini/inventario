@@ -16,7 +16,7 @@ class GastoMenorController extends Controller
 {
     public function index()
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('gastos_menores'), 403);
 
         $user  = auth()->user();
         $query = GastoMenor::with(['producto', 'user', 'historialCambio.container'])
@@ -36,7 +36,7 @@ class GastoMenorController extends Controller
 
     public function edit(Request $request, string $folio)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('gastos_menores'), 403);
         $folio = urldecode($folio);
         $items = GastoMenor::with(['producto', 'historialCambio'])
             ->where('folio', $folio)
@@ -53,7 +53,7 @@ class GastoMenorController extends Controller
 
     public function update(Request $request, string $folio)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('gastos_menores'), 403);
         $folio = urldecode($folio);
 
         $request->validate([
@@ -104,7 +104,7 @@ class GastoMenorController extends Controller
 
     public function actualizarContenedor(Request $request, int $id)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('gastos_menores'), 403);
         $request->validate(['contenedor_id' => ['required', 'integer', 'exists:containers,id']]);
         $gasto = GastoMenor::findOrFail($id);
         if ($gasto->historialCambio) {
@@ -116,7 +116,7 @@ class GastoMenorController extends Controller
 
     public function descargarBoleta(int $id)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('gastos_menores'), 403);
         $gasto = GastoMenor::findOrFail($id);
         abort_unless($gasto->documento_path && Storage::disk('local')->exists($gasto->documento_path), 404);
         return response()->file(
@@ -127,7 +127,7 @@ class GastoMenorController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('gastos_menores'), 403);
 
         $request->validate([
             'proveedor_nombre'  => ['required', 'string', 'min:3', 'max:300'],

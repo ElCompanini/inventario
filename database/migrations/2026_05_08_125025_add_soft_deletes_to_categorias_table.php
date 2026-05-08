@@ -11,14 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('boletas', function (Blueprint $table) {
-            $table->softDeletes()->after('updated_at');
+        Schema::table('categorias', function (Blueprint $table) {
+            $table->softDeletes();
         });
     }
 
     public function down(): void
     {
-        Schema::table('boletas', function (Blueprint $table) {
+        Schema::table('categorias', function (Blueprint $table) {
             $table->dropSoftDeletes();
         });
     }

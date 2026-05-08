@@ -79,7 +79,12 @@
     @endforeach
 </div>
 
-@php $familiaActual = $familias->firstWhere('id', $familiaActiva); @endphp
+@php
+    $familiaActual = $familias->firstWhere('id', $familiaActiva);
+    $familiaProtegida = $familiaActual &&
+        str_contains(strtolower(str_replace([' ','-','_'], '', $familiaActual->nombre)), 'partes') &&
+        str_contains(strtolower(str_replace([' ','-','_'], '', $familiaActual->nombre)), 'piezas');
+@endphp
 
 @if($familiaActual)
 
@@ -91,6 +96,7 @@
         <div class="bg-white rounded-xl shadow p-5">
             <div class="flex items-center justify-between mb-4 pb-3" style="border-bottom:1px solid #f3f4f6;">
                 <h2 class="text-sm font-bold text-gray-700">Categorías</h2>
+                @if(!$familiaProtegida)
                 <button onclick="abrirModalCategoria({{ $familiaActual->id }})"
                         class="btn-primary inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg shrink-0">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -98,6 +104,9 @@
                     </svg>
                     Nueva
                 </button>
+                @else
+                <span class="text-xs text-gray-400 italic">Familia protegida</span>
+                @endif
             </div>
 
             @if($familiaActual->categorias->isEmpty())
@@ -105,10 +114,10 @@
             @else
             <ul class="space-y-1" id="lista-categorias">
                 @foreach($familiaActual->categorias as $cat)
-                <li>
+                <li class="flex items-center gap-1 group">
                     <button onclick="seleccionarCategoria({{ $cat->id }}, '{{ addslashes($cat->nombre) }}')"
                             id="cat-btn-{{ $cat->id }}"
-                            class="btn-ghost cat-item w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between
+                            class="btn-ghost cat-item flex-1 text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between
                                    {{ request('categoria', $familiaActual->categorias->first()?->id) == $cat->id
                                       ? 'bg-indigo-50 text-indigo-700 font-semibold'
                                       : 'text-gray-700 hover:bg-gray-50' }}"
@@ -116,6 +125,22 @@
                         <span class="cat-nombre min-w-0 flex-1 truncate">{{ $cat->nombre }}</span>
                         <span class="text-xs text-gray-400 ml-2 shrink-0">{{ $cat->productos->count() }}</span>
                     </button>
+                    @if(auth()->user()->esDev() && !$familiaProtegida)
+                    <button onclick="editarCategoria({{ $cat->id }}, '{{ addslashes($cat->nombre) }}')"
+                            title="Editar categoría"
+                            class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50 transition shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </button>
+                    <button onclick="abrirConfirmarEliminarCat({{ $cat->id }}, '{{ addslashes($cat->nombre) }}')"
+                            title="Eliminar categoría"
+                            class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50 transition shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                    @endif
                 </li>
                 @endforeach
             </ul>
@@ -413,6 +438,34 @@
     </div>
 </div>
 
+{{-- Modal: confirmar eliminación de categoría --}}
+<div id="modal-eliminar-cat" style="display:none; position:fixed; inset:0; z-index:9100; align-items:center; justify-content:center; background:rgba(0,0,0,.5);">
+    <div class="bg-white rounded-xl shadow-xl w-full mx-4" style="max-width:400px; padding:1.5rem; animation:cat-in .2s cubic-bezier(.22,.68,0,1.2) both;">
+        <div class="flex items-start gap-3 mb-5">
+            <div class="shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-content:center">
+                <svg class="w-5 h-5 text-red-600 mx-auto" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-base font-bold text-gray-800">Eliminar categoría</p>
+                <p class="text-sm text-gray-500 mt-1">¿Eliminar <span id="eliminar-cat-nombre" class="font-semibold text-gray-700"></span>? Solo es posible si no tiene productos asignados.</p>
+            </div>
+        </div>
+        <div id="eliminar-cat-error" class="hidden mb-4 bg-red-50 border border-red-300 text-red-700 rounded-lg px-3 py-2 text-sm"></div>
+        <div class="flex justify-end gap-3" style="border-top:1px solid #f3f4f6; padding-top:1rem;">
+            <button onclick="cerrarConfirmarEliminarCat()"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                Cancelar
+            </button>
+            <button id="btn-confirmar-eliminar-cat" onclick="confirmarEliminarCat()"
+                    class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg">
+                Eliminar
+            </button>
+        </div>
+    </div>
+</div>
+
 @push('head')
 <style>
     @keyframes cat-in {
@@ -428,7 +481,8 @@ const CSRF             = '{{ csrf_token() }}';
 const IS_DEV           = {{ auth()->user()->esDev() ? 'true' : 'false' }};
 const ROUTE_FAM_STORE  = '{{ route('admin.catalogo.familias.store') }}';
 const ROUTE_CAT_STORE  = '{{ route('admin.catalogo.categorias.store') }}';
-const ROUTE_CAT_UPDATE = (id) => `{{ url('admin/catalogo/categorias') }}/${id}`;
+const ROUTE_CAT_UPDATE  = (id) => `{{ url('admin/catalogo/categorias') }}/${id}`;
+const ROUTE_CAT_DESTROY = (id) => `{{ url('admin/catalogo/categorias') }}/${id}`;
 const ROUTE_PROD_STORE   = '{{ route('admin.catalogo.productos.store') }}';
 const ROUTE_PROD_UPDATE  = (id) => `{{ url('admin/catalogo/productos') }}/${id}`;
 const ROUTE_PROD_DESTROY = (id) => `{{ url('admin/catalogo/productos') }}/${id}`;
@@ -862,6 +916,66 @@ function abrirModalCategoria(familiaId) {
     abrirModal('modal-categoria');
     setTimeout(() => document.getElementById('cat-nombre-input').focus(), 50);
 }
+
+function editarCategoria(catId, catNombre) {
+    editandoCatId = catId;
+    const familia = catalogoData.find(f => f.categorias.some(c => c.id === catId));
+    catFamiliaId  = familia ? familia.id : catFamiliaId;
+    document.getElementById('modal-cat-titulo').textContent    = 'Editar categoría';
+    document.getElementById('modal-cat-subtitulo').textContent = familia ? familia.nombre : '';
+    document.getElementById('cat-nombre-input').value          = catNombre;
+    document.getElementById('modal-cat-errors').classList.add('hidden');
+    abrirModal('modal-categoria');
+    setTimeout(() => document.getElementById('cat-nombre-input').focus(), 50);
+}
+
+let _eliminarCatId = null;
+
+function abrirConfirmarEliminarCat(catId, catNombre) {
+    _eliminarCatId = catId;
+    document.getElementById('eliminar-cat-nombre').textContent = catNombre;
+    document.getElementById('eliminar-cat-error').classList.add('hidden');
+    document.getElementById('btn-confirmar-eliminar-cat').disabled = false;
+    document.getElementById('btn-confirmar-eliminar-cat').textContent = 'Eliminar';
+    document.getElementById('modal-eliminar-cat').style.display = 'flex';
+}
+
+function cerrarConfirmarEliminarCat() {
+    document.getElementById('modal-eliminar-cat').style.display = 'none';
+    _eliminarCatId = null;
+}
+
+async function confirmarEliminarCat() {
+    if (!_eliminarCatId) return;
+    const btn    = document.getElementById('btn-confirmar-eliminar-cat');
+    const errDiv = document.getElementById('eliminar-cat-error');
+    btn.disabled = true;
+    btn.textContent = 'Eliminando...';
+    errDiv.classList.add('hidden');
+    try {
+        const res  = await fetch(ROUTE_CAT_DESTROY(_eliminarCatId), {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) {
+            errDiv.textContent = json.message ?? 'No se pudo eliminar la categoría.';
+            errDiv.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Eliminar';
+            return;
+        }
+        location.reload();
+    } catch(e) {
+        errDiv.textContent = 'Error de conexión.';
+        errDiv.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Eliminar';
+    }
+}
+
+document.getElementById('modal-eliminar-cat').addEventListener('click', e => { if (e.target === e.currentTarget) cerrarConfirmarEliminarCat(); });
+
 function cerrarModalCategoria() { cerrarModal('modal-categoria'); }
 
 async function guardarCategoria() {

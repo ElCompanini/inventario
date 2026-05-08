@@ -18,7 +18,7 @@ class CatalogoController extends Controller
 
     public function index(Request $request)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $ccId = $this->ccId();
 
@@ -41,7 +41,7 @@ class CatalogoController extends Controller
 
     public function storeFamilia(Request $request)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $ccId = $this->ccId();
 
@@ -55,7 +55,7 @@ class CatalogoController extends Controller
         ]);
 
         $familia = Familia::create([
-            'nombre'          => $data['nombre'],
+            'nombre'          => strtoupper(trim($data['nombre'])),
             'centro_costo_id' => $ccId,
         ]);
 
@@ -66,9 +66,17 @@ class CatalogoController extends Controller
         return back()->with('success', 'Familia creada correctamente.');
     }
 
+    private function esFamiliaProtegida(int $familiaId): bool
+    {
+        $familia = Familia::find($familiaId);
+        if (!$familia) return false;
+        $nombre = strtolower(str_replace([' ', '_', '-'], '', $familia->nombre));
+        return str_contains($nombre, 'partes') && str_contains($nombre, 'piezas');
+    }
+
     public function storeCategoria(Request $request)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $data = $request->validate([
             'nombre'     => ['required', 'string', 'max:150',
@@ -78,6 +86,14 @@ class CatalogoController extends Controller
             'nombre.unique' => 'Ya existe una categoría con ese nombre en esta familia.',
         ]);
 
+        if ($this->esFamiliaProtegida((int) $data['familia_id'])) {
+            $err = 'La familia "Partes y Piezas" está protegida. Sus categorías no pueden ser modificadas.';
+            return $request->ajax()
+                ? response()->json(['ok' => false, 'error' => $err], 403)
+                : back()->withErrors(['familia_id' => $err]);
+        }
+
+        $data['nombre'] = strtoupper(trim($data['nombre']));
         $categoria = Categoria::create($data);
 
         if ($request->ajax()) {
@@ -89,7 +105,14 @@ class CatalogoController extends Controller
 
     public function updateCategoria(Request $request, Categoria $categoria)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
+
+        if ($this->esFamiliaProtegida($categoria->familia_id)) {
+            $err = 'Las categorías de "Partes y Piezas" están protegidas y no pueden ser modificadas.';
+            return $request->ajax()
+                ? response()->json(['ok' => false, 'error' => $err], 403)
+                : back()->withErrors(['nombre' => $err]);
+        }
 
         $data = $request->validate([
             'nombre' => ['required', 'string', 'max:150',
@@ -98,6 +121,7 @@ class CatalogoController extends Controller
             'nombre.unique' => 'Ya existe una categoría con ese nombre en esta familia.',
         ]);
 
+        $data['nombre'] = strtoupper(trim($data['nombre']));
         $categoria->update($data);
         Producto::where('categoria_id', $categoria->id)->update(['nombre' => $data['nombre']]);
 
@@ -110,7 +134,7 @@ class CatalogoController extends Controller
 
     public function buscarBarcode(Request $request)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $ccId   = $this->ccId();
         $codigo = trim($request->get('codigo', ''));
@@ -164,7 +188,7 @@ class CatalogoController extends Controller
 
     public function storeProducto(Request $request)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $data = $request->validate([
             'categoria_id'  => ['required', 'integer', 'exists:categorias,id'],
@@ -205,7 +229,7 @@ class CatalogoController extends Controller
 
     public function asociarBarcode(Request $request, Producto $producto)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $data = $request->validate([
             'codigo_barras' => ['required', 'string', 'max:100', 'unique:productos,codigo_barras'],
@@ -229,7 +253,7 @@ class CatalogoController extends Controller
 
     public function updateProducto(Request $request, Producto $producto)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $data = $request->validate([
             'stock_minimo'  => ['required', 'integer', 'min:0'],
@@ -248,6 +272,26 @@ class CatalogoController extends Controller
         }
 
         return back()->with('success', 'Producto actualizado.');
+    }
+
+    public function destroyCategoria(Categoria $categoria)
+    {
+        abort_unless(auth()->user()->esDev(), 403);
+
+        if ($this->esFamiliaProtegida($categoria->familia_id)) {
+            return response()->json(['ok' => false, 'message' => 'Familia protegida.'], 403);
+        }
+
+        if ($categoria->productos()->count() > 0) {
+            return response()->json([
+                'ok'      => false,
+                'message' => "No se puede eliminar: tiene {$categoria->productos()->count()} producto(s) asignados.",
+            ], 422);
+        }
+
+        $categoria->delete();
+
+        return response()->json(['ok' => true]);
     }
 
     public function destroyProducto(Producto $producto)

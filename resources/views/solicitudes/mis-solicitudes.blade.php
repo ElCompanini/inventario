@@ -23,6 +23,7 @@
         </thead>
         <tbody class="divide-y divide-gray-100">
             @forelse($solicitudes as $solicitud)
+                @if(!$solicitud->producto) @continue @endif
                 <tr class="hover:bg-gray-50 transition">
                     <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
                         {{ $solicitud->created_at->format('d/m/Y H:i') }}

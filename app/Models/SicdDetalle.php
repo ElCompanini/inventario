@@ -32,4 +32,21 @@ class SicdDetalle extends Model
     {
         return $this->belongsTo(Producto::class);
     }
+
+    public function ocDetalles()
+    {
+        return $this->hasMany(OrdenCompraDetalle::class, 'sicd_detalle_id');
+    }
+
+    /** Cantidad ya asignada a otras OCs */
+    public function getCantidadAsignadaAttribute(): int
+    {
+        return (int) $this->ocDetalles->sum('cantidad_asignada');
+    }
+
+    /** Cantidad disponible para asignar a una nueva OC */
+    public function getCantidadDisponibleAttribute(): int
+    {
+        return max(0, $this->cantidad_solicitada - $this->cantidad_asignada);
+    }
 }

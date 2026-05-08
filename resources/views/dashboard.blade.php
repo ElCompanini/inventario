@@ -877,7 +877,7 @@
                         </div>
                         <div>
                             <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                Folio <span style="color:#ef4444;">*</span>
+                                Folio — Número de Boleta <span style="color:#ef4444;">*</span>
                             </label>
                             <input type="text" name="folio" placeholder="Ej: 001234" required
                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
@@ -1163,7 +1163,7 @@ function escHtmlGm(str) {
                             </div>
                             <div>
                                 <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                    Folio <span style="color:#ef4444;">*</span>
+                                    Folio — Número de Boleta <span style="color:#ef4444;">*</span>
                                 </label>
                                 <input type="text" name="folio" id="ai-folio" placeholder="Ej: 001234"
                                     style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
@@ -1278,7 +1278,7 @@ function escHtmlGm(str) {
                                 </div>
                                 <div>
                                     <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                        Folio <span style="color:#ef4444;">*</span>
+                                        Folio — Número de Boleta <span style="color:#ef4444;">*</span>
                                     </label>
                                     <input type="text" name="folio" id="ai-ext-folio" placeholder="Ej: 001234"
                                         style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
@@ -2854,6 +2854,24 @@ function aiRenderFilaManual(idx, id, nombre, contenedorId) {
         return '<option value="' + c.id + '"' + sel + '>' + escHtmlAi(c.nombre) + '</option>';
     }).join('');
 
+    // Unidad: si el producto ya tiene asignada, mostrar como badge bloqueado
+    var unidadValor = aiGetUnidad(id);
+    var tienUnidad  = unidadValor && unidadValor !== '—';
+    var unidadHtml;
+    if (tienUnidad) {
+        // Solo lectura — hidden input para enviar el valor, badge visual
+        unidadHtml = '<input type="hidden" name="items_manual[' + idx + '][unidad]" value="' + escHtmlAi(unidadValor) + '">'
+                   + '<span title="Unidad asignada al producto (no editable)"'
+                   + ' style="display:inline-block;font-size:0.72rem;font-weight:700;font-family:monospace;'
+                   + 'padding:2px 8px;border-radius:9999px;background:#eff6ff;color:#2563eb;'
+                   + 'border:1px solid #bfdbfe;cursor:default;white-space:nowrap;">'
+                   + escHtmlAi(unidadValor) + '</span>';
+    } else {
+        // Editable — el producto no tiene unidad de medida definida
+        unidadHtml = '<input type="text" name="items_manual[' + idx + '][unidad]" value="" placeholder="—"'
+                   + ' style="width:68px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">';
+    }
+
     tr.innerHTML =
         '<td style="padding:0.4rem 0.6rem;">'
         + '<input type="hidden" name="items_manual[' + idx + '][producto_id]" value="' + id + '">'
@@ -2864,8 +2882,7 @@ function aiRenderFilaManual(idx, id, nombre, contenedorId) {
         + ' style="width:62px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="text" name="items_manual[' + idx + '][unidad]" value="' + escHtmlAi(aiGetUnidad(id)) + '" placeholder="—"'
-        + ' style="width:68px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + unidadHtml
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
         + '<input type="number" id="ai-pneto-' + idx + '" name="items_manual[' + idx + '][precio_neto]" placeholder="0" min="0" step="any"'

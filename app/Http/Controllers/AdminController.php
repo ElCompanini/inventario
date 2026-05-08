@@ -25,9 +25,14 @@ class AdminController extends Controller
         $user = auth()->user();
         $ccId = $user->ccFiltro();
 
-        $solicitudes = Solicitud::with(['producto.container', 'usuario'])
+        $solicitudes = Solicitud::with([
+                'producto' => fn($q) => $q->withoutGlobalScopes()->with('container'),
+                'usuario',
+            ])
             ->where('estado', 'pendiente')
-            ->when($ccId, fn($q) => $q->whereHas('producto', fn($q2) => $q2->where('centro_costo_id', $ccId)))
+            ->whereHas('producto', fn($q) => $q->withoutGlobalScopes()
+                ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId))
+            )
             ->orderByDesc('created_at')
             ->get();
 
@@ -117,9 +122,14 @@ class AdminController extends Controller
         $user = auth()->user();
         $ccId = $user->ccFiltro();
 
-        $solicitudes = Solicitud::with(['producto', 'usuario'])
+        $solicitudes = Solicitud::with([
+                'producto' => fn($q) => $q->withoutGlobalScopes(),
+                'usuario',
+            ])
             ->where('estado', 'rechazado')
-            ->when($ccId, fn($q) => $q->whereHas('producto', fn($q2) => $q2->where('centro_costo_id', $ccId)))
+            ->whereHas('producto', fn($q) => $q->withoutGlobalScopes()
+                ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId))
+            )
             ->orderByDesc('created_at')
             ->get();
 
@@ -293,6 +303,17 @@ class AdminController extends Controller
 
         return redirect()->route('dashboard')
             ->with('success', "Producto '{$producto->nombre}' trasladado a {$containerDestino->nombre} correctamente.");
+    }
+
+    public function deshabilitarProducto(int $id)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $producto = Producto::withoutGlobalScope('activo')->findOrFail($id);
+        $producto->activo = false;
+        $producto->save();
+
+        return back()->with('success', "Producto «{$producto->nombre}» deshabilitado. No aparecerá en el inventario activo.");
     }
 
     public function cargaMasiva(Request $request)

@@ -17,147 +17,160 @@
 <form id="form-recepcion" method="POST" action="{{ route('admin.ordenes.recepcion.procesar', $oc->id) }}">
     @csrf
 
+    {{-- Agrupar oc_detalles por SICD para presentación visual --}}
+    @php
+        $detallesPorSicd = $oc->detalles->groupBy(fn($d) => $d->sicdDetalle->sicd->codigo_sicd);
+    @endphp
+
     <div class="space-y-4">
-        @foreach($oc->sicds as $sicd)
+        @forelse($detallesPorSicd as $codigoSicd => $detallesOc)
+        @php $sicd = $detallesOc->first()->sicdDetalle->sicd; @endphp
             <div class="bg-white rounded-xl shadow overflow-hidden">
-                <div class="px-5 py-4 border-b border-gray-100">
-                    <h2 class="text-base font-semibold text-gray-700 font-mono">{{ $sicd->codigo_sicd }}</h2>
-                    @if($sicd->descripcion)
-                        <p class="text-xs text-gray-400 mt-0.5">{{ $sicd->descripcion }}</p>
-                    @endif
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-semibold text-gray-700 font-mono">{{ $sicd->codigo_sicd }}</h2>
+                        @if($sicd->descripcion)
+                            <p class="text-xs text-gray-400 mt-0.5">{{ $sicd->descripcion }}</p>
+                        @endif
+                    </div>
+                    <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">
+                        {{ $detallesOc->count() }} producto(s) asignado(s) a esta OC
+                    </span>
                 </div>
 
-                @if($sicd->detalles->isEmpty())
-                    <div class="px-5 py-4 text-sm text-gray-400">Sin productos en este SICD.</div>
-                @else
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th colspan="6" class="px-4 py-1"></th>
-                                <th class="px-4 py-1 text-left">
-                                    <div style="border:2px solid #3b82f6; border-radius:0.5rem; overflow:hidden;">
-                                        <p style="font-size:0.75rem; font-weight:700; color:#1d4ed8; background:#dbeafe; padding:4px 8px;">Cambiar todos los contenedores a:</p>
-                                        <select id="container-global"
-                                                style="width:100%; padding:0.375rem 0.5rem; font-size:0.75rem; font-weight:600; color:#1d4ed8; background:#fff; outline:none; border:none;">
-                                            <option value="">— seleccionar —</option>
+                <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th colspan="6" class="px-4 py-1"></th>
+                            <th class="px-4 py-1 text-left">
+                                <div style="border:2px solid #3b82f6; border-radius:0.5rem; overflow:hidden;">
+                                    <p style="font-size:0.75rem; font-weight:700; color:#1d4ed8; background:#dbeafe; padding:4px 8px;">Cambiar todos los contenedores a:</p>
+                                    <select class="container-global-sicd" data-sicd="{{ $sicd->id }}"
+                                            style="width:100%; padding:0.375rem 0.5rem; font-size:0.75rem; font-weight:600; color:#1d4ed8; background:#fff; outline:none; border:none;">
+                                        <option value="">— seleccionar —</option>
+                                        @foreach($containers as $c)
+                                            <option value="{{ $c->id }}">{{ $c->nombre }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </th>
+                        </tr>
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Producto</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Stock actual</th>
+                            <th class="px-4 py-3 text-center font-semibold text-gray-600">Asignado esta OC</th>
+                            <th class="px-4 py-3 text-center font-semibold text-gray-600">Cantidad recibida</th>
+                            <th class="px-4 py-3 text-right font-semibold text-gray-600">Precio neto</th>
+                            <th class="px-4 py-3 text-right font-semibold text-gray-600">Total neto</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Container destino</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($detallesOc as $ocDet)
+                        @php $det = $ocDet->sicdDetalle; @endphp
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3" style="vertical-align:middle;">
+                                    @if($det->producto)
+                                        <p class="font-medium text-gray-800">{{ $det->producto->nombre }}</p>
+                                        @if($det->producto->nombre !== $det->nombre_producto_excel)
+                                            <p class="text-xs text-gray-400 mt-0.5">Excel: {{ $det->nombre_producto_excel }}</p>
+                                        @endif
+                                    @else
+                                        <p class="font-medium text-gray-800">{{ $det->nombre_producto_excel }}</p>
+                                        <p class="text-xs text-amber-500 mt-0.5">Sin enlace a producto — no actualizará stock</p>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-gray-600" style="vertical-align:middle;">
+                                    {{ $det->producto?->stock_actual ?? '—' }}
+                                </td>
+                                <td class="px-4 py-3 text-center font-semibold text-indigo-700" style="vertical-align:middle;">
+                                    {{ $ocDet->cantidad_asignada }}
+                                    <p class="text-xs font-normal text-gray-400">de {{ $det->cantidad_solicitada }} SICD</p>
+                                </td>
+                                <td class="px-4 py-3 text-center" style="vertical-align:middle;">
+                                    <input type="number"
+                                           name="recibido[{{ $ocDet->id }}]"
+                                           data-asignado="{{ $ocDet->cantidad_asignada }}"
+                                           data-detid="{{ $ocDet->id }}"
+                                           value="{{ old("recibido.{$ocDet->id}", $ocDet->cantidad_asignada) }}"
+                                           min="0"
+                                           max="{{ $ocDet->cantidad_asignada }}"
+                                           class="input-recibido w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                </td>
+                                <td class="px-4 py-3 text-right" style="vertical-align:middle;">
+                                    <div style="display:inline-block; width:7.5rem;">
+                                        <input type="text"
+                                               data-precio
+                                               data-sicd="{{ $ocDet->precio_neto ?? ($det->precio_neto ? (int) $det->precio_neto : '') }}"
+                                               name="precio_neto[{{ $ocDet->id }}]"
+                                               value="{{ old("precio_neto.{$ocDet->id}", $ocDet->precio_neto ?? ($det->precio_neto ? (int) $det->precio_neto : '')) }}"
+                                               placeholder="—"
+                                               style="width:100%;"
+                                               class="input-precio border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none">
+                                        @if($det->precio_neto)
+                                            <span style="font-size:0.78rem; color:#111827; white-space:nowrap;"><strong>SICD:</strong> ${{ number_format($det->precio_neto, 0, ',', '.') }}</span>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-right" style="vertical-align:middle;">
+                                    <div style="display:inline-block; width:7.5rem;">
+                                        <input type="text"
+                                               data-precio
+                                               data-sicd="{{ $ocDet->total_neto ?? ($det->total_neto ? (int) $det->total_neto : '') }}"
+                                               name="total_neto[{{ $ocDet->id }}]"
+                                               value="{{ old("total_neto.{$ocDet->id}", $ocDet->total_neto ?? ($det->total_neto ? (int) $det->total_neto : '')) }}"
+                                               placeholder="—"
+                                               style="width:100%;"
+                                               class="input-precio border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none">
+                                        @if($det->total_neto)
+                                            <span style="font-size:0.78rem; color:#111827; white-space:nowrap;"><strong>SICD:</strong> ${{ number_format($det->total_neto, 0, ',', '.') }}</span>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3" style="vertical-align:middle;">
+                                    @if($det->producto)
+                                        <select name="container[{{ $ocDet->id }}]"
+                                                data-sicd-id="{{ $sicd->id }}"
+                                                style="width:100%; border:2px solid #3b82f6; border-radius:0.5rem; padding:0.375rem 0.5rem; font-size:0.75rem; font-weight:600; color:#1d4ed8; background:#eff6ff; outline:none;"
+                                                class="w-full select-container-row">
                                             @foreach($containers as $c)
-                                                <option value="{{ $c->id }}">{{ $c->nombre }}</option>
+                                                <option value="{{ $c->id }}"
+                                                    {{ $det->producto->contenedor == $c->id ? 'selected' : '' }}>
+                                                    {{ $c->nombre }}
+                                                </option>
                                             @endforeach
                                         </select>
+                                    @else
+                                        <span class="text-xs text-gray-400">—</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            <tr id="motivo-row-{{ $ocDet->id }}"
+                                style="display:none; background:#fff7ed;">
+                                <td colspan="7" class="px-4 py-3" style="border-top:1px dashed #fed7aa;">
+                                    <div style="display:flex; align-items:flex-start; gap:0.75rem;">
+                                        <span style="font-size:0.8rem; font-weight:700; color:#c2410c; white-space:nowrap; padding-top:0.4rem;">
+                                            ⚠ Cantidad diferente — Motivo:
+                                        </span>
+                                        <textarea name="motivo_recepcion[{{ $ocDet->id }}]"
+                                                  rows="2"
+                                                  placeholder="Indica el motivo por el que la cantidad recibida difiere de la asignada..."
+                                                  style="flex:1; border:1.5px solid #f97316; border-radius:0.5rem; padding:0.375rem 0.625rem; font-size:0.8rem; color:#7c2d12; background:#fff; resize:vertical; outline:none;"
+                                                  onfocus="this.style.borderColor='#ea580c'; this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.2)'"
+                                                  onblur="this.style.borderColor='#f97316'; this.style.boxShadow='none'">{{ old("motivo_recepcion.{$ocDet->id}") }}</textarea>
                                     </div>
-                                </th>
+                                </td>
                             </tr>
-                            <tr>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Producto</th>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Stock actual</th>
-                                <th class="px-4 py-3 text-center font-semibold text-gray-600">Solicitado</th>
-                                <th class="px-4 py-3 text-center font-semibold text-gray-600">Cantidad recibida</th>
-                                <th class="px-4 py-3 text-right font-semibold text-gray-600">Precio neto</th>
-                                <th class="px-4 py-3 text-right font-semibold text-gray-600">Total neto</th>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Container destino</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            @foreach($sicd->detalles as $det)
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-3" style="vertical-align:middle;">
-                                        @if($det->producto)
-                                            <p class="font-medium text-gray-800">{{ $det->producto->nombre }}</p>
-                                            @if($det->producto->nombre !== $det->nombre_producto_excel)
-                                                <p class="text-xs text-gray-400 mt-0.5">Excel: {{ $det->nombre_producto_excel }}</p>
-                                            @endif
-                                        @else
-                                            <p class="font-medium text-gray-800">{{ $det->nombre_producto_excel }}</p>
-                                            <p class="text-xs text-amber-500 mt-0.5">Sin enlace a producto — no actualizará stock</p>
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-3 text-gray-600" style="vertical-align:middle;">
-                                        {{ $det->producto?->stock_actual ?? '—' }}
-                                    </td>
-                                    <td class="px-4 py-3 text-center font-semibold text-gray-700" style="vertical-align:middle;">
-                                        {{ $det->cantidad_solicitada }}
-                                    </td>
-                                    <td class="px-4 py-3 text-center" style="vertical-align:middle;">
-                                        <input type="number"
-                                               name="recibido[{{ $det->id }}]"
-                                               data-solicitado="{{ $det->cantidad_solicitada }}"
-                                               data-detid="{{ $det->id }}"
-                                               value="{{ old("recibido.{$det->id}", $det->cantidad_solicitada) }}"
-                                               min="0"
-                                               class="input-recibido w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                        @error("recibido.{$det->id}")
-                                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                                        @enderror
-                                    </td>
-                                    <td class="px-4 py-3 text-right" style="vertical-align:middle;">
-                                        <div style="display:inline-block; width:7.5rem;">
-                                            <input type="text"
-                                                   data-precio
-                                                   data-sicd="{{ $det->precio_neto ? (int) $det->precio_neto : '' }}"
-                                                   name="precio_neto[{{ $det->id }}]"
-                                                   value="{{ old("precio_neto.{$det->id}", $det->precio_neto ? (int) $det->precio_neto : '') }}"
-                                                   placeholder="—"
-                                                   style="width:100%;"
-                                                   class="input-precio border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none">
-                                            @if($det->precio_neto)
-                                                <span style="font-size:0.78rem; color:#111827; white-space:nowrap;"><strong>SICD:</strong> ${{ number_format($det->precio_neto, 0, ',', '.') }}</span>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 text-right" style="vertical-align:middle;">
-                                        <div style="display:inline-block; width:7.5rem;">
-                                            <input type="text"
-                                                   data-precio
-                                                   data-sicd="{{ $det->total_neto ? (int) $det->total_neto : '' }}"
-                                                   name="total_neto[{{ $det->id }}]"
-                                                   value="{{ old("total_neto.{$det->id}", $det->total_neto ? (int) $det->total_neto : '') }}"
-                                                   placeholder="—"
-                                                   style="width:100%;"
-                                                   class="input-precio border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none">
-                                            @if($det->total_neto)
-                                                <span style="font-size:0.78rem; color:#111827; white-space:nowrap;"><strong>SICD:</strong> ${{ number_format($det->total_neto, 0, ',', '.') }}</span>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3" style="vertical-align:middle;">
-                                        @if($det->producto)
-                                            <select name="container[{{ $det->id }}]"
-                                                    style="width:100%; border:2px solid #3b82f6; border-radius:0.5rem; padding:0.375rem 0.5rem; font-size:0.75rem; font-weight:600; color:#1d4ed8; background:#eff6ff; outline:none;"
-                                                    class="w-full">
-                                                @foreach($containers as $c)
-                                                    <option value="{{ $c->id }}"
-                                                        {{ $det->producto->contenedor == $c->id ? 'selected' : '' }}>
-                                                        {{ $c->nombre }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        @else
-                                            <span class="text-xs text-gray-400">—</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                                <tr id="motivo-row-{{ $det->id }}"
-                                    style="display:none; background:#fff7ed;">
-                                    <td colspan="7" class="px-4 py-3" style="border-top:1px dashed #fed7aa;">
-                                        <div style="display:flex; align-items:flex-start; gap:0.75rem;">
-                                            <span style="font-size:0.8rem; font-weight:700; color:#c2410c; white-space:nowrap; padding-top:0.4rem;">
-                                                ⚠ Cantidad diferente — Motivo:
-                                            </span>
-                                            <textarea name="motivo_recepcion[{{ $det->id }}]"
-                                                      rows="2"
-                                                      placeholder="Indica el motivo por el que la cantidad recibida difiere de la solicitada..."
-                                                      style="flex:1; border:1.5px solid #f97316; border-radius:0.5rem; padding:0.375rem 0.625rem; font-size:0.8rem; color:#7c2d12; background:#fff; resize:vertical; outline:none;"
-                                                      onfocus="this.style.borderColor='#ea580c'; this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.2)'"
-                                                      onblur="this.style.borderColor='#f97316'; this.style.boxShadow='none'">{{ old("motivo_recepcion.{$det->id}") }}</textarea>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                @endif
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-        @endforeach
+        @empty
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-8 text-center">
+                <p class="text-amber-700 font-semibold">Esta OC no tiene productos asignados.</p>
+                <p class="text-amber-600 text-sm mt-1">Los productos se asignan durante la creación de la OC.</p>
+            </div>
+        @endforelse
     </div>
 
     <div class="mt-6 flex justify-end gap-3">
@@ -213,11 +226,15 @@
 
 @push('scripts')
 <script>
-    document.getElementById('container-global').addEventListener('change', function () {
-        const val = this.value;
-        if (!val) return;
-        document.querySelectorAll('select[name^="container["]').forEach(function (sel) {
-            sel.value = val;
+    // Cambio masivo de container por SICD
+    document.querySelectorAll('.container-global-sicd').forEach(function(globalSel) {
+        globalSel.addEventListener('change', function() {
+            const val    = this.value;
+            const sicdId = this.dataset.sicd;
+            if (!val) return;
+            document.querySelectorAll('.select-container-row[data-sicd-id="' + sicdId + '"]').forEach(function(sel) {
+                sel.value = val;
+            });
         });
     });
 
@@ -273,7 +290,7 @@
     // También recalcular si cambia la cantidad recibida + mostrar motivo si difiere
     function verificarMotivo(cantInput) {
         const id         = cantInput.dataset.detid;
-        const solicitado = parseInt(cantInput.dataset.solicitado) || 0;
+        const solicitado = parseInt(cantInput.dataset.asignado || cantInput.dataset.solicitado) || 0;
         const recibido   = parseInt(cantInput.value) || 0;
         const motivoRow  = document.getElementById('motivo-row-' + id);
         if (!motivoRow) return;

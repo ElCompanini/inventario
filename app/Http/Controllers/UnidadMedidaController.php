@@ -9,14 +9,14 @@ class UnidadMedidaController extends Controller
 {
     public function index()
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
         $unidades = UnidadMedida::orderBy('nombre')->get();
         return view('admin.catalogo.unidades.index', compact('unidades'));
     }
 
     public function store(Request $request)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
         $data = $request->validate([
             'nombre'      => ['required', 'string', 'max:80'],
             'abreviacion' => ['required', 'string', 'max:20'],
@@ -42,7 +42,7 @@ class UnidadMedidaController extends Controller
 
     public function update(Request $request, UnidadMedida $unidad)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
         $data = $request->validate([
             'nombre'      => ['required', 'string', 'max:80'],
             'abreviacion' => ['required', 'string', 'max:20'],
@@ -63,20 +63,20 @@ class UnidadMedidaController extends Controller
 
     public function destroy(UnidadMedida $unidad)
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
         if ($unidad->productos()->count() > 0) {
             return back()->withErrors(['error' => "No se puede desactivar: tiene {$unidad->productos()->count()} producto(s) asignados."]);
         }
         // Desactivación lógica: soft delete + marcar inactivo
         $unidad->update(['activo' => false]);
-        $unidad->delete(); // sets deleted_at via SoftDeletes
+        $unidad->delete();
         return back()->with('success', "Unidad \"{$unidad->nombre}\" desactivada.");
     }
 
     // API: listado para dropdowns JS
     public function listar()
     {
-        abort_unless(auth()->user()->esAdmin(), 403);
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
         return response()->json(
             UnidadMedida::activas()->orderBy('nombre')->get(['id', 'nombre', 'abreviacion'])
         );

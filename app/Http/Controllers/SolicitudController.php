@@ -11,7 +11,7 @@ class SolicitudController extends Controller
 {
     public function index()
     {
-        $solicitudes = Solicitud::with('producto')
+        $solicitudes = Solicitud::with(['producto' => fn($q) => $q->withoutGlobalScopes()])
             ->where('usuario_id', Auth::id())
             ->orderByDesc('created_at')
             ->get();

@@ -13,6 +13,11 @@
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/3.0.2/css/buttons.tailwindcss.min.css">
     @stack('head')
 <style>
+    input[name="nombre"],
+    #fam-nombre-input,
+    #cat-nombre-input,
+    #bc-nueva-cat { text-transform: uppercase; }
+
     :root {
         --sb-w: 260px;
         --sb-cw: 68px;
@@ -192,21 +197,9 @@
     #sb-tooltip.visible { opacity: 1; }
 
     /* ── Mobile ── */
-    @media (max-width: 767px) {
-        #sidebar {
-            transform: translateX(-100%);
-            width: var(--sb-w) !important;
-            transition: transform .28s cubic-bezier(.4,0,.2,1);
-        }
-        body.sb-mobile-open #sidebar    { transform: translateX(0); }
-        body.sb-mobile-open #sb-overlay { display: block; }
-        #main-wrapper { margin-left: 0 !important; }
-        #hamburger    { display: flex; }
-    }
-    @media (min-width: 768px) {
-        #hamburger    { display: none; }
-        #sb-overlay   { display: none !important; }
-    }
+    /* El hamburger y overlay móvil están deshabilitados — la app es desktop */
+    #hamburger  { display: none !important; }
+    #sb-overlay { display: none !important; }
 
     /* Sidebar link hover */
     #sidebar .sb-link:not(.bg-indigo-600):hover {
@@ -303,6 +296,9 @@
             <div class="sb-footer-text flex-1 overflow-hidden" style="min-width:0;">
                 <p class="text-sm font-medium truncate leading-tight" style="color:#818cf8;">{{ $u->name }}</p>
                 <p class="text-xs text-slate-400 truncate leading-tight">{{ $u->esDev() ? 'Super Administrador' : ($u->esAdmin() ? 'Administrador' : 'Usuario') }}</p>
+                @if($u->centroCosto)
+                    <p class="text-[10px] text-slate-500 leading-tight" style="white-space:normal;word-break:break-word;">{{ $u->centroCosto->nombre_completo }}</p>
+                @endif
             </div>
             {{-- Dark mode toggle --}}
             <button id="dm-toggle" class="sb-logout-btn" title="Modo oscuro/claro" onclick="dmToggle()">
@@ -369,7 +365,9 @@
             @if($u->tienePermiso('solicitudes') || $u->tienePermiso('aprobar_solicitudes'))
                 @php
                     $pendientes = \App\Models\Solicitud::where('estado','pendiente')
-                        ->when($u->tieneFiltroCC(), fn($q) => $q->whereHas('producto', fn($q2) => $q2->where('centro_costo_id', $u->centro_costo_id)))
+                        ->whereHas('producto', fn($q) => $q->withoutGlobalScopes()
+                            ->when($u->tieneFiltroCC(), fn($q2) => $q2->where('centro_costo_id', $u->centro_costo_id))
+                        )
                         ->count();
                 @endphp
                 <a href="{{ route('admin.solicitudes') }}" data-tip="Solicitudes de Retiro"
@@ -423,7 +421,7 @@
         @endif
 
         {{-- ── Logística y Compras ── --}}
-        @if($u->tienePermiso('sicd') || $u->tienePermiso('ordenes') || $u->tienePermiso('containers') || $u->esAdmin())
+        @if($u->tienePermiso('sicd') || $u->tienePermiso('ordenes') || $u->tienePermiso('containers') || $u->tienePermiso('gastos_menores'))
         <div class="px-3">
             <p class="sb-section-title text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-2 mb-1">
                 Logística y Compras
@@ -462,7 +460,7 @@
                 </a>
             @endif
 
-            @if($u->esAdmin())
+            @if($u->tienePermiso('gastos_menores'))
                 <a href="{{ route('admin.gastos-menores.index') }}" data-tip="Gastos Menores"
                    class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                           {{ request()->routeIs('admin.gastos-menores.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
@@ -476,21 +474,44 @@
         @endif
 
         {{-- ── Administración ── --}}
-        @if($u->esAdmin())
+        @if($u->tienePermiso('computadores') || $u->tienePermiso('reportes') || $u->tienePermiso('usuarios') || $u->tienePermiso('catalogo'))
         <div class="px-3">
             <p class="sb-section-title text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-2 mb-1">
                 Administración
             </p>
 
+            @if($u->tienePermiso('computadores'))
+            <a href="{{ route('admin.computadores.index') }}" data-tip="Armado de Computadoras"
+               class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
+                      {{ request()->routeIs('admin.computadores.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+                <span class="sb-label">Armado Computadoras</span>
+            </a>
+            @endif
+
+            @if($u->tienePermiso('reportes'))
             <a href="{{ route('admin.reportes.index') }}" data-tip="Reportes"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
-                      {{ request()->routeIs('admin.reportes.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
+                      {{ request()->routeIs('admin.reportes.index') || request()->routeIs('admin.reportes.bincard*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
                 <span class="sb-label">Reportes</span>
             </a>
 
+            <a href="{{ route('admin.reportes.historial') }}" data-tip="Historial Reporterías"
+               class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
+                      {{ request()->routeIs('admin.reportes.historial*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="sb-label">Historial Reporterías</span>
+            </a>
+            @endif
+
+            @if($u->tienePermiso('usuarios'))
             <a href="{{ route('admin.usuarios.index') }}" data-tip="Usuarios"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                       {{ request()->routeIs('admin.usuarios.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
@@ -499,7 +520,9 @@
                 </svg>
                 <span class="sb-label">Usuarios</span>
             </a>
+            @endif
 
+            @if($u->tienePermiso('catalogo'))
             <a href="{{ route('admin.catalogo.unidades.index') }}" data-tip="Unidades de Medida"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                       {{ request()->routeIs('admin.catalogo.unidades.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
@@ -509,7 +532,6 @@
                 <span class="sb-label">Unidades de Medida</span>
             </a>
 
-            @if($u->esDev())
             <a href="{{ route('admin.productos.catalogo') }}" data-tip="Catálogo de Productos"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                       {{ request()->routeIs('admin.productos.catalogo*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
@@ -648,5 +670,39 @@ function sbCloseMobile() {
 <script src="https://cdn.datatables.net/buttons/3.0.2/js/buttons.html5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/3.0.2/js/buttons.print.min.js"></script>
 @stack('scripts')
+<script>
+// Mayúsculas automáticas en campos de nombres de productos/categorías/familias
+(function() {
+    const SEL = 'input[name="nombre"], #fam-nombre-input, #cat-nombre-input, #bc-nueva-cat';
+    function toUpper(el) {
+        if (!el.value) return;
+        const pos = el.selectionStart;
+        el.value = el.value.toUpperCase();
+        try { el.setSelectionRange(pos, pos); } catch(e) {}
+    }
+    document.addEventListener('input', function(e) {
+        if (e.target.matches && e.target.matches(SEL)) toUpper(e.target);
+    });
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll(SEL).forEach(toUpper);
+    });
+})();
+
+// Formateador global de RUT chileno → xx.xxx.xxx-x
+function _formatRut(input) {
+    const raw = input.value.replace(/[^0-9kK]/gi, '').toUpperCase();
+    if (raw.length === 0) { input.value = ''; return; }
+    if (raw.length === 1) { input.value = raw; return; }
+    const dv   = raw.slice(-1);
+    const body = raw.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    input.value = body + '-' + dv;
+}
+document.addEventListener('input', function(e) {
+    if (e.target.matches('input[name="rut_proveedor"]')) _formatRut(e.target);
+});
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input[name="rut_proveedor"]').forEach(_formatRut);
+});
+</script>
 </body>
 </html>

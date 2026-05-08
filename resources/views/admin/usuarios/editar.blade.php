@@ -71,31 +71,42 @@
             @endif
         </div>
 
-        {{-- Permisos: solo visibles para Super Administrador --}}
+        {{-- Permisos: visibles para Dev editando cualquier usuario no-dev --}}
         @if(auth()->user()->esDev())
-        <div id="bloque-permisos" style="border-top:1px solid #e5e7eb; padding-top:0.75rem; {{ old('rol', $usuario->rol) != 0 ? 'display:none;' : '' }}">
-            <p class="text-xs font-semibold text-gray-600 mb-2">Permisos</p>
-            <div class="grid grid-cols-2 gap-2">
-                @foreach(\App\Models\User::PERMISOS_DISPONIBLES as $key => $label)
-                    @php $activo = old($key, in_array($key, $usuario->permisos ?? []) ? '1' : '') === '1'; @endphp
-                    <div class="flex items-center justify-between gap-3 select-none py-1 px-2 rounded-lg hover:bg-gray-50 transition">
-                        <span class="text-xs text-gray-700">{{ $label }}</span>
-                        <input type="checkbox" name="{{ $key }}" value="1" {{ $activo ? 'checked' : '' }}
-                               id="perm-{{ $key }}" class="perm-toggle" style="display:none;">
-                        <div class="perm-track" data-for="perm-{{ $key }}" style="
-                            width:34px; height:19px; border-radius:9999px; position:relative; cursor:pointer; flex-shrink:0;
-                            background: {{ $activo ? '#2563eb' : '#6b7280' }};
-                            transition: background .12s;">
-                            <div class="perm-thumb" style="
-                                width:13px; height:13px; border-radius:50%; background:#fff;
-                                position:absolute; top:3px;
-                                left: {{ $activo ? '18px' : '3px' }};
-                                transition: left .12s;
-                                box-shadow: 0 1px 3px rgba(0,0,0,0.25);"></div>
-                        </div>
-                    </div>
-                @endforeach
+        <div id="bloque-permisos" style="border-top:1px solid #e5e7eb; padding-top:0.75rem; {{ old('rol', $usuario->rol) == 2 ? 'display:none;' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-xs font-semibold text-gray-600">Permisos de acceso</p>
+                <span class="text-[10px] text-gray-400">Vacío = acceso completo (solo para Admin)</span>
             </div>
+            @foreach(\App\Models\User::PERMISOS_GRUPOS as $grupo => $claves)
+            <div class="mb-3">
+                <p class="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1 px-2">{{ $grupo }}</p>
+                <div class="grid grid-cols-2 gap-1">
+                    @foreach($claves as $key)
+                        @php
+                            $label  = \App\Models\User::PERMISOS_DISPONIBLES[$key];
+                            $activo = old($key, in_array($key, $usuario->permisos ?? []) ? '1' : '') === '1';
+                        @endphp
+                        <div class="flex items-center justify-between gap-3 select-none py-1 px-2 rounded-lg hover:bg-gray-50 transition">
+                            <span class="text-xs text-gray-700">{{ $label }}</span>
+                            <input type="checkbox" name="{{ $key }}" value="1" {{ $activo ? 'checked' : '' }}
+                                   id="perm-{{ $key }}" class="perm-toggle" style="display:none;">
+                            <div class="perm-track" data-for="perm-{{ $key }}" style="
+                                width:34px; height:19px; border-radius:9999px; position:relative; cursor:pointer; flex-shrink:0;
+                                background: {{ $activo ? '#2563eb' : '#6b7280' }};
+                                transition: background .12s;">
+                                <div class="perm-thumb" style="
+                                    width:13px; height:13px; border-radius:50%; background:#fff;
+                                    position:absolute; top:3px;
+                                    left: {{ $activo ? '18px' : '3px' }};
+                                    transition: left .12s;
+                                    box-shadow: 0 1px 3px rgba(0,0,0,0.25);"></div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+            @endforeach
         </div>
         @endif
 
@@ -114,10 +125,13 @@
 
 @push('scripts')
 <script>
-    document.querySelector('select[name="rol"]').addEventListener('change', function () {
-        var bloque = document.getElementById('bloque-permisos');
-        if (bloque) bloque.style.display = this.value == '0' ? '' : 'none';
-    });
+    var rolSelect = document.querySelector('select[name="rol"]');
+    if (rolSelect) {
+        rolSelect.addEventListener('change', function () {
+            var bloque = document.getElementById('bloque-permisos');
+            if (bloque) bloque.style.display = this.value == '2' ? 'none' : '';
+        });
+    }
 
     // Toggle visual para permisos
     document.querySelectorAll('.perm-track').forEach(function(track) {

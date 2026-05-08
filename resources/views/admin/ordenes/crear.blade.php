@@ -142,6 +142,31 @@
 
     </div>
 
+    {{-- ══ SECCIÓN: Productos asociados a esta OC ══ --}}
+    <div id="seccion-productos-oc" style="display:none; margin-top:1.5rem;">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-700">Productos asociados a esta OC</h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Selecciona qué productos y cantidades pertenecen a esta Orden de Compra específica.</p>
+                </div>
+                <span id="badge-prods-asignados" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700"></span>
+            </div>
+
+            @error('oc_detalles')
+                <div class="px-5 py-3 bg-red-50 border-b border-red-200 text-red-700 text-sm">{{ $message }}</div>
+            @enderror
+
+            <div id="productos-oc-body" class="divide-y divide-gray-100">
+                {{-- Renderizado por JS --}}
+            </div>
+
+            <div id="productos-oc-vacio" class="px-5 py-10 text-center text-sm text-gray-400" style="display:none;">
+                Selecciona al menos un SICD para asignar sus productos.
+            </div>
+        </div>
+    </div>
+
     {{-- Feedback visual más OC --}}
     <div id="mas-oc-feedback" style="display:none; margin-top:1rem; padding:0.6rem 1rem; border-radius:0.5rem; font-size:0.8rem; font-weight:600;"></div>
 
@@ -208,6 +233,22 @@
 </style>
 @endpush
 
+{{-- Datos de SICD detalles con disponibilidad para JS --}}
+<script id="sicd-detalles-data" type="application/json">
+{!! json_encode($sicdsPendientes->map(fn($s) => [
+    'sicd_id'     => $s->id,
+    'codigo_sicd' => $s->codigo_sicd,
+    'detalles'    => $s->detalles->map(fn($d) => [
+        'id'                  => $d->id,
+        'nombre'              => $d->nombre_producto_excel,
+        'cantidad_solicitada' => $d->cantidad_solicitada,
+        'ya_asignado'         => (int) $d->ocDetalles->sum('cantidad_asignada'),
+        'disponible'          => max(0, $d->cantidad_solicitada - (int) $d->ocDetalles->sum('cantidad_asignada')),
+        'precio_neto'         => $d->precio_neto ? (int) $d->precio_neto : null,
+    ])->values(),
+])->values()) !!}
+</script>
+
 @push('scripts')
 <script>
 const RUTA_BUSCAR_MP  = '{{ route("admin.ordenes.buscar-mp") }}';
@@ -231,11 +272,183 @@ function getSicdIds() {
     return [...document.querySelectorAll('[name="sicd_ids[]"]:checked')].map(el => el.value);
 }
 
+// ─── Datos de SICD detalles ──────────────────────────────────────────────────
+const SICD_DETALLES_DATA = JSON.parse(document.getElementById('sicd-detalles-data').textContent);
+
 function onSicdChange() {
     const ids   = getSicdIds();
     const badge = $el('badge-sicd-count');
     if (badge) badge.textContent = ids.length > 0 ? ids.length + ' seleccionado' + (ids.length > 1 ? 's' : '') : '';
+    renderProductosOc(ids);
     actualizarSubmit();
+}
+
+// ─── Renderizar sección de productos por OC ──────────────────────────────────
+function renderProductosOc(sicdIds) {
+    const seccion = $el('seccion-productos-oc');
+    const body    = $el('productos-oc-body');
+    const vacio   = $el('productos-oc-vacio');
+    if (!seccion || !body) return;
+
+    if (sicdIds.length === 0) {
+        seccion.style.display = 'none';
+        return;
+    }
+    seccion.style.display = '';
+
+    const sicdSel   = SICD_DETALLES_DATA.filter(s => sicdIds.includes(String(s.sicd_id)));
+    const totalDets = sicdSel.reduce((a, s) => a + s.detalles.length, 0);
+
+    if (totalDets === 0) {
+        vacio.style.display = '';
+        body.innerHTML = '';
+        return;
+    }
+    vacio.style.display = 'none';
+
+    // Paleta adaptativa dark/light
+    const dm = document.documentElement.classList.contains('dark');
+    const oc = {
+        headerBg     : dm ? 'var(--c-surface-2)' : '#f9fafb',
+        headerBorder : dm ? 'var(--c-border)'    : '#e5e7eb',
+        headerTx     : dm ? '#a5b4fc'            : '#4338ca',
+        headerSub    : dm ? 'var(--c-text-3)'    : '#9ca3af',
+        rowBorder    : dm ? 'var(--c-border)'    : '#f3f4f6',
+        rowBgNormal  : dm ? 'transparent'        : 'transparent',
+        rowBgSinStock: dm ? 'rgba(127,29,29,0.25)' : '#fef2f2',
+        txtPrimary   : dm ? 'var(--c-text)'      : '#1f2937',
+        txtSecundary : dm ? 'var(--c-text-3)'    : '#9ca3af',
+        txtVerde     : dm ? '#4ade80'            : '#15803d',
+        txtRojo      : dm ? '#f87171'            : '#dc2626',
+        inputDisBg   : dm ? 'rgba(127,29,29,0.3)' : '#fee2e2',
+        inputDisBd   : dm ? '#7f1d1d'           : '#fca5a5',
+        inputNorBg   : dm ? 'var(--c-input)'    : '#ffffff',
+        inputNorBd   : dm ? 'var(--c-input-bd)' : '#d1d5db',
+        inputTx      : dm ? 'var(--c-input-tx)' : '#111827',
+    };
+
+    let html = '';
+    sicdSel.forEach(function(sicd) {
+        if (sicd.detalles.length === 0) return;
+        html += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 1.25rem;'
+              + 'background:' + oc.headerBg + ';border-bottom:1px solid ' + oc.headerBorder + ';">'
+              + '<span style="font-size:0.72rem;font-weight:700;font-family:monospace;color:' + oc.headerTx + ';">' + esc(sicd.codigo_sicd) + '</span>'
+              + '<span style="font-size:0.72rem;color:' + oc.headerSub + ';">— ' + sicd.detalles.length + ' producto(s)</span>'
+              + '</div>';
+
+        sicd.detalles.forEach(function(det) {
+            const disponible   = det.disponible;
+            const adjudicado   = disponible <= 0;   // ya asignado completamente a otras OC
+            const rowBgAdjud   = dm ? 'rgba(51,65,85,0.5)'  : '#f8fafc';
+            const txtAdjud     = dm ? '#475569'              : '#9ca3af';
+
+            html += '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 1.25rem;'
+                  + 'border-bottom:1px solid ' + oc.rowBorder + ';'
+                  + 'background:' + (adjudicado ? rowBgAdjud : oc.rowBgNormal) + ';">'
+
+                  // ── Checkbox (solo si tiene disponibles) ──────────────
+                  + '<div style="flex-shrink:0;display:flex;align-items:center;justify-content:center;width:20px;">';
+
+            if (adjudicado) {
+                // Candado — completamente adjudicado a otras OC
+                html += '<span title="Totalmente asignado a otra(s) OC" style="color:' + txtAdjud + ';font-size:0.9rem;">🔒</span>';
+            } else {
+                html += '<input type="checkbox" class="oc-det-check" data-det-id="' + det.id + '"'
+                      + ' style="width:16px;height:16px;cursor:pointer;accent-color:#4f46e5;"'
+                      + ' onchange="toggleProdOc(this)">';
+            }
+
+            html += '</div>'
+                  // ── Nombre y stats ────────────────────────────────────
+                  + '<div style="flex:2;min-width:0;' + (adjudicado ? 'opacity:0.55;' : '') + '">'
+                  + '<p style="font-size:0.82rem;font-weight:600;color:' + (adjudicado ? txtAdjud : oc.txtPrimary) + ';'
+                  + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;">' + esc(det.nombre) + '</p>'
+                  + '<div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.2rem;flex-wrap:wrap;">'
+                  + '<span style="font-size:0.7rem;color:' + oc.txtSecundary + ';">Total SICD: <strong>' + det.cantidad_solicitada + '</strong></span>'
+                  + '<span style="font-size:0.7rem;color:' + oc.txtSecundary + ';">· Ya asignado: <strong>' + det.ya_asignado + '</strong></span>'
+                  + '<span style="font-size:0.7rem;font-weight:700;color:' + (adjudicado ? txtAdjud : oc.txtVerde) + ';">'
+                  + '· Disponible: ' + disponible + '</span>'
+                  + (adjudicado ? '<span style="font-size:0.68rem;font-weight:700;color:' + oc.txtRojo + ';">'
+                                + '· Completamente adjudicado</span>' : '')
+                  + '</div>'
+                  + '</div>'
+
+                  // ── Panel cantidad (oculto hasta marcar checkbox) ─────
+                  + '<div id="cant-wrap-' + det.id + '" style="width:170px;flex-shrink:0;'
+                  + (adjudicado ? 'display:none;' : 'display:none;') + '">'
+                  + '<label style="display:block;font-size:0.7rem;color:' + oc.txtSecundary + ';margin-bottom:0.2rem;">Cantidad a asignar:</label>'
+                  + '<input type="number"'
+                  + '  name="oc_detalles[' + det.id + '][cantidad_asignada]"'
+                  + '  id="oc-cant-' + det.id + '"'
+                  + '  data-det-id="' + det.id + '"'
+                  + '  data-disponible="' + disponible + '"'
+                  + '  value="' + disponible + '"'
+                  + '  min="1" max="' + disponible + '"'
+                  + '  disabled'
+                  + '  class="oc-det-cant w-full rounded-lg px-2 py-1.5 text-sm text-center"'
+                  + '  style="border:1px solid ' + oc.inputNorBd + ';background:' + oc.inputNorBg + ';'
+                  + 'color:' + oc.inputTx + ';outline:none;"'
+                  + '  oninput="validarCantOc(this)">'
+                  // Hidden sicd_detalle_id — también deshabilitado hasta marcar
+                  + '<input type="hidden" name="oc_detalles[' + det.id + '][sicd_detalle_id]"'
+                  + '  id="oc-hidden-' + det.id + '" value="' + det.id + '" disabled>'
+                  + '</div>'
+                  + '</div>';
+        });
+    });
+
+    body.innerHTML = html;
+    actualizarBadgeProductos();
+}
+
+// ── Toggle checkbox de producto ────────────────────────────────────────────
+function toggleProdOc(checkbox) {
+    var detId   = checkbox.dataset.detId;
+    var wrap    = document.getElementById('cant-wrap-' + detId);
+    var cantIn  = document.getElementById('oc-cant-' + detId);
+    var hidIn   = document.getElementById('oc-hidden-' + detId);
+
+    if (checkbox.checked) {
+        wrap.style.display = '';
+        cantIn.disabled  = false;
+        hidIn.disabled   = false;
+        cantIn.style.borderColor = '#6366f1';
+    } else {
+        wrap.style.display = 'none';
+        cantIn.disabled  = true;
+        hidIn.disabled   = true;
+        cantIn.style.borderColor = '';
+    }
+    actualizarBadgeProductos();
+    actualizarSubmit();
+}
+
+function validarCantOc(input) {
+    const max = parseInt(input.dataset.disponible) || 0;
+    let val   = parseInt(input.value) || 0;
+    if (val < 1)   val = 1;
+    if (val > max) val = max;
+    input.value = val;
+    input.style.borderColor = val > 0 ? '#6366f1' : '#d1d5db';
+    actualizarBadgeProductos();
+    actualizarSubmit();
+}
+
+function actualizarBadgeProductos() {
+    const badge   = $el('badge-prods-asignados');
+    // Solo contar checkboxes marcados con cantidad válida
+    const checks  = document.querySelectorAll('.oc-det-check:checked');
+    let asignados = 0;
+    checks.forEach(function(chk) {
+        var detId = chk.dataset.detId;
+        var cant  = document.getElementById('oc-cant-' + detId);
+        if (cant && (parseInt(cant.value) || 0) > 0) asignados++;
+    });
+    if (badge) {
+        badge.textContent = asignados > 0 ? asignados + ' producto(s) seleccionado(s)' : 'Sin productos seleccionados';
+        badge.className = 'text-xs font-semibold px-2 py-0.5 rounded-full '
+            + (asignados > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600');
+    }
 }
 
 function abrirModalMasOc() {
@@ -694,9 +907,14 @@ function actualizarSubmit() {
     var hint = $el('submit-hint');
     if (!btn) return;
 
-    var primeraOC = _ocEntradas.find(function(e) { return e.estado === 'oc'; });
-    var sicdCount = getSicdIds().length;
-    var valid     = !!(primeraOC && sicdCount > 0);
+    var primeraOC  = _ocEntradas.find(function(e) { return e.estado === 'oc'; });
+    var sicdCount  = getSicdIds().length;
+    // Al menos un checkbox marcado con cantidad válida
+    var prodsOk    = [...document.querySelectorAll('.oc-det-check:checked')].some(function(chk) {
+        var cant = document.getElementById('oc-cant-' + chk.dataset.detId);
+        return cant && (parseInt(cant.value) || 0) > 0;
+    });
+    var valid      = !!(primeraOC && sicdCount > 0 && prodsOk);
 
     var hiddenOC = $el('hidden-numero-oc');
     if (hiddenOC) hiddenOC.value = primeraOC ? primeraOC.codigo : '';
@@ -718,6 +936,8 @@ function actualizarSubmit() {
                 hint.textContent = 'Selecciona al menos un SICD';
             } else if (!primeraOC) {
                 hint.textContent = 'Agrega y valida al menos una OC';
+            } else if (!prodsOk) {
+                hint.textContent = 'Asigna al menos un producto con cantidad > 0';
             }
         }
     }

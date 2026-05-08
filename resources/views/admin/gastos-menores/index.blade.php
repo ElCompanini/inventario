@@ -244,7 +244,7 @@ if (strlen($limpio) < 2) return $rut;
                             </div>
                             <div>
                                 <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                    Folio <span style="color:#ef4444;">*</span>
+                                    Folio — Número de Boleta <span style="color:#ef4444;">*</span>
                                 </label>
                                 <input type="text" name="folio" placeholder="Ej: 001234" required
                                     style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">

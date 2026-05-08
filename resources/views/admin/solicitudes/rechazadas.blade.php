@@ -150,6 +150,7 @@
         </thead>
         <tbody>
             @foreach($solicitudes as $s)
+            @if(!$s->producto) @continue @endif
             <tr class="hover:bg-gray-50 transition" data-producto-id="{{ $s->producto_id }}">
                 <td class="px-4 py-3 text-gray-400 text-xs">#{{ $s->id }}</td>
                 <td class="px-4 py-3 font-medium text-gray-800">{{ $s->producto->nombre }}</td>

@@ -309,4 +309,101 @@ html.dark .bincard-td > *  { color:inherit; }
 </div>
 @endif
 
+{{-- Modal: advertencia bincard existente --}}
+<div id="modal-bincard-existente" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:1rem;box-shadow:0 24px 60px rgba(0,0,0,.25);width:440px;max-width:calc(100vw - 2rem);padding:1.75rem;animation:bc-in .2s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="display:flex;align-items:flex-start;gap:.85rem;margin-bottom:1.25rem;">
+            <div style="flex-shrink:0;width:2.75rem;height:2.75rem;border-radius:9999px;background:#fef3c7;display:flex;align-items:center;justify-content:center;">
+                <svg style="width:1.35rem;height:1.35rem;" fill="none" stroke="#d97706" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+            </div>
+            <div style="flex:1;">
+                <p style="font-size:.9375rem;font-weight:700;color:#1f2937;margin:0 0 .35rem;">Ya existe un BINCARD generado</p>
+                <p style="font-size:.8125rem;color:#6b7280;margin:0;line-height:1.55;">
+                    El producto <span id="bc-modal-nombre" style="font-weight:700;color:#374151;"></span> ya tiene un BINCARD generado anteriormente. ¿Qué deseas hacer?
+                </p>
+            </div>
+        </div>
+        <div style="display:flex;gap:.65rem;justify-content:flex-end;border-top:1px solid #f3f4f6;padding-top:1rem;">
+            <button type="button" onclick="cerrarModalBincardExistente()"
+                    style="padding:.45rem 1rem;font-size:.82rem;font-weight:600;color:#6b7280;background:#f3f4f6;border:none;border-radius:.5rem;cursor:pointer;">
+                Cancelar
+            </button>
+            <a id="bc-modal-ver-link" href="#"
+               style="padding:.45rem 1.1rem;font-size:.82rem;font-weight:600;color:#fff;background:#4f46e5;border:none;border-radius:.5rem;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;">
+                <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+                Ver BINCARD
+            </a>
+            <button type="button" onclick="confirmarGenerarBincard()"
+                    style="padding:.45rem 1.1rem;font-size:.82rem;font-weight:600;color:#fff;background:#16a34a;border:none;border-radius:.5rem;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;">
+                <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                Generar igual
+            </button>
+        </div>
+    </div>
+</div>
+
+@push('head')
+<style>
+@keyframes bc-in { from{opacity:0;transform:scale(.94)} to{opacity:1;transform:scale(1)} }
+</style>
+@endpush
+
+@push('scripts')
+<script>
+const BINCARDS_POR_PRODUCTO = @json($bincardsPorProducto ?? []);
+const BINCARD_URL_BASE = '{{ route('admin.reportes.bincard') }}';
+
+let _submitForzado = false;
+
+document.getElementById('form-bincard').addEventListener('submit', function(e) {
+    if (_submitForzado) { _submitForzado = false; return; }
+
+    const select = this.querySelector('[name="producto_id"]');
+    const prodId = parseInt(select.value);
+    if (!prodId) return;
+
+    const existente = BINCARDS_POR_PRODUCTO[prodId];
+    if (!existente) return;
+
+    e.preventDefault();
+
+    // Nombre del producto seleccionado
+    const nombreOpt = select.options[select.selectedIndex].text;
+    document.getElementById('bc-modal-nombre').textContent = nombreOpt;
+
+    // Construir URL "Ver Bincard" con filtros del reporte existente
+    const params = new URLSearchParams();
+    if (existente.producto_id) params.set('producto_id', existente.producto_id);
+    if (existente.fecha_desde)  params.set('fecha_desde',  existente.fecha_desde);
+    if (existente.fecha_hasta)  params.set('fecha_hasta',  existente.fecha_hasta);
+    if (existente.tipo)         params.set('tipo',         existente.tipo);
+    params.set('solo_ver', '1');
+    document.getElementById('bc-modal-ver-link').href = BINCARD_URL_BASE + '?' + params.toString();
+
+    document.getElementById('modal-bincard-existente').style.display = 'flex';
+});
+
+function cerrarModalBincardExistente() {
+    document.getElementById('modal-bincard-existente').style.display = 'none';
+}
+
+function confirmarGenerarBincard() {
+    cerrarModalBincardExistente();
+    _submitForzado = true;
+    document.getElementById('form-bincard').submit();
+}
+
+document.getElementById('modal-bincard-existente').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) cerrarModalBincardExistente();
+});
+</script>
+@endpush
+
 @endsection
