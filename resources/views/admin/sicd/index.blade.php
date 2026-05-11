@@ -144,23 +144,41 @@
     (function () {
         var badges = document.querySelectorAll('.sicd-est-externo');
         if (!badges.length) return;
+
+        function isDark() {
+            return document.documentElement.classList.contains('dark');
+        }
+
+        function aplicarColores(badgesData) {
+            badges.forEach(function (el) {
+                var est = badgesData[el.dataset.codigo];
+                if (est && est.texto) {
+                    el.textContent      = est.texto;
+                    el.style.background = isDark() ? (est.dark_bg    || '#374151') : est.bg;
+                    el.style.color      = isDark() ? (est.dark_color || '#9ca3af') : est.color;
+                } else {
+                    el.textContent      = '—';
+                    el.style.background = isDark() ? '#374151' : '#f3f4f6';
+                    el.style.color      = isDark() ? '#9ca3af' : '#6b7280';
+                }
+            });
+        }
+
         var codigos = Array.from(badges).map(function (el) { return el.dataset.codigo; });
         var params  = codigos.map(function (c) { return 'codigos[]=' + encodeURIComponent(c); }).join('&');
+        var badgeCache = {};
+
         fetch('{{ route("admin.sicd.estados-externos") }}?' + params)
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                badges.forEach(function (el) {
-                    var est = data[el.dataset.codigo];
-                    if (est) {
-                        el.textContent         = est.texto;
-                        el.style.background    = est.bg;
-                        el.style.color         = est.color;
-                    } else {
-                        el.textContent      = '—';
-                        el.style.background = '#f3f4f6';
-                        el.style.color      = '#9ca3af';
-                    }
+                badgeCache = data;
+                aplicarColores(data);
+
+                // Re-aplicar colores si el usuario cambia de modo claro/oscuro
+                var observer = new MutationObserver(function () {
+                    aplicarColores(badgeCache);
                 });
+                observer.observe(document.documentElement, { attributeFilter: ['class'] });
             })
             .catch(function () {
                 badges.forEach(function (el) { el.textContent = '—'; });

@@ -32,19 +32,23 @@ class ComputadorArmado extends Model
 
     /** Tipos de componente disponibles */
     const TIPOS_COMPONENTE = [
-        'placa_madre'   => 'Placa Madre',
-        'procesador'    => 'Procesador',
-        'ram'           => 'RAM',
-        'gpu'           => 'GPU',
-        'fuente_poder'  => 'Fuente de Poder',
-        'ssd'           => 'SSD',
-        'hdd'           => 'HDD',
-        'gabinete'      => 'Gabinete',
-        'ventilador'    => 'Ventilador',
-        'disipador'     => 'Disipador',
-        'tarjeta_pci'   => 'Tarjeta PCI',
-        'periferico'    => 'Periférico',
-        'otro'          => 'Otro',
+        'placa_madre'      => 'Placa Madre',
+        'procesador'       => 'Procesador',
+        'ram'              => 'RAM',
+        'gpu'              => 'GPU',
+        'fuente_poder'     => 'Fuente de Poder',
+        'ssd'              => 'SSD',
+        'hdd'              => 'HDD',
+        'gabinete'         => 'Gabinete',
+        'ventilador'       => 'Ventilador',
+        'disipador'        => 'Disipador',
+        'tarjeta_pci'      => 'Tarjeta PCI',
+        'cable_hdmi'       => 'Cable HDMI',
+        'cable_displayport'=> 'Cable DisplayPort',
+        'cable_vga'        => 'Cable VGA',
+        'extensor_usb'     => 'Extensor USB',
+        'periferico'       => 'Periférico',
+        'otro'             => 'Otro',
     ];
 
     public function usuario()

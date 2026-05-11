@@ -21,4 +21,9 @@ class Categoria extends Model
     {
         return $this->hasMany(Producto::class)->orderBy('nombre');
     }
+
+    public function marcas()
+    {
+        return $this->hasMany(Marca::class)->orderBy('nombre');
+    }
 }

@@ -19,6 +19,7 @@ class Producto extends Model
         'stock_critico',
         'contenedor',
         'categoria_id',
+        'marca_id',
         'centro_costo_id',
         'stock_minimo_desde',
         'stock_critico_desde',
@@ -51,6 +52,11 @@ class Producto extends Model
     public function categoria()
     {
         return $this->belongsTo(Categoria::class);
+    }
+
+    public function marca()
+    {
+        return $this->belongsTo(Marca::class);
     }
 
     public function unidadMedida()

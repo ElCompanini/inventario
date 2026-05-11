@@ -41,7 +41,7 @@
                 <table class="min-w-full divide-y divide-gray-100 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th colspan="6" class="px-4 py-1"></th>
+                            <th colspan="4" class="px-4 py-1"></th>
                             <th class="px-4 py-1 text-left">
                                 <div style="border:2px solid #3b82f6; border-radius:0.5rem; overflow:hidden;">
                                     <p style="font-size:0.75rem; font-weight:700; color:#1d4ed8; background:#dbeafe; padding:4px 8px;">Cambiar todos los contenedores a:</p>
@@ -60,8 +60,6 @@
                             <th class="px-4 py-3 text-left font-semibold text-gray-600">Stock actual</th>
                             <th class="px-4 py-3 text-center font-semibold text-gray-600">Asignado esta OC</th>
                             <th class="px-4 py-3 text-center font-semibold text-gray-600">Cantidad recibida</th>
-                            <th class="px-4 py-3 text-right font-semibold text-gray-600">Precio neto</th>
-                            <th class="px-4 py-3 text-right font-semibold text-gray-600">Total neto</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-600">Container destino</th>
                         </tr>
                     </thead>
@@ -97,36 +95,6 @@
                                            max="{{ $ocDet->cantidad_asignada }}"
                                            class="input-recibido w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                 </td>
-                                <td class="px-4 py-3 text-right" style="vertical-align:middle;">
-                                    <div style="display:inline-block; width:7.5rem;">
-                                        <input type="text"
-                                               data-precio
-                                               data-sicd="{{ $ocDet->precio_neto ?? ($det->precio_neto ? (int) $det->precio_neto : '') }}"
-                                               name="precio_neto[{{ $ocDet->id }}]"
-                                               value="{{ old("precio_neto.{$ocDet->id}", $ocDet->precio_neto ?? ($det->precio_neto ? (int) $det->precio_neto : '')) }}"
-                                               placeholder="—"
-                                               style="width:100%;"
-                                               class="input-precio border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none">
-                                        @if($det->precio_neto)
-                                            <span style="font-size:0.78rem; color:#111827; white-space:nowrap;"><strong>SICD:</strong> ${{ number_format($det->precio_neto, 0, ',', '.') }}</span>
-                                        @endif
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3 text-right" style="vertical-align:middle;">
-                                    <div style="display:inline-block; width:7.5rem;">
-                                        <input type="text"
-                                               data-precio
-                                               data-sicd="{{ $ocDet->total_neto ?? ($det->total_neto ? (int) $det->total_neto : '') }}"
-                                               name="total_neto[{{ $ocDet->id }}]"
-                                               value="{{ old("total_neto.{$ocDet->id}", $ocDet->total_neto ?? ($det->total_neto ? (int) $det->total_neto : '')) }}"
-                                               placeholder="—"
-                                               style="width:100%;"
-                                               class="input-precio border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none">
-                                        @if($det->total_neto)
-                                            <span style="font-size:0.78rem; color:#111827; white-space:nowrap;"><strong>SICD:</strong> ${{ number_format($det->total_neto, 0, ',', '.') }}</span>
-                                        @endif
-                                    </div>
-                                </td>
                                 <td class="px-4 py-3" style="vertical-align:middle;">
                                     @if($det->producto)
                                         <select name="container[{{ $ocDet->id }}]"
@@ -147,7 +115,7 @@
                             </tr>
                             <tr id="motivo-row-{{ $ocDet->id }}"
                                 style="display:none; background:#fff7ed;">
-                                <td colspan="7" class="px-4 py-3" style="border-top:1px dashed #fed7aa;">
+                                <td colspan="5" class="px-4 py-3" style="border-top:1px dashed #fed7aa;">
                                     <div style="display:flex; align-items:flex-start; gap:0.75rem;">
                                         <span style="font-size:0.8rem; font-weight:700; color:#c2410c; white-space:nowrap; padding-top:0.4rem;">
                                             ⚠ Cantidad diferente — Motivo:
@@ -238,56 +206,7 @@
         });
     });
 
-    // ── Precio: formato visual $100.000 ─────────────────────────────────────
-    function colorearSegunSicd(input) {
-        const sicd = parseInt(input.dataset.sicd) || null;
-        const raw  = parseInt(input.value.replace(/\$/g,'').replace(/\./g,'').replace(/[^0-9]/g,'')) || null;
-        if (!sicd || !raw) { input.style.borderColor = ''; input.style.background = ''; return; }
-        if (raw === sicd) {
-            input.style.borderColor = '#22c55e';
-            input.style.background  = '#f0fdf4';
-        } else {
-            input.style.borderColor = '#f97316';
-            input.style.background  = '#fff7ed';
-        }
-    }
-
-    function formatearPrecio(input) {
-        const raw = input.value.replace(/\./g, '').replace(/[^0-9]/g, '');
-        if (!raw) { input.value = ''; return; }
-        input.value = '$' + parseInt(raw).toLocaleString('es-CL');
-    }
-
-    function rawNum(input) {
-        return parseInt(input.value.replace(/\$/g, '').replace(/\./g, '').replace(/[^0-9]/g, '')) || 0;
-    }
-
-    function recalcularTotal(precioInput) {
-        const name = precioInput.getAttribute('name'); // precio_neto[123]
-        const id = name.match(/\[(\d+)\]/)?.[1];
-        if (!id) return;
-        const cantInput  = document.querySelector(`input[name="recibido[${id}]"]`);
-        const totalInput = document.querySelector(`input[name="total_neto[${id}]"]`);
-        if (!cantInput || !totalInput) return;
-        const precio = rawNum(precioInput);
-        const cant   = parseInt(cantInput.value) || 0;
-        const total  = precio * cant;
-        totalInput.value = total ? '$' + total.toLocaleString('es-CL') : '';
-        colorearSegunSicd(totalInput);
-    }
-
-    document.querySelectorAll('.input-precio').forEach(function(input) {
-        if (input.value) { formatearPrecio(input); colorearSegunSicd(input); }
-
-        input.addEventListener('input', function () {
-            const raw = this.value.replace(/\$/g, '').replace(/\./g, '').replace(/[^0-9]/g, '');
-            if (!raw) { this.value = ''; } else { this.value = '$' + parseInt(raw).toLocaleString('es-CL'); }
-            colorearSegunSicd(this);
-            if (this.name && this.name.startsWith('precio_neto')) recalcularTotal(this);
-        });
-    });
-
-    // También recalcular si cambia la cantidad recibida + mostrar motivo si difiere
+    // Mostrar motivo si la cantidad recibida difiere de la asignada
     function verificarMotivo(cantInput) {
         const id         = cantInput.dataset.detid;
         const solicitado = parseInt(cantInput.dataset.asignado || cantInput.dataset.solicitado) || 0;
@@ -309,18 +228,7 @@
         verificarMotivo(cantInput);
 
         cantInput.addEventListener('input', function () {
-            const id = this.name.match(/\[(\d+)\]/)?.[1];
-            if (!id) return;
-            const precioInput = document.querySelector(`input[name="precio_neto[${id}]"]`);
-            if (precioInput) recalcularTotal(precioInput);
             verificarMotivo(this);
-        });
-    });
-
-    // Antes de enviar: convertir a número puro
-    document.getElementById('form-recepcion').addEventListener('submit', function () {
-        document.querySelectorAll('.input-precio').forEach(function(input) {
-            input.value = input.value.replace(/\$/g, '').replace(/\./g, '').replace(/[^0-9]/g, '');
         });
     });
 

@@ -66,15 +66,13 @@
     /* Nav: uniform icon spacing when collapsed — kill section gaps */
     body.sb-collapsed nav              { padding-top: 6px !important; padding-bottom: 6px !important; display: flex; flex-direction: column; gap: 0; }
     body.sb-collapsed nav > div       { padding: 0 !important; margin: 0 !important; display: contents; }
-    /* Each link gets consistent 2px vertical margin */
-    body.sb-collapsed .sb-link        { margin-top: 2px !important; margin-bottom: 2px !important; }
 
-    /* Each link: centered 44x44 icon pill */
+    /* Each link: 44×44 icon pill — left-aligned so margin:0 is stable during transition */
     body.sb-collapsed .sb-link {
         width: 44px;
         height: 44px;
         padding: 0;
-        margin: 2px auto;
+        margin: 2px 0;   /* NOT auto — auto can't interpolate and causes negative-margin leftward jump */
         display: flex;
         align-items: center;
         justify-content: center;
@@ -176,6 +174,66 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         max-width: 100%;
+    }
+
+    /* ═══════════════════════════════════════════════
+       ENHANCED SIDEBAR ANIMATIONS — visual only
+       No structural changes. Only overrides display:none
+       on elements where CSS transitions can fire.
+    ═══════════════════════════════════════════════ */
+
+    /* Nav links: only visual properties transition — width/padding/margin snap instantly
+       to prevent the icon from drifting left as the pill forms */
+    #sidebar .sb-link {
+        transition: background-color .18s ease, color .18s ease, transform .18s ease;
+    }
+    /* Subtle slide on hover (expanded only) */
+    #sidebar .sb-link:not(.bg-indigo-600):hover {
+        transform: translateX(2px);
+    }
+    body.sb-collapsed #sidebar .sb-link:not(.bg-indigo-600):hover {
+        transform: none;
+    }
+
+    /* Labels: max-width snaps instantly so it doesn't push the icon sideways
+       inside the pill; opacity fades in on expand for a nice text-appear effect */
+    .sb-label {
+        max-width: 220px;
+        overflow: hidden;
+        white-space: nowrap;
+        transition: opacity .15s ease;
+    }
+    body.sb-collapsed .sb-label {
+        display: inline !important;   /* allow transition — override display:none */
+        max-width: 0;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* Section titles: smooth max-height + opacity instead of display:none */
+    .sb-section-title {
+        max-height: 3rem;
+        overflow: hidden;
+        transition: opacity .18s ease,
+                    max-height .28s cubic-bezier(.4,0,.2,1),
+                    margin-bottom .28s cubic-bezier(.4,0,.2,1);
+    }
+    body.sb-collapsed .sb-section-title {
+        display: block !important;    /* allow transition — override display:none */
+        max-height: 0;
+        opacity: 0;
+        margin-bottom: 0 !important;
+        pointer-events: none;
+    }
+
+    /* Notification badges: opacity fade only (no layout impact) */
+    .sb-badge {
+        transition: opacity .16s ease;
+    }
+    body.sb-collapsed .sb-badge {
+        display: inline-flex !important; /* allow transition — override display:none */
+        opacity: 0;
+        pointer-events: none;
     }
 
     /* Tooltips via fixed div — no overflow clipping issues */
@@ -330,6 +388,20 @@
     {{-- Navigation --}}
     <nav class="flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-4 scrollbar-thin">
 
+        {{-- ── Dashboard (solo admins) ── --}}
+        @if($u->esAdmin())
+        <div class="px-3">
+            <a href="{{ route('admin.dashboard') }}" data-tip="Dashboard"
+               class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
+                      {{ request()->routeIs('admin.dashboard') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+                <span class="sb-label">Dashboard</span>
+            </a>
+        </div>
+        @endif
+
         {{-- ── Gestión de Stock ── --}}
         <div class="px-3">
             <p class="sb-section-title text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-2 mb-1">
@@ -481,13 +553,13 @@
             </p>
 
             @if($u->tienePermiso('computadores'))
-            <a href="{{ route('admin.computadores.index') }}" data-tip="Armado de Computadoras"
+            <a href="{{ route('admin.computadores.index') }}" data-tip="Armado de Equipos"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                       {{ request()->routeIs('admin.computadores.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                 </svg>
-                <span class="sb-label">Armado Computadoras</span>
+                <span class="sb-label">Armado Equipos</span>
             </a>
             @endif
 
@@ -568,8 +640,8 @@
 {{-- ═══════════════════════════════════════
      MAIN CONTENT
 ═══════════════════════════════════════ --}}
-<div id="main-wrapper" class="min-h-screen">
-    <main class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div id="main-wrapper" class="min-h-screen flex flex-col">
+    <main class="flex-1 w-full min-w-0 px-5 sm:px-7 lg:px-10 py-6">
 
         @if(session('success'))
             <div class="mb-4 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded relative" role="alert">

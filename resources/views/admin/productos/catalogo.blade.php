@@ -7,7 +7,7 @@
 <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
     <div>
         <h1 class="text-2xl font-bold text-gray-800">Catálogo de Productos</h1>
-        <p class="text-sm text-gray-500 mt-1">Gestión de familias, categorías y productos</p>
+        <p class="text-sm text-gray-500 mt-1">Gestión de familias, categorías, marcas y productos</p>
     </div>
     <div class="flex items-center gap-2">
         <button onclick="toggleScanner()"
@@ -66,6 +66,7 @@
 @endif
 
 {{-- Family tabs --}}
+<p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Familias</p>
 <div class="flex flex-wrap items-center gap-2 mb-6">
     @foreach($familias as $familia)
     <a href="{{ route('admin.productos.catalogo', ['familia' => $familia->id]) }}"
@@ -89,7 +90,7 @@
 @if($familiaActual)
 
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-5">
 
     {{-- LEFT: Categorías --}}
     <div class="lg:col-span-1">
@@ -148,8 +149,26 @@
         </div>
     </div>
 
+    {{-- MIDDLE: Marcas --}}
+    <div class="lg:col-span-1" id="panel-marcas-col">
+        <div class="bg-white rounded-xl shadow p-5">
+            <div class="flex items-center justify-between mb-4 pb-3" style="border-bottom:1px solid #f3f4f6;">
+                <h2 class="text-sm font-bold text-gray-700">Marcas</h2>
+                <button onclick="abrirModalMarcaCatalogo()"
+                        class="btn-primary inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg shrink-0">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Nueva
+                </button>
+            </div>
+            <p class="text-xs text-gray-400 italic text-center py-4" id="marcas-panel-hint">Selecciona una categoría</p>
+            <ul class="space-y-1" id="lista-marcas" style="display:none;"></ul>
+        </div>
+    </div>
+
     {{-- RIGHT: Productos --}}
-    <div class="lg:col-span-2">
+    <div class="lg:col-span-1">
         <div class="bg-white rounded-xl shadow p-5" id="panel-productos">
 
             <div class="flex items-center justify-between mb-4 pb-3" style="border-bottom:1px solid #f3f4f6;">
@@ -194,6 +213,7 @@
         'id'        => $c->id,
         'nombre'    => $c->nombre,
         'familia_id'=> $c->familia_id,
+        'marcas'    => $c->marcas->map(fn($m) => ['id' => $m->id, 'nombre' => $m->nombre, 'activo' => (bool)$m->activo])->values(),
         'productos' => $c->productos->map(fn($p) => [
             'id'           => $p->id,
             'nombre'       => $p->nombre,
@@ -201,6 +221,8 @@
             'stock_minimo' => $p->stock_minimo,
             'stock_critico'=> $p->stock_critico,
             'contenedor_id'=> $p->contenedor,
+            'marca_id'     => $p->marca_id,
+            'marca_nombre' => $p->marca?->nombre,
         ])->values(),
     ])->values(),
 ])->values()) !!}
@@ -209,6 +231,11 @@
 <script id="containers-data" type="application/json">
 {!! json_encode($containers->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values()) !!}
 </script>
+
+<script id="unidades-data" type="application/json">
+{!! json_encode($unidades->map(fn($u) => ['id' => $u->id, 'nombre' => $u->nombre, 'abreviacion' => $u->abreviacion])->values()) !!}
+</script>
+
 
 {{-- Modal: nueva familia --}}
 <div id="modal-familia" style="display:none; position:fixed; inset:0; z-index:9000; align-items:center; justify-content:center; background:rgba(0,0,0,.5);">
@@ -269,20 +296,27 @@
         <div id="modal-prod-errors" class="hidden mb-3 bg-red-50 border border-red-300 text-red-700 rounded-lg px-3 py-2 text-sm"></div>
         <div id="modal-prod-success" class="hidden mb-3 bg-green-50 border border-green-300 text-green-700 rounded-lg px-3 py-2 text-sm"></div>
 
-        {{-- Selectores familia/categoría (solo al crear) --}}
-        <div id="prod-selector-wrapper" class="space-y-3 mb-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Familia <span class="text-red-500">*</span></label>
-                <div id="prod-familias-btns" class="flex flex-wrap gap-2"></div>
+        {{-- Breadcrumb familia › categoría › marca (solo al crear) --}}
+        <div id="prod-selector-wrapper" class="mb-4">
+            <div id="prod-breadcrumb" class="inline-flex items-center gap-1.5 text-sm bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 flex-wrap">
+                <span id="prod-breadcrumb-fam" class="font-semibold text-indigo-600"></span>
+                <span class="text-gray-400">›</span>
+                <span id="prod-breadcrumb-cat" class="font-semibold text-gray-700"></span>
+                <span id="prod-breadcrumb-sep-marca" class="text-gray-400">›</span>
+                <span id="prod-breadcrumb-marca" class="font-semibold text-indigo-500"></span>
             </div>
-            <div id="prod-cat-wrapper" style="display:none;">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Categoría <span class="text-red-500">*</span></label>
-                <div id="prod-categorias-btns" class="flex flex-wrap gap-2"></div>
-            </div>
-            <div style="border-top:1px solid #f3f4f6; margin-top:0.25rem;"></div>
+            <div style="border-top:1px solid #f3f4f6; margin-top:0.75rem;"></div>
         </div>
 
         <div class="space-y-4">
+
+            {{-- Nombre: solo al crear --}}
+            <div id="prod-nombre-wrapper">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del producto <span class="text-red-500">*</span></label>
+                <input type="text" id="prod-nombre" maxlength="200" placeholder="Ej: Cable HDMI 1.8m"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase">
+            </div>
+
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Stock mínimo <span class="text-red-500">*</span></label>
@@ -302,6 +336,15 @@
                 <select id="prod-contenedor"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <option value="">— Selecciona un contenedor —</option>
+                </select>
+            </div>
+
+            {{-- Unidad de medida: requerida al crear, oculta al editar --}}
+            <div id="prod-unidad-wrapper">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Unidad de medida <span class="text-red-500">*</span></label>
+                <select id="prod-unidad"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">— Selecciona una unidad —</option>
                 </select>
             </div>
         </div>
@@ -447,6 +490,33 @@
     </div>
 </div>
 
+{{-- Modal: nueva/editar marca (dentro del catálogo) --}}
+<div id="modal-marca-cat" style="display:none; position:fixed; inset:0; z-index:9000; align-items:center; justify-content:center; background:rgba(0,0,0,.5);">
+    <div id="modal-marca-cat-inner" class="bg-white rounded-xl shadow-xl w-full mx-4" style="max-width:420px; padding:1.5rem; animation:cat-in .25s cubic-bezier(.22,.68,0,1.2) both;">
+        <h2 class="text-lg font-bold text-gray-800 mb-1" id="modal-marca-cat-titulo">Nueva marca</h2>
+        <p class="text-sm text-gray-500 mb-4">Las marcas son globales y se reutilizan en todos los productos.</p>
+
+        <div id="modal-marca-cat-errors" class="hidden mb-3 bg-red-50 border border-red-300 text-red-700 rounded-lg px-3 py-2 text-sm"></div>
+
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre <span class="text-red-500">*</span></label>
+        <input type="text" id="marca-cat-nombre-input" maxlength="100" placeholder="Ej: Samsung"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-5"
+               style="text-transform:uppercase;"
+               onkeydown="if(event.key==='Enter') guardarMarcaCatalogo()">
+
+        <div class="flex justify-end gap-3" style="border-top:1px solid #f3f4f6; padding-top:1rem;">
+            <button onclick="cerrarModal('modal-marca-cat')"
+                    class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                Cancelar
+            </button>
+            <button id="btn-guardar-marca-cat" onclick="guardarMarcaCatalogo()"
+                    class="btn-primary px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+                Guardar
+            </button>
+        </div>
+    </div>
+</div>
+
 {{-- Modal: confirmar eliminación de categoría --}}
 <div id="modal-eliminar-cat" style="display:none; position:fixed; inset:0; z-index:9100; align-items:center; justify-content:center; background:rgba(0,0,0,.5);">
     <div class="bg-white rounded-xl shadow-xl w-full mx-4" style="max-width:400px; padding:1.5rem; animation:cat-in .2s cubic-bezier(.22,.68,0,1.2) both;">
@@ -497,15 +567,25 @@ const ROUTE_PROD_UPDATE  = (id) => `{{ url('admin/catalogo/productos') }}/${id}`
 const ROUTE_PROD_DESTROY = (id) => `{{ url('admin/catalogo/productos') }}/${id}`;
 const ROUTE_BARCODE          = '{{ route('admin.catalogo.barcode') }}';
 const ROUTE_ASOCIAR_BARCODE  = (id) => `{{ url('admin/catalogo/productos') }}/${id}/barcode`;
+const ROUTE_MARCA_UPDATE  = (id) => `{{ url('admin/catalogo/marcas') }}/${id}`;
+const ROUTE_MARCA_DESTROY = (id) => `{{ url('admin/catalogo/marcas') }}/${id}`;
+const ROUTE_MARCA_TOGGLE  = (id) => `{{ url('admin/catalogo/marcas') }}/${id}/toggle`;
+const ROUTE_CAT_MARCA_STORE = (catId) => `{{ url('admin/catalogo/categorias') }}/${catId}/marcas`;
 
 const catalogoData   = JSON.parse(document.getElementById('catalogo-data').textContent);
 const containersData = JSON.parse(document.getElementById('containers-data').textContent);
+const unidadesData   = JSON.parse(document.getElementById('unidades-data').textContent);
+// Brands live inside catalogoData per category; build a flat index for quick lookup by ID
+let marcasData = catalogoData.flatMap(f => f.categorias.flatMap(c => (c.marcas || []).map(m => ({...m}))));
 
-let catActualId    = null;
-let catActualNombre = '';
-let catFamiliaId   = {{ $familiaActiva }};
-let editandoCatId  = null;
-let editandoProdId = null;
+let catActualId      = null;
+let catActualNombre  = '';
+let catFamiliaId     = {{ $familiaActiva }};
+let editandoCatId    = null;
+let editandoProdId   = null;
+let marcaActualId    = null;
+let marcaActualNombre = '';
+let editandoMarcaCatId = null;
 
 // ── Scanner de código de barras ───────────────────────────────────────────────
 
@@ -852,8 +932,10 @@ document.getElementById('fam-nombre-input').addEventListener('keydown', e => { i
 // ── Selección de categoría ───────────────────────────────────────────────────
 
 function seleccionarCategoria(catId, catNombre) {
-    catActualId     = catId;
-    catActualNombre = catNombre;
+    catActualId      = catId;
+    catActualNombre  = catNombre;
+    marcaActualId    = null;
+    marcaActualNombre = '';
     document.querySelectorAll('.cat-item').forEach(el => {
         el.classList.remove('bg-indigo-50', 'text-indigo-700', 'font-semibold');
         el.classList.add('text-gray-700');
@@ -870,6 +952,7 @@ function seleccionarCategoria(catId, catNombre) {
     btnNuevo.classList.remove('hidden');
     btnNuevo.style.display = 'inline-flex';
 
+    renderMarcas(cat);
     renderProductos(cat?.productos ?? []);
 }
 
@@ -887,6 +970,7 @@ function renderProductos(productos) {
         <div class="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition">
             <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-800 leading-snug">${escHtml(p.nombre)}</p>
+                ${p.marca_nombre ? `<p class="text-xs text-indigo-600 font-semibold">${escHtml(p.marca_nombre)}</p>` : ''}
                 <p class="text-xs mt-1 flex items-center gap-1.5">
                     <span class="inline-flex items-center gap-1 bg-yellow-50 border border-yellow-200 text-yellow-700 font-medium px-2 py-0.5 rounded-md">Mín: <strong>${p.stock_minimo}</strong></span>
                     <span class="inline-flex items-center gap-1 bg-red-50 border border-red-200 text-red-600 font-medium px-2 py-0.5 rounded-md">Crít: <strong>${p.stock_critico}</strong></span>
@@ -1010,6 +1094,267 @@ async function guardarCategoria() {
 document.getElementById('modal-categoria').addEventListener('click', e => { if (e.target === e.currentTarget) cerrarModalCategoria(); });
 document.getElementById('cat-nombre-input').addEventListener('keydown', e => { if (e.key === 'Enter') guardarCategoria(); });
 
+// ── Panel de Marcas ──────────────────────────────────────────────────────────
+
+function renderMarcas(cat) {
+    const hint  = document.getElementById('marcas-panel-hint');
+    const lista = document.getElementById('lista-marcas');
+    hint.style.display = 'none';
+    lista.style.display = 'block';
+
+    const catMarcas  = cat ? (cat.marcas || []) : [];
+    const cuentas    = {};
+    (cat?.productos ?? []).forEach(function(p) {
+        if (p.marca_id) cuentas[p.marca_id] = (cuentas[p.marca_id] || 0) + 1;
+    });
+    const totalProds = (cat?.productos ?? []).length;
+
+    lista.innerHTML = '';
+
+    // "Todas" row
+    const liTodas = document.createElement('li');
+    const isTodas = marcaActualId === null;
+    liTodas.innerHTML = `<button onclick="seleccionarMarca(null, '')" id="marca-btn-todas"
+        class="btn-ghost w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between
+               ${isTodas ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}">
+        <span>Todas</span>
+        <span class="text-xs text-gray-400 ml-2 shrink-0">${totalProds}</span>
+    </button>`;
+    lista.appendChild(liTodas);
+
+    const marcasActivas = catMarcas.filter(function(m) { return m.activo !== false; });
+
+    if (marcasActivas.length === 0) {
+        const liVacio = document.createElement('li');
+        liVacio.innerHTML = '<p class="text-xs text-gray-400 italic px-3 py-2">Sin marcas. Usa "Nueva" para crear una.</p>';
+        lista.appendChild(liVacio);
+    } else {
+        marcasActivas.forEach(function(m) {
+            const count = cuentas[m.id] || 0;
+            const isSel = marcaActualId === m.id;
+            const li = document.createElement('li');
+            li.className = 'flex items-center gap-1 group';
+            li.innerHTML = `
+                <button onclick="seleccionarMarca(${m.id}, '${escHtml(m.nombre).replace(/'/g, "\\'")}')" id="marca-btn-${m.id}"
+                        class="btn-ghost flex-1 text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between
+                               ${isSel ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}">
+                    <span class="truncate">${escHtml(m.nombre)}</span>
+                    <span class="text-xs ${count > 0 ? 'text-gray-400' : 'text-gray-300'} ml-2 shrink-0">${count}</span>
+                </button>
+                <button onclick="abrirModalMarcaCatalogo(${m.id})" title="Editar marca"
+                        class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50 transition shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                </button>
+                <button onclick="desasociarMarcaDeCategoria(${m.id})" title="Eliminar marca"
+                        class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50 transition shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>`;
+            lista.appendChild(li);
+        });
+    }
+
+}
+
+function seleccionarMarca(marcaId, marcaNombre) {
+    marcaActualId     = marcaId;
+    marcaActualNombre = marcaNombre;
+
+    const cat = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
+    renderMarcas(cat);
+
+    let prods = cat ? cat.productos : [];
+    if (marcaId) prods = prods.filter(function(p) { return p.marca_id === marcaId; });
+
+    const total = cat ? cat.productos.length : 0;
+    const shown = prods.length;
+    document.getElementById('subtitulo-categoria').textContent = marcaId
+        ? (shown === 0 ? 'Sin productos de ' + marcaNombre : shown + ' de ' + total + ' producto' + (total !== 1 ? 's' : ''))
+        : (total === 0 ? 'Sin productos' : (total === 1 ? '1 producto' : total + ' productos'));
+
+    renderProductos(prods);
+}
+
+// ── Modal Marca (catálogo) ────────────────────────────────────────────────────
+
+function abrirModalMarcaCatalogo(marcaId) {
+    marcaId = marcaId || null;
+    editandoMarcaCatId = marcaId;
+    const marca = marcaId ? marcasData.find(function(m) { return m.id === marcaId; }) : null;
+    document.getElementById('modal-marca-cat-titulo').textContent = marcaId ? 'Editar marca' : 'Nueva marca';
+    document.getElementById('marca-cat-nombre-input').value = marca ? marca.nombre : '';
+    document.getElementById('modal-marca-cat-errors').classList.add('hidden');
+    abrirModal('modal-marca-cat');
+    setTimeout(function() { document.getElementById('marca-cat-nombre-input').focus(); }, 50);
+}
+
+async function guardarMarcaCatalogo() {
+    const nombre = document.getElementById('marca-cat-nombre-input').value.trim().toUpperCase();
+    const errDiv = document.getElementById('modal-marca-cat-errors');
+    if (!nombre) { errDiv.textContent = 'El nombre es obligatorio.'; errDiv.classList.remove('hidden'); return; }
+    if (!editandoMarcaCatId && !catActualId) { errDiv.textContent = 'Selecciona una categoría primero.'; errDiv.classList.remove('hidden'); return; }
+    errDiv.classList.add('hidden');
+    const btn = document.getElementById('btn-guardar-marca-cat');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try {
+        const url    = editandoMarcaCatId ? ROUTE_MARCA_UPDATE(editandoMarcaCatId) : ROUTE_CAT_MARCA_STORE(catActualId);
+        const method = editandoMarcaCatId ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ _token: CSRF, nombre })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) {
+            errDiv.textContent = json.errors?.nombre?.[0] ?? json.message ?? 'Error al guardar.';
+            errDiv.classList.remove('hidden');
+        } else {
+            const cat = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
+            if (editandoMarcaCatId) {
+                // Update in catalogoData
+                if (cat) {
+                    const mIdx = cat.marcas.findIndex(function(m) { return m.id === editandoMarcaCatId; });
+                    if (mIdx !== -1) cat.marcas[mIdx].nombre = json.nombre;
+                    cat.productos.forEach(function(p) {
+                        if (p.marca_id === editandoMarcaCatId) p.marca_nombre = json.nombre;
+                    });
+                }
+                const gIdx = marcasData.findIndex(function(m) { return m.id === editandoMarcaCatId; });
+                if (gIdx !== -1) marcasData[gIdx].nombre = json.nombre;
+            } else {
+                // Brand created directly in category — add to catalogoData
+                const newMarca = { id: json.id, nombre: json.nombre, activo: true };
+                if (cat) {
+                    cat.marcas.push(newMarca);
+                    cat.marcas.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+                }
+                marcasData.push(newMarca);
+                marcasData.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+            }
+            cerrarModal('modal-marca-cat');
+            renderMarcas(cat);
+            if (catActualId) {
+                let prods = cat ? cat.productos : [];
+                if (marcaActualId) prods = prods.filter(function(p) { return p.marca_id === marcaActualId; });
+                renderProductos(prods);
+            }
+        }
+    } catch(e) { errDiv.textContent = 'Error de conexión.'; errDiv.classList.remove('hidden'); }
+    finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+}
+
+async function toggleMarcaCatalogo(marcaId) {
+    try {
+        const res = await fetch(ROUTE_MARCA_TOGGLE(marcaId), {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ _token: CSRF, _method: 'PATCH' })
+        });
+        const json = await res.json();
+        if (json.ok) {
+            const cat = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
+            if (cat) {
+                const mIdx = cat.marcas.findIndex(function(m) { return m.id === marcaId; });
+                if (mIdx !== -1) cat.marcas[mIdx].activo = json.activo;
+            }
+            const gIdx = marcasData.findIndex(function(m) { return m.id === marcaId; });
+            if (gIdx !== -1) marcasData[gIdx].activo = json.activo;
+            if (!json.activo && marcaActualId === marcaId) { marcaActualId = null; marcaActualNombre = ''; }
+            renderMarcas(cat);
+        }
+    } catch(e) { alert('Error de conexión.'); }
+}
+
+document.getElementById('modal-marca-cat').addEventListener('click', function(e) { if (e.target === e.currentTarget) cerrarModal('modal-marca-cat'); });
+
+async function desasociarMarcaDeCategoria(marcaId) {
+    if (!catActualId) return;
+    try {
+        const res = await fetch(ROUTE_MARCA_DESTROY(marcaId), {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json',
+                       'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ _token: CSRF, _method: 'DELETE' })
+        });
+        const json = await res.json();
+        if (json.ok) {
+            const cat = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
+            if (cat) {
+                cat.marcas = cat.marcas.filter(function(m) { return m.id !== marcaId; });
+                if (marcaActualId === marcaId) { marcaActualId = null; marcaActualNombre = ''; }
+            }
+            marcasData = marcasData.filter(function(m) { return m.id !== marcaId; });
+            renderMarcas(cat);
+            if (marcaActualId === null) {
+                const prods = cat ? cat.productos : [];
+                renderProductos(prods);
+                document.getElementById('subtitulo-categoria').textContent = prods.length === 0 ? 'Sin productos' : (prods.length === 1 ? '1 producto' : prods.length + ' productos');
+            }
+        } else {
+            alert(json.message ?? 'No se puede eliminar esta marca.');
+        }
+    } catch(e) { alert('Error de conexión.'); }
+}
+
+// ── Marca helpers ────────────────────────────────────────────────────────────
+
+function poblarSelectMarca(selectedId) {
+    var sel = document.getElementById('prod-marca');
+    sel.innerHTML = '<option value="">— Selecciona una marca —</option>';
+
+    var catId = editandoProdId ? catActualId : prodCatId;
+    var cat   = catId ? catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catId; }) : null;
+    var pool  = cat ? (cat.marcas || []).filter(function(m) { return m.activo !== false; }) : [];
+
+    // In edit mode always include the currently assigned brand even if it changed categories
+    var lista = pool.slice();
+    if (selectedId && !lista.find(function(m) { return String(m.id) === String(selectedId); })) {
+        var current = marcasData.find(function(m) { return String(m.id) === String(selectedId); });
+        if (current) lista.unshift(current);
+    }
+
+    lista.forEach(function(m) {
+        var opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.nombre;
+        if (selectedId && String(m.id) === String(selectedId)) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+async function crearMarcaRapida() {
+    var nombreInput = document.getElementById('prod-nueva-marca');
+    var nombre = nombreInput.value.trim().toUpperCase();
+    if (!nombre) return;
+    var catId = editandoProdId ? catActualId : prodCatId;
+    if (!catId) { alert('Selecciona una categoría primero.'); return; }
+    try {
+        var res = await fetch(ROUTE_CAT_MARCA_STORE(catId), {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ _token: CSRF, nombre })
+        });
+        var json = await res.json();
+        if (json.ok) {
+            var cat = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catId; });
+            var newMarca = { id: json.id, nombre: json.nombre, activo: true };
+            if (cat) {
+                cat.marcas.push(newMarca);
+                cat.marcas.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+            }
+            marcasData.push(newMarca);
+            marcasData.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+            poblarSelectMarca(json.id);
+            nombreInput.value = '';
+        } else {
+            alert(json.errors?.nombre?.[0] ?? json.message ?? 'Error al crear la marca.');
+        }
+    } catch(e) { alert('Error de conexión.'); }
+}
+
 // ── Modal Producto ───────────────────────────────────────────────────────────
 
 let prodFamiliaId = null;
@@ -1043,7 +1388,7 @@ function prodRenderCategorias() {
         btn.textContent = c.nombre;
         btn.className = 'text-xs font-semibold px-3 py-1.5 rounded-lg border transition ' +
             (sel ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400 hover:text-indigo-600');
-        btn.onclick = function() { prodCatId = c.id; prodRenderCategorias(); };
+        btn.onclick = function() { prodCatId = c.id; prodRenderCategorias(); poblarSelectMarca(null); };
         cont.appendChild(btn);
     });
     wrapper.style.display = 'block';
@@ -1055,22 +1400,37 @@ function abrirModalProducto() {
         alert('No hay contenedores disponibles. Crea al menos un contenedor antes de agregar productos.');
         return;
     }
+    // Bloquear si no hay unidades de medida
+    if (unidadesData.length === 0) {
+        alert('No hay unidades de medida disponibles. Crea al menos una unidad de medida antes de agregar productos.');
+        return;
+    }
+    // Bloquear si no hay marca seleccionada en el panel
+    if (!marcaActualId) {
+        alert('Selecciona una marca en el panel antes de agregar un producto.');
+        return;
+    }
 
     editandoProdId = null;
-    // Pre-seleccionar familia y categoría si hay una activa
-    if (catActualId) {
-        var familia = catalogoData.find(function(f) { return f.categorias.some(function(c) { return c.id === catActualId; }); });
-        prodFamiliaId = familia ? familia.id : null;
-        prodCatId     = catActualId;
-    } else {
-        prodFamiliaId = null;
-        prodCatId     = null;
-    }
-    document.getElementById('prod-selector-wrapper').style.display = 'block';
-    document.getElementById('modal-prod-titulo').textContent    = 'Nuevo producto';
-    document.getElementById('modal-prod-subtitulo').textContent = 'Selecciona familia y categoría';
-    document.getElementById('prod-stock-minimo').value          = '0';
-    document.getElementById('prod-stock-critico').value         = '0';
+    var familia = catActualId ? catalogoData.find(function(f) { return f.categorias.some(function(c) { return c.id === catActualId; }); }) : null;
+    prodFamiliaId = familia ? familia.id : null;
+    prodCatId     = catActualId;
+
+    // Populate breadcrumb
+    var catObj = familia ? familia.categorias.find(function(c) { return c.id === catActualId; }) : null;
+    document.getElementById('prod-breadcrumb-fam').textContent   = familia ? familia.nombre : '—';
+    document.getElementById('prod-breadcrumb-cat').textContent   = catObj  ? catObj.nombre  : '—';
+    var hasMarca = !!marcaActualNombre;
+    document.getElementById('prod-breadcrumb-sep-marca').style.display = hasMarca ? '' : 'none';
+    document.getElementById('prod-breadcrumb-marca').textContent = hasMarca ? marcaActualNombre : '';
+
+    document.getElementById('prod-selector-wrapper').style.display  = 'block';
+    document.getElementById('modal-prod-titulo').textContent         = 'Nuevo producto';
+    document.getElementById('modal-prod-subtitulo').textContent      = '';
+    document.getElementById('prod-stock-minimo').value               = '0';
+    document.getElementById('prod-stock-critico').value              = '0';
+    document.getElementById('prod-nombre').value                     = '';
+    document.getElementById('prod-nombre-wrapper').style.display     = 'block';
     document.getElementById('modal-prod-errors').classList.add('hidden');
     document.getElementById('modal-prod-success').classList.add('hidden');
 
@@ -1085,8 +1445,17 @@ function abrirModalProducto() {
     });
     document.getElementById('prod-contenedor-wrapper').style.display = 'block';
 
-    prodRenderFamilias();
-    prodRenderCategorias();
+    // Poblar y mostrar select de unidad de medida
+    var selU = document.getElementById('prod-unidad');
+    selU.innerHTML = '<option value="">— Selecciona una unidad —</option>';
+    unidadesData.forEach(function(u) {
+        var opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = u.nombre + (u.abreviacion ? ' (' + u.abreviacion + ')' : '');
+        selU.appendChild(opt);
+    });
+    document.getElementById('prod-unidad-wrapper').style.display = 'block';
+
     abrirModal('modal-producto');
     setTimeout(function() { document.getElementById('prod-stock-minimo').focus(); }, 50);
 }
@@ -1104,6 +1473,8 @@ function editarProducto(prodId) {
     document.getElementById('modal-prod-errors').classList.add('hidden');
     document.getElementById('modal-prod-success').classList.add('hidden');
     document.getElementById('prod-contenedor-wrapper').style.display = 'none';
+    document.getElementById('prod-unidad-wrapper').style.display = 'none';
+    document.getElementById('prod-nombre-wrapper').style.display = 'none';
     abrirModal('modal-producto');
     setTimeout(function() { document.getElementById('prod-stock-minimo').focus(); }, 50);
 }
@@ -1145,12 +1516,32 @@ async function guardarProducto() {
     errDiv.classList.add('hidden');
     sucDiv.classList.add('hidden');
 
-    if (!editandoProdId && !prodFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.classList.remove('hidden'); return; }
-    if (!editandoProdId && !prodCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.classList.remove('hidden'); return; }
+    if (!editandoProdId && !prodCatId) { errDiv.textContent = 'No hay categoría seleccionada.'; errDiv.classList.remove('hidden'); return; }
+
+    var nombreProd = document.getElementById('prod-nombre')?.value.trim() ?? '';
+    if (!editandoProdId && !nombreProd) {
+        errDiv.textContent = 'El nombre del producto es obligatorio.';
+        errDiv.classList.remove('hidden');
+        return;
+    }
+
+    // Marca: viene del panel (marcaActualId) al crear; en edición no se toca
+    if (!editandoProdId && !marcaActualId) {
+        errDiv.textContent = 'Selecciona una marca en el panel antes de crear un producto.';
+        errDiv.classList.remove('hidden');
+        return;
+    }
 
     var contenedorId = document.getElementById('prod-contenedor')?.value ?? '';
     if (!editandoProdId && !contenedorId) {
         errDiv.textContent = 'Debes seleccionar un contenedor.';
+        errDiv.classList.remove('hidden');
+        return;
+    }
+
+    var unidadId = document.getElementById('prod-unidad')?.value ?? '';
+    if (!editandoProdId && !unidadId) {
+        errDiv.textContent = 'Debes seleccionar una unidad de medida.';
         errDiv.classList.remove('hidden');
         return;
     }
@@ -1162,8 +1553,11 @@ async function guardarProducto() {
         var method = editandoProdId ? 'PUT' : 'POST';
         var body   = new URLSearchParams({ _token: CSRF, stock_minimo, stock_critico });
         if (!editandoProdId) {
+            body.append('marca_id', marcaActualId);
             body.append('categoria_id', prodCatId);
             body.append('contenedor', contenedorId);
+            body.append('unidad_medida_id', unidadId);
+            body.append('nombre', nombreProd.toUpperCase());
         }
         var res  = await fetch(url, { method, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
         var json = await res.json();
@@ -1173,26 +1567,30 @@ async function guardarProducto() {
         } else if (editandoProdId) {
             var cat = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
             var prod = cat ? cat.productos.find(function(p) { return p.id === editandoProdId; }) : null;
-            if (prod) { prod.stock_minimo = parseInt(stock_minimo); prod.stock_critico = parseInt(stock_critico); }
-            renderProductos(cat ? cat.productos : []);
+            if (prod) {
+                prod.stock_minimo  = parseInt(stock_minimo);
+                prod.stock_critico = parseInt(stock_critico);
+            }
+            var prods = cat ? cat.productos : [];
+            if (marcaActualId) prods = prods.filter(function(p) { return p.marca_id === marcaActualId; });
+            renderProductos(prods);
             cerrarModalProducto();
         } else {
             var familia = catalogoData.find(function(f) { return f.categorias.some(function(c) { return c.id === prodCatId; }); });
             var cat     = familia ? familia.categorias.find(function(c) { return c.id === prodCatId; }) : null;
             if (cat) {
-                cat.productos.push({ id: json.id, nombre: json.nombre, stock_actual: 0, stock_minimo: parseInt(stock_minimo), stock_critico: parseInt(stock_critico), contenedor_id: null });
+                var marcaSel = marcasData.find(function(m) { return m.id === marcaActualId; });
+                cat.productos.push({ id: json.id, nombre: json.nombre, stock_actual: 0, stock_minimo: parseInt(stock_minimo), stock_critico: parseInt(stock_critico), contenedor_id: null, marca_id: marcaActualId, marca_nombre: marcaSel ? marcaSel.nombre : null });
                 if (catActualId === prodCatId) {
                     document.getElementById('subtitulo-categoria').textContent = cat.productos.length + ' producto' + (cat.productos.length !== 1 ? 's' : '');
-                    renderProductos(cat.productos);
+                    var prodsVis = marcaActualId ? cat.productos.filter(function(p) { return p.marca_id === marcaActualId; }) : cat.productos;
+                    renderProductos(prodsVis);
+                    renderMarcas(cat);
                 }
-                var spanCont = document.querySelector('[data-cat-id="' + prodCatId + '"] + span, #cat-btn-' + prodCatId + ' span.text-xs');
+                var spanCont = document.querySelector('#cat-btn-' + prodCatId + ' span.text-xs');
                 if (spanCont) spanCont.textContent = cat.productos.length;
             }
-            sucDiv.textContent = '✓ Producto "' + (json.nombre || '') + '" guardado. Puedes agregar otro.';
-            sucDiv.classList.remove('hidden');
-            document.getElementById('prod-stock-minimo').value = '0';
-            document.getElementById('prod-stock-critico').value = '0';
-            document.getElementById('prod-stock-minimo').focus();
+            cerrarModalProducto();
         }
     } catch (e) { errDiv.textContent = 'Error de conexión.'; errDiv.classList.remove('hidden'); }
     finally { btn.disabled = false; btn.textContent = 'Guardar'; }

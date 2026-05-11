@@ -312,14 +312,18 @@ class SicdController extends Controller
         ]);
 
         foreach ($items as $item) {
+            $pNeto  = $item['precioNeto'] ?? null;
+            $tNeto  = $item['totalNeto']  ?? null;
             $sicd->detalles()->create([
                 'producto_id'           => $item['producto_id'] ?? null,
                 'nombre_producto_excel' => $item['descripcion'],
                 'unidad'                => $item['unidad'] ?: null,
                 'cantidad_solicitada'   => $item['cantidad'],
                 'cantidad_recibida'     => 0,
-                'precio_neto'           => $item['precioNeto'] ?? null,
-                'total_neto'            => $item['totalNeto'] ?? null,
+                'precio_neto'           => $pNeto,
+                'total_neto'            => $tNeto,
+                'precio_neto_original'  => $pNeto,
+                'total_neto_original'   => $tNeto,
             ]);
         }
 
@@ -463,14 +467,18 @@ class SicdController extends Controller
             foreach ($items as $item) {
                 $cantidad = $item['cantidad'];
 
+                $pNeto2 = $item['precioNeto'] ?? null;
+                $tNeto2 = $item['totalNeto']  ?? null;
                 $sicd->detalles()->create([
                     'producto_id'           => $item['producto_id'],
                     'nombre_producto_excel' => $item['descripcion'],
                     'unidad'                => $item['unidad'] ?: null,
                     'cantidad_solicitada'   => $cantidad,
                     'cantidad_recibida'     => $item['producto_id'] ? $cantidad : 0,
-                    'precio_neto'           => $item['precioNeto'] ?? null,
-                    'total_neto'            => $item['totalNeto'] ?? null,
+                    'precio_neto'           => $pNeto2,
+                    'total_neto'            => $tNeto2,
+                    'precio_neto_original'  => $pNeto2,
+                    'total_neto_original'   => $tNeto2,
                 ]);
 
                 if ($item['producto_id']) {
@@ -692,8 +700,11 @@ class SicdController extends Controller
                 'total_neto'            => isset($det['total_neto'])  && $det['total_neto']  !== '' ? (float) $det['total_neto']  : null,
             ];
             if (!empty($det['id'])) {
+                // Nunca tocar _original en registros existentes: es inmutable
                 $sicd->detalles()->where('id', (int) $det['id'])->update($data);
             } else {
+                $data['precio_neto_original'] = $data['precio_neto'];
+                $data['total_neto_original']  = $data['total_neto'];
                 $sicd->detalles()->create($data);
             }
         }

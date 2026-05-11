@@ -137,7 +137,7 @@ html.dark .bincard-td > *  { color:inherit; }
 
     {{-- Info producto --}}
     <div style="padding:1rem 1.5rem; background:#f8fafc; border-bottom:2px solid #e2e8f0;">
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
             <div>
                 <p style="font-size:.65rem; font-weight:700; text-transform:uppercase; color:#64748b; letter-spacing:.06em;">Producto</p>
                 <p style="font-size:.95rem; font-weight:800; color:#1e293b; margin:.1rem 0 0;">{{ $producto->nombre }}</p>
@@ -146,6 +146,12 @@ html.dark .bincard-td > *  { color:inherit; }
                 <p style="font-size:.65rem; font-weight:700; text-transform:uppercase; color:#64748b; letter-spacing:.06em;">Categoría / Familia</p>
                 <p style="font-size:.85rem; font-weight:600; color:#374151; margin:.1rem 0 0;">
                     {{ $producto->categoria?->nombre ?? '—' }} / {{ $producto->categoria?->familia?->nombre ?? '—' }}
+                </p>
+            </div>
+            <div>
+                <p style="font-size:.65rem; font-weight:700; text-transform:uppercase; color:#64748b; letter-spacing:.06em;">Marca</p>
+                <p style="font-size:.85rem; font-weight:600; color:#374151; margin:.1rem 0 0;">
+                    {{ $producto->marca?->nombre ?? '—' }}
                 </p>
             </div>
             <div>

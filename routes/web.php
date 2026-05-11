@@ -18,7 +18,9 @@ use App\Http\Controllers\PrecioController;
 use App\Http\Controllers\ComputadorController;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\ReporteriaIndexController;
+use App\Http\Controllers\MarcaController;
 use App\Http\Controllers\UnidadMedidaController;
+use App\Http\Controllers\DashboardController;
 
 // Raíz → login
 Route::get('/', fn() => redirect()->route('login'));
@@ -39,7 +41,7 @@ Route::middleware('auth')->group(function () {
 
 // Rutas autenticadas (admin y usuario)
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', [ProductoController::class, 'index'])->name('dashboard');
+    Route::get('/productos', [ProductoController::class, 'index'])->name('dashboard');
     Route::get('/mis-solicitudes', [SolicitudController::class, 'index'])->name('solicitudes.mis');
     Route::post('/solicitudes', [SolicitudController::class, 'store'])->name('solicitudes.store');
 
@@ -51,6 +53,8 @@ Route::middleware('auth')->group(function () {
 
 // Rutas solo admin
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
     Route::get('/solicitudes', [AdminController::class, 'solicitudes'])->name('solicitudes');
     Route::get('/solicitudes/rechazadas', [AdminController::class, 'rechazadas'])->name('solicitudes.rechazadas');
     Route::post('/solicitudes/{id}/aprobar', [AdminController::class, 'aprobar'])->name('solicitudes.aprobar');
@@ -125,6 +129,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/gastos-menores', [GastoMenorController::class, 'index'])->name('gastos-menores.index');
     Route::get('/precios', [PrecioController::class, 'index'])->name('precios.index');
 
+    // Marcas
+    Route::get('/catalogo/marcas/listar',              [MarcaController::class, 'listar'])->name('catalogo.marcas.listar');
+    Route::get('/catalogo/marcas',                     [MarcaController::class, 'index'])->name('catalogo.marcas.index');
+    Route::post('/catalogo/marcas',                    [MarcaController::class, 'store'])->name('catalogo.marcas.store');
+    Route::put('/catalogo/marcas/{marca}',             [MarcaController::class, 'update'])->name('catalogo.marcas.update');
+    Route::delete('/catalogo/marcas/{marca}',          [MarcaController::class, 'destroy'])->name('catalogo.marcas.destroy');
+    Route::patch('/catalogo/marcas/{id}/toggle',       [MarcaController::class, 'toggle'])->name('catalogo.marcas.toggle');
+
     // Unidades de Medida
     Route::get('/catalogo/unidades',                   [UnidadMedidaController::class, 'index'])->name('catalogo.unidades.index');
     Route::post('/catalogo/unidades',                  [UnidadMedidaController::class, 'store'])->name('catalogo.unidades.store');
@@ -166,6 +178,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/catalogo/categorias', [CatalogoController::class, 'storeCategoria'])->name('catalogo.categorias.store');
     Route::put('/catalogo/categorias/{categoria}', [CatalogoController::class, 'updateCategoria'])->name('catalogo.categorias.update');
     Route::delete('/catalogo/categorias/{categoria}', [CatalogoController::class, 'destroyCategoria'])->name('catalogo.categorias.destroy');
+    Route::get('/catalogo/categorias/{categoria}/marcas', [CatalogoController::class, 'marcasPorCategoria'])->name('catalogo.categorias.marcas.index');
+    Route::post('/catalogo/categorias/{categoria}/marcas', [CatalogoController::class, 'asociarMarcaCategoria'])->name('catalogo.categorias.marcas.store');
+    Route::delete('/catalogo/categorias/{categoriaId}/marcas/{marcaId}', [CatalogoController::class, 'desasociarMarcaCategoria'])->name('catalogo.categorias.marcas.destroy');
     Route::post('/catalogo/productos', [CatalogoController::class, 'storeProducto'])->name('catalogo.productos.store');
     Route::put('/catalogo/productos/{producto}', [CatalogoController::class, 'updateProducto'])->name('catalogo.productos.update');
     Route::get('/catalogo/barcode', [CatalogoController::class, 'buscarBarcode'])->name('catalogo.barcode');

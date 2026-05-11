@@ -243,6 +243,7 @@
                 <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Unidad</th>
                 <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Familia</th>
                 <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Categoría</th>
+                <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Marca</th>
                 <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Cont.</th>
                 <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Stock</th>
                 <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Mín.</th>
@@ -308,19 +309,26 @@
                         <span>{{ $producto->nombre }}</span>
                     </div>
                 </td>
-                <td class="px-2 py-3 text-gray-500 text-xs whitespace-nowrap">{{ $producto->unidadMedida?->abreviacion ?? $producto->unidad ?? '—' }}</td>
+                <td class="px-2 py-3 text-gray-500 text-xs whitespace-nowrap">{{ $producto->unidadMedida?->nombre ?? $producto->unidad ?? '—' }}</td>
                 <td class="px-2 py-3 text-gray-500 text-xs">{{ $producto->categoria->familia->nombre ?? '—' }}</td>
                 <td class="px-2 py-3 text-gray-500 text-xs">{{ $producto->categoria->nombre ?? '—' }}</td>
+                <td class="px-2 py-3 text-xs whitespace-nowrap">
+                    @if($producto->marca)
+                        <span class="inline-block bg-indigo-50 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $producto->marca->nombre }}</span>
+                    @else
+                        <span class="text-gray-300">—</span>
+                    @endif
+                </td>
                 <td class="px-2 py-3" style="text-align:center; vertical-align:middle;">
                     @if($producto->container)
                         @if(auth()->user()->esAdmin())
                             <a href="{{ route('admin.containers.index') }}#container-{{ $producto->container->id }}"
                                style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.875rem; font-weight:700; padding:2px 12px; border-radius:9999px; text-decoration:none;">
-                                {{ str_replace('Contenedor ', 'C', $producto->container->nombre) }}
+                                {{ strtoupper(substr($producto->container->nombre, 0, 1)) . preg_replace('/\D/', '', $producto->container->nombre) }}
                             </a>
                         @else
                             <span style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.875rem; font-weight:700; padding:2px 12px; border-radius:9999px;">
-                                {{ str_replace('Contenedor ', 'C', $producto->container->nombre) }}
+                                {{ strtoupper(substr($producto->container->nombre, 0, 1)) . preg_replace('/\D/', '', $producto->container->nombre) }}
                             </span>
                         @endif
                     @else

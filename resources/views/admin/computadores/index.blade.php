@@ -69,15 +69,39 @@
 
             {{-- Componentes en grid visual --}}
             <div class="px-5 py-3">
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    Componentes — {{ $activos->count() }} instalado(s)
-                </p>
-                <div class="grid grid-cols-2 gap-1">
+                @php
+                    $total      = count($tipos);
+                    $instalados = $activos->count();
+                    $pct        = $total > 0 ? round($instalados / $total * 100) : 0;
+                @endphp
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Componentes
+                    </p>
+                    <span class="text-xs font-bold {{ $instalados === $total ? 'text-green-600 dark:text-green-400' : ($instalados > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500 dark:text-red-400') }}">
+                        {{ $instalados }}/{{ $total }}
+                    </span>
+                </div>
+                {{-- Barra de progreso --}}
+                <div class="w-full h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 mb-3">
+                    <div class="h-1.5 rounded-full transition-all {{ $instalados === $total ? 'bg-green-500' : ($instalados > 0 ? 'bg-yellow-400' : 'bg-red-400') }}"
+                         style="width: {{ $pct }}%"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
                     @foreach($tipos as $tipoKey => $tipoLabel)
                     @php $tiene = in_array($tipoKey, $tiposActivos); @endphp
-                    <div class="flex items-center gap-1.5 text-xs {{ $tiene ? 'text-green-700' : 'text-gray-300' }}">
-                        <span>{{ $tiene ? '✔' : '✖' }}</span>
-                        <span class="{{ $tiene ? 'font-medium' : '' }}">{{ $tipoLabel }}</span>
+                    <div class="flex items-center gap-1.5 text-xs min-w-0">
+                        @if($tiene)
+                            <svg class="w-3.5 h-3.5 shrink-0 text-green-500 dark:text-green-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="font-medium text-gray-700 dark:text-gray-200 truncate">{{ $tipoLabel }}</span>
+                        @else
+                            <svg class="w-3.5 h-3.5 shrink-0 text-red-400 dark:text-red-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                            <span class="text-gray-400 dark:text-gray-500 truncate">{{ $tipoLabel }}</span>
+                        @endif
                     </div>
                     @endforeach
                 </div>

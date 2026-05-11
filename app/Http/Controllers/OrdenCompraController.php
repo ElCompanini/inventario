@@ -343,14 +343,14 @@ class OrdenCompraController extends Controller
                 $totalRaw  = preg_replace('/[^0-9]/', '', $request->input("total_neto.{$ocDetalle->id}", ''));
 
                 // Guardar lo recibido en oc_detalle (para multi-OC: cada OC registra su parte)
+                // NOTA: NO se sobreescriben precio_neto/total_neto del sicd_detalle —
+                // esos campos conservan el valor referencial original de la SICD para trazabilidad.
                 $ocDetalle->cantidad_recibida = $recibido;
                 if ($precioRaw !== '') {
                     $ocDetalle->precio_neto = (float) $precioRaw;
-                    $detalle->precio_neto   = (float) $precioRaw;
                 }
                 if ($totalRaw !== '') {
                     $ocDetalle->total_neto = (float) $totalRaw;
-                    $detalle->total_neto   = (float) $totalRaw;
                 }
                 $ocDetalle->save();
 

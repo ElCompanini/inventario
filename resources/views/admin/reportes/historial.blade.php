@@ -221,16 +221,13 @@
                             @endif
 
                             {{-- Eliminar del índice --}}
-                            <form method="POST" action="{{ route('admin.reportes.historial.destroy', $r->id) }}"
-                                  onsubmit="return confirm('¿Eliminar del índice?')">
-                                @csrf @method('DELETE')
-                                <button type="submit" title="Eliminar del índice"
-                                        class="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition">
-                                    <svg style="width:1.125rem;height:1.125rem" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                    </svg>
-                                </button>
-                            </form>
+                            <button type="button" title="Eliminar del índice"
+                                    onclick="abrirModalEliminar({{ $r->id }}, '{{ addslashes($r->nombre) }}')"
+                                    class="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition">
+                                <svg style="width:1.125rem;height:1.125rem" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -245,5 +242,73 @@
         @endif
     @endif
 </div>
+
+{{-- Modal: confirmar eliminación --}}
+<div id="modal-eliminar-reporte"
+     style="display:none; position:fixed; inset:0; z-index:9000; align-items:center; justify-content:center; background:rgba(0,0,0,.5);">
+    <div class="bg-white rounded-xl shadow-xl w-full mx-4" style="max-width:420px; padding:1.5rem; animation:hist-in .2s cubic-bezier(.22,.68,0,1.2) both;">
+
+        <div class="flex items-start gap-3 mb-5">
+            <div class="shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-base font-bold text-gray-800">Eliminar del índice</p>
+                <p class="text-sm text-gray-500 mt-1">
+                    Se eliminará el registro de
+                    <span id="modal-eliminar-nombre" class="font-semibold text-gray-700"></span>
+                    del historial. Esta acción no puede deshacerse.
+                </p>
+            </div>
+        </div>
+
+        <form id="form-eliminar-reporte" method="POST">
+            @csrf
+            @method('DELETE')
+            <div class="flex justify-end gap-3" style="border-top:1px solid #f3f4f6; padding-top:1rem;">
+                <button type="button" onclick="cerrarModalEliminar()"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition">
+                    Sí, eliminar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@push('head')
+<style>
+    @keyframes hist-in {
+        from { opacity:0; transform:scale(.94); }
+        to   { opacity:1; transform:scale(1); }
+    }
+</style>
+@endpush
+
+@push('scripts')
+<script>
+const DESTROY_BASE = '{{ url('admin/reportes/historial') }}';
+
+function abrirModalEliminar(id, nombre) {
+    document.getElementById('modal-eliminar-nombre').textContent = nombre;
+    document.getElementById('form-eliminar-reporte').action = DESTROY_BASE + '/' + id;
+    const modal = document.getElementById('modal-eliminar-reporte');
+    modal.style.display = 'flex';
+}
+
+function cerrarModalEliminar() {
+    document.getElementById('modal-eliminar-reporte').style.display = 'none';
+}
+
+document.getElementById('modal-eliminar-reporte').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) cerrarModalEliminar();
+});
+</script>
+@endpush
 
 @endsection

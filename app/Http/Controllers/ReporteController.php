@@ -57,6 +57,7 @@ class ReporteController extends Controller
 
         $producto = Producto::withoutGlobalScopes()->with([
             'categoria.familia',
+            'marca:id,nombre',
             'container',
             'unidadMedida:id,nombre,abreviacion',
             'centroCosto:id,acronimo,nombre_completo',

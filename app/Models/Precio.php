@@ -12,6 +12,7 @@ class Precio extends Model
         'producto_id',
         'familia_id',
         'categoria_id',
+        'marca_id',
         'usuario_id',
         'precio_neto',
         'precio_total',
@@ -44,6 +45,11 @@ class Precio extends Model
         return $this->belongsTo(Categoria::class);
     }
 
+    public function marca()
+    {
+        return $this->belongsTo(Marca::class);
+    }
+
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');
@@ -73,6 +79,7 @@ class Precio extends Model
     ): self {
         $categoriaId = $producto->categoria_id ?? null;
         $familiaId   = null;
+        $marcaId     = $producto->marca_id ?? null;
 
         if ($categoriaId) {
             $cat = $producto->relationLoaded('categoria')
@@ -85,6 +92,7 @@ class Precio extends Model
             'producto_id'     => $producto->id,
             'familia_id'      => $familiaId,
             'categoria_id'    => $categoriaId,
+            'marca_id'        => $marcaId,
             'usuario_id'      => $usuarioId ?? auth()->id(),
             'precio_neto'     => $precioNeto,
             'precio_total'    => $precioTotal ?? round($precioNeto * $cantidad, 2),

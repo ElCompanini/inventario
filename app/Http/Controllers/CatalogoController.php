@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Categoria;
 use App\Models\Container;
 use App\Models\Familia;
+use App\Models\Marca;
 use App\Models\Producto;
 use App\Models\UnidadMedida;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class CatalogoController extends Controller
 {
@@ -25,7 +27,10 @@ class CatalogoController extends Controller
 
         $familias = Familia::with([
             'categorias' => fn($q) => $q->with([
-                'productos' => fn($q2) => $q2->when($ccId, fn($q3) => $q3->where('centro_costo_id', $ccId)),
+                'marcas',
+                'productos' => fn($q2) => $q2
+                    ->with('marca')
+                    ->when($ccId, fn($q3) => $q3->where('centro_costo_id', $ccId)),
             ]),
         ])->where('activo', true)
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
@@ -194,22 +199,34 @@ class CatalogoController extends Controller
         abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $data = $request->validate([
+            'nombre'          => ['required', 'string', 'max:200'],
             'categoria_id'    => ['required', 'integer', 'exists:categorias,id'],
+            'marca_id'        => ['required', 'integer', 'exists:marcas,id'],
             'stock_minimo'    => ['required', 'integer', 'min:0'],
             'stock_critico'   => ['required', 'integer', 'min:0'],
             'contenedor'      => ['required', 'integer', 'exists:containers,id'],
             'unidad_medida_id'=> ['required', 'integer', 'exists:unidades_medida,id'],
             'codigo_barras'   => ['nullable', 'string', 'max:100', 'unique:productos,codigo_barras'],
         ], [
+            'nombre.required'           => 'El nombre del producto es obligatorio.',
+            'marca_id.required'         => 'Debes seleccionar una marca.',
             'codigo_barras.unique'      => 'Ese código de barras ya está asignado a otro producto.',
             'unidad_medida_id.required' => 'Debes seleccionar una unidad de medida.',
         ]);
 
-        $categoria = Categoria::findOrFail($data['categoria_id']);
-        $ccId      = $this->ccId();
+        // Brand must belong to the selected category
+        $marca = Marca::find($data['marca_id']);
+        if (!$marca || (int) $marca->categoria_id !== (int) $data['categoria_id']) {
+            $err = 'La marca seleccionada no pertenece a esta categoría.';
+            return $request->ajax()
+                ? response()->json(['ok' => false, 'errors' => ['marca_id' => [$err]]], 422)
+                : back()->withErrors(['marca_id' => $err]);
+        }
+
+        $ccId = $this->ccId();
 
         $producto = Producto::create([
-            'nombre'           => $categoria->nombre,
+            'nombre'           => strtoupper(trim($data['nombre'])),
             'codigo_barras'    => $data['codigo_barras'] ?? null,
             'stock_actual'     => 0,
             'stock_minimo'     => $data['stock_minimo'],
@@ -217,6 +234,7 @@ class CatalogoController extends Controller
             'contenedor'       => $data['contenedor'],
             'unidad_medida_id' => $data['unidad_medida_id'],
             'categoria_id'     => $data['categoria_id'],
+            'marca_id'         => $data['marca_id'],
             'centro_costo_id'  => $ccId,
         ]);
 
@@ -265,12 +283,14 @@ class CatalogoController extends Controller
             'stock_minimo'  => ['required', 'integer', 'min:0'],
             'stock_critico' => ['required', 'integer', 'min:0'],
             'contenedor'    => ['nullable', 'integer', 'exists:containers,id'],
+            'marca_id'      => ['nullable', 'integer', 'exists:marcas,id'],
         ]);
 
         $producto->update([
             'stock_minimo'  => $data['stock_minimo'],
             'stock_critico' => $data['stock_critico'],
             'contenedor'    => $data['contenedor'] ?? null,
+            'marca_id'      => $data['marca_id'] ?? $producto->marca_id,
         ]);
 
         if ($request->ajax()) {
@@ -307,5 +327,63 @@ class CatalogoController extends Controller
         $producto->update(['activo' => false]);
 
         return response()->json(['ok' => true]);
+    }
+
+    public function marcasPorCategoria(Categoria $categoria)
+    {
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
+
+        return response()->json(
+            $categoria->marcas()->activas()->get(['id', 'nombre'])
+                ->map(fn($m) => ['id' => $m->id, 'nombre' => $m->nombre])->values()
+        );
+    }
+
+    public function asociarMarcaCategoria(Request $request, Categoria $categoria)
+    {
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
+
+        $data = $request->validate([
+            'nombre' => [
+                'required', 'string', 'max:100',
+                Rule::unique('marcas', 'nombre')->where('categoria_id', $categoria->id)->whereNull('deleted_at'),
+            ],
+        ], [
+            'nombre.unique' => 'Ya existe una marca con ese nombre en esta categoría.',
+        ]);
+
+        $marca = Marca::create([
+            'nombre'      => strtoupper(trim($data['nombre'])),
+            'categoria_id' => $categoria->id,
+        ]);
+
+        if ($request->ajax()) {
+            return response()->json(['ok' => true, 'id' => $marca->id, 'nombre' => $marca->nombre]);
+        }
+
+        return back();
+    }
+
+    public function desasociarMarcaCategoria(int $categoriaId, int $marcaId)
+    {
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
+
+        $marca = Marca::where('id', $marcaId)->where('categoria_id', $categoriaId)->firstOrFail();
+
+        if ($marca->productos()->count() > 0) {
+            return response()->json([
+                'ok'      => false,
+                'message' => "No se puede eliminar: la marca tiene {$marca->productos()->count()} producto(s) asignados.",
+            ], 422);
+        }
+
+        $marca->update(['activo' => false]);
+        $marca->delete();
+
+        if (request()->ajax()) {
+            return response()->json(['ok' => true]);
+        }
+
+        return back();
     }
 }

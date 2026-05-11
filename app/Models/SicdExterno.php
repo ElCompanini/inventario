@@ -79,13 +79,13 @@ class SicdExterno extends Model
     public static function etiquetaEstado(?int $estado): array
     {
         return match ($estado) {
-            1 => ['texto' => '1.- Creada',                      'bg' => '#fef3c7', 'color' => '#92400e'],
-            2 => ['texto' => '2.- Ejecución Abastecimiento',    'bg' => '#dbeafe', 'color' => '#1e40af'],
-            3 => ['texto' => '3.- Análisis Presupuestario',     'bg' => '#ede9fe', 'color' => '#5b21b6'],
-            4 => ['texto' => '4.- Refrendación Presupuestaria', 'bg' => '#fce7f3', 'color' => '#9d174d'],
-            5 => ['texto' => '5.- Autorización RRFF y FF',      'bg' => '#ffedd5', 'color' => '#9a3412'],
-            6 => ['texto' => '6.- Autorizada Para Compra',      'bg' => '#dcfce7', 'color' => '#166534'],
-            default => ['texto' => $estado !== null ? $estado . '.- Desconocido' : '—', 'bg' => '#f3f4f6', 'color' => '#6b7280'],
+            1 => ['texto' => '1.- Creada',                      'bg' => '#fef3c7', 'color' => '#92400e', 'dark_bg' => '#422006', 'dark_color' => '#fde68a'],
+            2 => ['texto' => '2.- Ejecución Abastecimiento',    'bg' => '#dbeafe', 'color' => '#1e40af', 'dark_bg' => '#1e3a5f', 'dark_color' => '#93c5fd'],
+            3 => ['texto' => '3.- Análisis Presupuestario',     'bg' => '#ede9fe', 'color' => '#5b21b6', 'dark_bg' => '#3b0764', 'dark_color' => '#c4b5fd'],
+            4 => ['texto' => '4.- Refrendación Presupuestaria', 'bg' => '#fce7f3', 'color' => '#9d174d', 'dark_bg' => '#4a0520', 'dark_color' => '#f9a8d4'],
+            5 => ['texto' => '5.- Autorización RRFF y FF',      'bg' => '#ffedd5', 'color' => '#9a3412', 'dark_bg' => '#431407', 'dark_color' => '#fdba74'],
+            6 => ['texto' => '6.- Autorizada Para Compra',      'bg' => '#dcfce7', 'color' => '#166534', 'dark_bg' => '#052e16', 'dark_color' => '#86efac'],
+            default => ['texto' => $estado !== null ? $estado . '.- Desconocido' : '—', 'bg' => '#f3f4f6', 'color' => '#6b7280', 'dark_bg' => '#374151', 'dark_color' => '#9ca3af'],
         };
     }
 

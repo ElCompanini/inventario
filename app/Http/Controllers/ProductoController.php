@@ -23,6 +23,7 @@ class ProductoController extends Controller
         $productos = Producto::with([
             'container',
             'categoria.familia',
+            'marca:id,nombre',
             'centroCosto:id,acronimo',
             'unidadMedida:id,nombre,abreviacion',
             'solicitudes' => fn($q) => $q->where('tipo', 'salida')->where('estado', 'pendiente')->with('usuario:id,name'),

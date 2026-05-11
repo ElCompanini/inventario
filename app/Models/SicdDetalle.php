@@ -21,6 +21,8 @@ class SicdDetalle extends Model
         'motivo_recepcion',
         'precio_neto',
         'total_neto',
+        'precio_neto_original',
+        'total_neto_original',
     ];
 
     public function sicd()

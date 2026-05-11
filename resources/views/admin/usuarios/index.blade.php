@@ -108,16 +108,30 @@
                     <td class="px-5 py-3 text-gray-600">{{ $u->email }}</td>
                     <td class="px-5 py-3 text-center">
                         @if($u->esDev())
-                            <span style="display:inline-block; background:#fae8ff; color:#7e22ce; font-size:0.75rem; font-weight:700; padding:2px 10px; border-radius:9999px;">Super Administrador</span>
+                            <span class="inline-block text-xs font-bold px-2.5 py-0.5 rounded-full
+                                         bg-purple-100 text-purple-800
+                                         dark:bg-purple-900/50 dark:text-purple-300">
+                                Super Administrador
+                            </span>
                         @elseif($u->esAdmin())
-                            <span style="display:inline-block; background:#e0e7ff; color:#3730a3; font-size:0.75rem; font-weight:700; padding:2px 10px; border-radius:9999px;">Admin</span>
+                            <span class="inline-block text-xs font-bold px-2.5 py-0.5 rounded-full
+                                         bg-indigo-100 text-indigo-800
+                                         dark:bg-indigo-900/50 dark:text-indigo-300">
+                                Admin
+                            </span>
                         @else
-                            <span style="display:inline-block; background:#f3f4f6; color:#374151; font-size:0.75rem; font-weight:600; padding:2px 10px; border-radius:9999px;">Usuario</span>
+                            <span class="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full
+                                         bg-gray-100 text-gray-700
+                                         dark:bg-gray-700 dark:text-gray-300">
+                                Usuario
+                            </span>
                         @endif
                     </td>
                     <td class="px-5 py-3 text-center">
                         @if($u->centroCosto)
-                            <span style="display:inline-block; background:#fef9c3; color:#854d0e; font-size:0.8rem; font-weight:700; padding:2px 12px; border-radius:9999px; font-family:monospace;">
+                            <span class="inline-block text-xs font-bold font-mono px-3 py-0.5 rounded-full
+                                         bg-amber-100 text-amber-800
+                                         dark:bg-amber-900/40 dark:text-amber-300">
                                 {{ $u->centroCosto->acronimo }}
                             </span>
                         @else
@@ -126,13 +140,15 @@
                     </td>
                     <td class="px-5 py-3">
                         @if($u->esDev())
-                            <span class="text-xs text-purple-400 italic">Acceso total (Dev)</span>
+                            <span class="text-xs text-purple-400 dark:text-purple-300 italic">Acceso total (Dev)</span>
                         @elseif($u->esAdmin() && empty($u->permisos))
-                            <span class="text-xs text-indigo-400 italic">Acceso completo</span>
+                            <span class="text-xs text-indigo-400 dark:text-indigo-300 italic">Acceso completo</span>
                         @elseif($u->permisos && count($u->permisos))
-                            <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                            <div class="flex flex-wrap gap-1">
                                 @foreach($u->permisos as $p)
-                                    <span style="display:inline-block; background:#e0e7ff; color:#3730a3; font-size:0.7rem; font-weight:600; padding:1px 8px; border-radius:9999px;">
+                                    <span class="inline-block text-xs font-semibold px-2 py-0.5 rounded-full
+                                                 bg-indigo-100 text-indigo-700
+                                                 dark:bg-indigo-900/40 dark:text-indigo-300">
                                         {{ \App\Models\User::PERMISOS_DISPONIBLES[$p] ?? $p }}
                                     </span>
                                 @endforeach
