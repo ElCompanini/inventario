@@ -66,58 +66,69 @@ class ComputadorController extends Controller
         $computador = ComputadorArmado::with([
             'componentesActivos.producto.unidadMedida',
             'componentesActivos.producto.categoria',
+            'componentesActivos.categoria',
             'componentes' => fn($q) => $q->with('producto', 'usuarioInstalacion', 'usuarioRetiro')
                                          ->orderByDesc('created_at'),
             'usuario',
         ])->findOrFail($id);
 
-        // Productos de "Partes y Piezas" con stock — incluye precio para valorización
-        $productos = Producto::where('stock_actual', '>', 0)
-            ->whereHas('categoria.familia', fn($q) =>
-                $q->whereRaw("LOWER(REPLACE(nombre,' ','')) LIKE ?", ['%partes%piezas%'])
-            )
-            ->with([
-                'categoria:id,nombre,familia_id',
-                'unidadMedida:id,abreviacion',
-            ])
-            ->orderBy('nombre')
-            ->get(['id', 'nombre', 'stock_actual', 'unidad', 'categoria_id', 'unidad_medida_id']);
+        // Familia "Partes y Piezas" — buscar por ID usando nombre normalizado
+        $familiaPiezas = \App\Models\Familia::whereRaw(
+            "LOWER(REPLACE(REPLACE(nombre,' ',''),'/','')) LIKE ?", ['%partes%piezas%']
+        )->first();
 
-        // Cargar último precio de cada producto (para valorización)
-        $preciosPorProducto = \App\Models\Precio::whereIn('producto_id', $productos->pluck('id'))
-            ->orderByDesc('created_at')
-            ->get(['producto_id', 'precio_neto'])
-            ->groupBy('producto_id')
-            ->map(fn($g) => $g->first()->precio_neto ?? 0);
+        // Categorías de esa familia para los tabs (ordenadas por nombre)
+        $familiaCategorias = $familiaPiezas
+            ? \App\Models\Categoria::where('familia_id', $familiaPiezas->id)
+                ->orderBy('nombre')
+                ->get(['id', 'nombre', 'familia_id'])
+            : collect();
 
-        // Categorías únicas para el browser
-        $categoriasJson = $productos->pluck('categoria')->filter()->unique('id')
-            ->sortBy('nombre')
-            ->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])
-            ->values();
+        $categoriasJson = $familiaCategorias->map(fn($c) => [
+            'id'     => $c->id,
+            'nombre' => $c->nombre,
+        ])->values();
 
-        // Productos pre-serializados para JS
-        $productosJson = $productos->map(function ($p) use ($preciosPorProducto) {
-            return [
-                'id'       => $p->id,
-                'nombre'   => $p->nombre,
-                'stock'    => $p->stock_actual,
-                'cat_id'   => $p->categoria_id,
-                'cat'      => optional($p->categoria)->nombre ?? '—',
-                'unidad'   => optional($p->unidadMedida)->abreviacion ?? ($p->unidad ?? '—'),
-                'precio'   => (float) ($preciosPorProducto[$p->id] ?? 0),
-            ];
-        })->values();
-
-        $tipos  = ComputadorArmado::TIPOS_COMPONENTE;
         $motivos = [
             'ARMADO EQUIPO NUEVO', 'UPGRADE', 'REEMPLAZO COMPONENTE',
             'MANTENIMIENTO', 'DIAGNÓSTICO', 'PRUEBAS TÉCNICAS', 'OTRO',
         ];
 
         return view('admin.computadores.show', compact(
-            'computador', 'tipos', 'productosJson', 'categoriasJson', 'motivos'
+            'computador', 'familiaCategorias', 'categoriasJson', 'motivos'
         ));
+    }
+
+    /** AJAX: productos con stock de una categoría específica */
+    public function productosPorCategoria(Request $request)
+    {
+        abort_unless(auth()->user()->tienePermiso('computadores'), 403);
+
+        $catId = (int) $request->input('cat_id');
+
+        $productos = Producto::where('categoria_id', $catId)
+            ->where('activo', true)
+            ->where('stock_actual', '>', 0)
+            ->with(['unidadMedida:id,abreviacion'])
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'stock_actual', 'unidad', 'categoria_id', 'unidad_medida_id']);
+
+        $preciosPorProducto = \App\Models\Precio::whereIn('producto_id', $productos->pluck('id'))
+            ->orderByDesc('created_at')
+            ->get(['producto_id', 'precio_neto'])
+            ->groupBy('producto_id')
+            ->map(fn($g) => $g->first()->precio_neto ?? 0);
+
+        return response()->json(
+            $productos->map(fn($p) => [
+                'id'     => $p->id,
+                'nombre' => $p->nombre,
+                'stock'  => $p->stock_actual,
+                'cat_id' => $p->categoria_id,
+                'unidad' => optional($p->unidadMedida)->abreviacion ?? ($p->unidad ?? ''),
+                'precio' => (float) ($preciosPorProducto[$p->id] ?? 0),
+            ])->values()
+        );
     }
 
     public function edit(int $id)
@@ -159,25 +170,35 @@ class ComputadorController extends Controller
         }
 
         $data = $request->validate([
-            'producto_id'    => ['required', 'integer', 'exists:productos,id'],
-            'tipo_componente'=> ['required', 'string', 'in:' . implode(',', array_keys(ComputadorArmado::TIPOS_COMPONENTE))],
-            'cantidad'       => ['required', 'integer', 'min:1'],
-            'motivo'         => ['required', 'string', 'max:200'],
-            'serial'         => ['nullable', 'string', 'max:100'],
-            'notas'          => ['nullable', 'string', 'max:500'],
+            'producto_id' => ['required', 'integer', 'exists:productos,id'],
+            'categoria_id'=> ['required', 'integer', 'exists:categorias,id'],
+            'cantidad'    => ['required', 'integer', 'min:1'],
+            'motivo'      => ['required', 'string', 'max:200'],
+            'serial'      => ['nullable', 'string', 'max:100'],
+            'notas'       => ['nullable', 'string', 'max:500'],
         ], [
-            'tipo_componente.in' => 'Tipo de componente inválido.',
-            'motivo.required'    => 'El motivo del movimiento es obligatorio.',
+            'motivo.required' => 'El motivo del movimiento es obligatorio.',
         ]);
 
-        $producto = Producto::with('categoria.familia')->findOrFail($data['producto_id']);
+        $producto  = Producto::with('categoria.familia')->findOrFail($data['producto_id']);
+        $categoria = \App\Models\Categoria::with('familia')->findOrFail($data['categoria_id']);
 
-        // Validar que pertenece a "Partes y Piezas"
-        $nombreFamilia  = $producto->categoria?->familia?->nombre ?? 'familia desconocida';
-        $familiaCompara = strtolower(str_replace(' ', '', $nombreFamilia));
-        if (!str_contains($familiaCompara, 'partes') || !str_contains($familiaCompara, 'piezas')) {
+        // Validar que el producto pertenece a la categoría enviada
+        if ($producto->categoria_id !== $categoria->id) {
             return back()->withErrors([
-                'producto_id' => "Solo se pueden agregar productos de la familia «Partes y Piezas». El producto pertenece a «{$nombreFamilia}».",
+                'producto_id' => "El producto no pertenece a la categoría «{$categoria->nombre}».",
+            ])->withInput();
+        }
+
+        // Validar que la categoría pertenece a la familia "Partes y Piezas" (por ID)
+        $familiaId = $categoria->familia_id;
+        $familiaPiezas = \App\Models\Familia::whereRaw(
+            "LOWER(REPLACE(REPLACE(nombre,' ',''),'/','')) LIKE ?", ['%partes%piezas%']
+        )->value('id');
+
+        if ($familiaId !== $familiaPiezas) {
+            return back()->withErrors([
+                'categoria_id' => "Solo se pueden agregar componentes de la familia «Partes y Piezas».",
             ])->withInput();
         }
 
@@ -187,14 +208,15 @@ class ComputadorController extends Controller
             ])->withInput();
         }
 
-        $tipoLabel = ComputadorArmado::TIPOS_COMPONENTE[$data['tipo_componente']] ?? $data['tipo_componente'];
-        $motivoStr = strtoupper(trim($data['motivo']));
+        $categoriaLabel = $categoria->nombre;
+        $motivoStr      = strtoupper(trim($data['motivo']));
 
-        DB::transaction(function () use ($computador, $producto, $data, $tipoLabel, $motivoStr) {
+        DB::transaction(function () use ($computador, $producto, $categoria, $data, $categoriaLabel, $motivoStr) {
             ComputadorComponente::create([
                 'computador_id'          => $computador->id,
                 'producto_id'            => $producto->id,
-                'tipo_componente'        => $data['tipo_componente'],
+                'categoria_id'           => $categoria->id,
+                'tipo_componente'        => 'otro', // mantenido por compatibilidad; categoría real en categoria_id
                 'cantidad'               => $data['cantidad'],
                 'serial'                 => $data['serial'] ?? null,
                 'notas'                  => $data['notas'] ?? null,
@@ -214,7 +236,7 @@ class ComputadorController extends Controller
                 'contenedor_id'   => $producto->contenedor,
                 'cantidad'        => $data['cantidad'],
                 'tipo'            => 'salida',
-                'motivo'          => "SALIDA ARMAR EQUIPO · {$computador->codigo} · {$tipoLabel} · Motivo: {$motivoStr}",
+                'motivo'          => "SALIDA ARMAR EQUIPO · {$computador->codigo} · {$categoriaLabel} · Motivo: {$motivoStr}",
                 'aprobado_por'    => Auth::user()->name,
                 'usuario_id'      => Auth::id(),
                 'origen'          => 'computador_armado',

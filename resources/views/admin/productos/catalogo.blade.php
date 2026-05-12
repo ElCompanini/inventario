@@ -1265,7 +1265,7 @@ async function toggleMarcaCatalogo(marcaId) {
             if (!json.activo && marcaActualId === marcaId) { marcaActualId = null; marcaActualNombre = ''; }
             renderMarcas(cat);
         }
-    } catch(e) { alert('Error de conexión.'); }
+    } catch(e) { showAviso('Error de conexión.', 'error'); }
 }
 
 document.getElementById('modal-marca-cat').addEventListener('click', function(e) { if (e.target === e.currentTarget) cerrarModal('modal-marca-cat'); });
@@ -1294,9 +1294,9 @@ async function desasociarMarcaDeCategoria(marcaId) {
                 document.getElementById('subtitulo-categoria').textContent = prods.length === 0 ? 'Sin productos' : (prods.length === 1 ? '1 producto' : prods.length + ' productos');
             }
         } else {
-            alert(json.message ?? 'No se puede eliminar esta marca.');
+            showAviso(json.message ?? 'No se puede eliminar esta marca.', 'error');
         }
-    } catch(e) { alert('Error de conexión.'); }
+    } catch(e) { showAviso('Error de conexión.', 'error'); }
 }
 
 // ── Marca helpers ────────────────────────────────────────────────────────────
@@ -1330,7 +1330,7 @@ async function crearMarcaRapida() {
     var nombre = nombreInput.value.trim().toUpperCase();
     if (!nombre) return;
     var catId = editandoProdId ? catActualId : prodCatId;
-    if (!catId) { alert('Selecciona una categoría primero.'); return; }
+    if (!catId) { showAviso('Selecciona una categoría primero.', 'warn'); return; }
     try {
         var res = await fetch(ROUTE_CAT_MARCA_STORE(catId), {
             method: 'POST',
@@ -1350,9 +1350,9 @@ async function crearMarcaRapida() {
             poblarSelectMarca(json.id);
             nombreInput.value = '';
         } else {
-            alert(json.errors?.nombre?.[0] ?? json.message ?? 'Error al crear la marca.');
+            showAviso(json.errors?.nombre?.[0] ?? json.message ?? 'Error al crear la marca.', 'error');
         }
-    } catch(e) { alert('Error de conexión.'); }
+    } catch(e) { showAviso('Error de conexión.', 'error'); }
 }
 
 // ── Modal Producto ───────────────────────────────────────────────────────────
@@ -1397,17 +1397,17 @@ function prodRenderCategorias() {
 function abrirModalProducto() {
     // Bloquear si no hay contenedores
     if (containersData.length === 0) {
-        alert('No hay contenedores disponibles. Crea al menos un contenedor antes de agregar productos.');
+        showAviso('No hay contenedores disponibles. Crea al menos un contenedor antes de agregar productos.', 'warn');
         return;
     }
     // Bloquear si no hay unidades de medida
     if (unidadesData.length === 0) {
-        alert('No hay unidades de medida disponibles. Crea al menos una unidad de medida antes de agregar productos.');
+        showAviso('No hay unidades de medida disponibles. Crea al menos una unidad de medida antes de agregar productos.', 'warn');
         return;
     }
     // Bloquear si no hay marca seleccionada en el panel
     if (!marcaActualId) {
-        alert('Selecciona una marca en el panel antes de agregar un producto.');
+        showAviso('Selecciona una marca en el panel antes de agregar un producto.', 'warn');
         return;
     }
 
@@ -1489,7 +1489,7 @@ async function eliminarProducto(prodId, nombre) {
             headers: { 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
         });
         const json = await res.json();
-        if (!res.ok || !json.ok) { alert('Error al inactivar el producto.'); return; }
+        if (!res.ok || !json.ok) { showAviso('Error al inactivar el producto.', 'error'); return; }
         // Quitar del catalogoData local
         catalogoData.forEach(function(f) {
             f.categorias.forEach(function(c) {
@@ -1505,7 +1505,7 @@ async function eliminarProducto(prodId, nombre) {
             document.getElementById('subtitulo-categoria').textContent = cat.productos.length === 0 ? 'Sin productos' : cat.productos.length + ' producto' + (cat.productos.length !== 1 ? 's' : '');
             renderProductos(cat.productos);
         }
-    } catch(e) { alert('Error de conexión.'); }
+    } catch(e) { showAviso('Error de conexión.', 'error'); }
 }
 
 async function guardarProducto() {
@@ -1603,7 +1603,70 @@ window.addEventListener('DOMContentLoaded', function() {
     const primerBtn = document.querySelector('.cat-item');
     if (primerBtn) seleccionarCategoria(parseInt(primerBtn.dataset.catId), primerBtn.querySelector('.cat-nombre').textContent.trim());
 });
+
+// ── Modal de aviso (reemplaza alert() nativo) ─────────────────────────────
+function showAviso(mensaje, tipo) {
+    const modal   = document.getElementById('aviso-modal');
+    const icon    = document.getElementById('aviso-icon');
+    const texto   = document.getElementById('aviso-texto');
+    const btnOk   = document.getElementById('aviso-ok');
+
+    const cfg = {
+        warn:  { bg: '#fef3c7', border: '#f59e0b', iconBg: '#fde68a', iconColor: '#b45309', stroke: 'M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z', btnBg: '#f59e0b', btnHover: '#d97706' },
+        error: { bg: '#fee2e2', border: '#ef4444', iconBg: '#fecaca', iconColor: '#b91c1c', stroke: 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z', btnBg: '#ef4444', btnHover: '#dc2626' },
+        info:  { bg: '#eff6ff', border: '#3b82f6', iconBg: '#dbeafe', iconColor: '#1d4ed8', stroke: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', btnBg: '#3b82f6', btnHover: '#2563eb' },
+    };
+    const c = cfg[tipo] || cfg.warn;
+
+    const isDark = document.documentElement.classList.contains('dark');
+    const innerBg     = isDark ? '#1e293b' : '#fff';
+    const textColor   = isDark ? '#e2e8f0' : '#1f2937';
+
+    modal.querySelector('.aviso-inner').style.background = innerBg;
+    modal.querySelector('.aviso-icon-wrap').style.background = c.iconBg;
+    modal.querySelector('.aviso-icon-wrap').style.border = '2px solid ' + c.border;
+    icon.setAttribute('stroke', c.iconColor);
+    icon.querySelector('path').setAttribute('d', c.stroke);
+    texto.textContent = mensaje;
+    texto.style.color = textColor;
+    btnOk.style.background = c.btnBg;
+    btnOk.onmouseover = () => btnOk.style.background = c.btnHover;
+    btnOk.onmouseout  = () => btnOk.style.background = c.btnBg;
+
+    modal.style.display = 'flex';
+    modal.querySelector('.aviso-inner').style.animation = 'aviso-in .2s cubic-bezier(.22,.68,0,1.2) both';
+}
+function cerrarAviso() {
+    document.getElementById('aviso-modal').style.display = 'none';
+}
 </script>
+@endpush
+
+{{-- Modal aviso (reemplaza alert nativo) --}}
+<div id="aviso-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55); align-items:center; justify-content:center; padding:1rem;"
+     onclick="if(event.target===this) cerrarAviso()">
+    <div class="aviso-inner" style="border-radius:1rem; box-shadow:0 20px 60px rgba(0,0,0,.3); width:380px; max-width:calc(100vw - 2rem); padding:1.5rem;">
+        <div style="display:flex; align-items:flex-start; gap:1rem;">
+            <div class="aviso-icon-wrap" style="width:2.5rem; height:2.5rem; border-radius:9999px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg id="aviso-icon" style="width:1.25rem;height:1.25rem;" fill="none" stroke="#b45309" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+            </div>
+            <p id="aviso-texto" style="flex:1; font-size:0.875rem; line-height:1.6; margin:0; padding-top:0.3rem;"></p>
+        </div>
+        <div style="margin-top:1.25rem; display:flex; justify-content:flex-end;">
+            <button id="aviso-ok" onclick="cerrarAviso()"
+                    style="padding:0.45rem 1.25rem; font-size:0.875rem; font-weight:600; color:#fff; border:none; border-radius:0.5rem; cursor:pointer; transition:background .15s;">
+                Entendido
+            </button>
+        </div>
+    </div>
+</div>
+
+@push('head')
+<style>
+@keyframes aviso-in { from { opacity:0; transform:scale(.93) translateY(-10px); } to { opacity:1; transform:none; } }
+</style>
 @endpush
 
 @endsection

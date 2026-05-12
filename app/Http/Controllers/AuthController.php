@@ -21,7 +21,8 @@ class AuthController extends Controller
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
-            return redirect()->intended(route('dashboard'));
+            $destino = Auth::user()->esAdmin() ? route('admin.dashboard') : route('dashboard');
+            return redirect()->intended($destino);
         }
 
         return back()->withErrors([

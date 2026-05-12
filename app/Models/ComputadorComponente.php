@@ -14,6 +14,7 @@ class ComputadorComponente extends Model
     protected $fillable = [
         'computador_id',
         'producto_id',
+        'categoria_id',
         'tipo_componente',
         'cantidad',
         'serial',
@@ -41,6 +42,11 @@ class ComputadorComponente extends Model
     public function producto()
     {
         return $this->belongsTo(Producto::class);
+    }
+
+    public function categoria()
+    {
+        return $this->belongsTo(\App\Models\Categoria::class);
     }
 
     public function usuarioInstalacion()

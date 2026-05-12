@@ -5,8 +5,13 @@
 
 @php
     $estados     = \App\Models\ComputadorArmado::ESTADOS;
-    $tipos       = \App\Models\ComputadorArmado::TIPOS_COMPONENTE;
-    $tiposActivos = $computador->componentesActivos->pluck('tipo_componente')->unique()->toArray();
+    // Cantidad por categoría (usando categoria_id del componente o del producto como fallback)
+    $cantidadesPorCat = $computador->componentesActivos
+        ->groupBy(fn($c) => $c->categoria_id ?? $c->producto?->categoria_id)
+        ->filter(fn($g, $k) => $k !== null && $k !== '')
+        ->map(fn($g) => $g->sum('cantidad'));
+
+    $catIdsInstaladas = $cantidadesPorCat->keys()->toArray();
     $statusClass = match($computador->estado) {
         'listo'     => 'bg-green-100 text-green-700 border-green-300',
         'en_uso'    => 'bg-blue-100 text-blue-700 border-blue-300',
@@ -69,34 +74,36 @@
                 <span class="text-xs font-bold text-indigo-600">{{ $computador->componentesActivos->count() }} piezas</span>
             </div>
             <div class="space-y-1">
-                @foreach($tipos as $tipoKey => $tipoLabel)
-                @php $comp = $computador->componentesActivos->where('tipo_componente', $tipoKey)->first(); @endphp
-                <div class="flex items-center gap-2 py-1 border-b border-gray-50 last:border-0">
-                    @if($comp)
+                @forelse($familiaCategorias as $cat)
+                @php
+                    $instalado  = in_array($cat->id, $catIdsInstaladas);
+                    $cantidad   = $cantidadesPorCat[$cat->id] ?? 0;
+                @endphp
+                <div class="flex items-center gap-2 py-1 border-b border-gray-50 dark:border-slate-700/60 last:border-0">
+                    @if($instalado)
                         <span class="w-4 h-4 text-green-500 flex-shrink-0">
                             <svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                             </svg>
                         </span>
-                        <span class="text-xs font-semibold text-gray-700 flex-1">{{ $tipoLabel }}</span>
+                        <span class="text-xs font-semibold text-gray-700 dark:text-gray-100 flex-1">{{ $cat->nombre }}</span>
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 shrink-0">
+                            {{ $cantidad }}
+                        </span>
                     @else
-                        <span class="w-4 h-4 text-gray-200 flex-shrink-0">
+                        <span class="w-4 h-4 text-gray-500 dark:text-slate-400 flex-shrink-0">
                             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <circle cx="12" cy="12" r="9" stroke-dasharray="3"/>
                             </svg>
                         </span>
-                        <span class="text-xs text-gray-300 flex-1">{{ $tipoLabel }}</span>
+                        <span class="text-xs text-gray-600 dark:text-slate-300 flex-1">{{ $cat->nombre }}</span>
                     @endif
                 </div>
-                @endforeach
+                @empty
+                <p class="text-xs text-gray-400 dark:text-slate-500 py-2">Sin categorías en familia Partes y Piezas.</p>
+                @endforelse
             </div>
 
-            @if($computador->componentesActivos->isNotEmpty())
-            <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                <span class="text-xs text-gray-400">Valorización total</span>
-                <span class="text-sm font-bold text-indigo-700">${{ number_format($computador->valorizacionTotal(), 0, ',', '.') }}</span>
-            </div>
-            @endif
         </div>
 
         {{-- Historial reciente --}}
@@ -193,11 +200,11 @@
 
             <div style="padding:1rem 1.25rem; display:flex; flex-direction:column; gap:0.85rem;">
 
-                {{-- Tipo componente (auto desde tab seleccionado) --}}
-                <input type="hidden" name="tipo_componente" id="mag-tipo">
+                {{-- Categoría (auto desde tab seleccionado por ID) --}}
+                <input type="hidden" name="categoria_id" id="mag-categoria-id">
                 <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:0.5rem; padding:0.5rem 0.75rem; display:flex; align-items:center; gap:0.5rem;">
-                    <span style="font-size:0.7rem; font-weight:700; color:#6366f1; text-transform:uppercase; letter-spacing:0.04em;">Tipo:</span>
-                    <span id="mag-tipo-display" style="font-size:0.82rem; font-weight:700; color:#312e81;">—</span>
+                    <span style="font-size:0.7rem; font-weight:700; color:#6366f1; text-transform:uppercase; letter-spacing:0.04em;">Categoría:</span>
+                    <span id="mag-cat-display" style="font-size:0.82rem; font-weight:700; color:#312e81;">—</span>
                 </div>
 
                 {{-- Cantidad + Serial --}}
@@ -340,42 +347,73 @@ html.dark .cat-tab.activo { background:#4f46e5; color:#fff; border-color:#4f46e5
 
 @push('scripts')
 <script>
-// Tipos de componente = igual que panel izquierdo
-var EQ_TIPOS     = @json(collect($tipos)->map(fn($label, $key) => ['key' => $key, 'label' => $label])->values());
-var EQ_PRODUCTOS = @json($productosJson);
-var tipoActivo   = EQ_TIPOS.length ? EQ_TIPOS[0] : null;
+var EQ_CATS    = @json($categoriasJson);   // [{id, nombre}, ...]
+var EQ_AJAX    = '{{ route('admin.computadores.productos-categoria') }}';
+var catActiva  = null;   // {id, nombre}
+var cargando   = false;
 
-// ── Renderizar tabs de tipos ──────────────────────────────────────────────
-function renderTipos() {
+// ── Renderizar tabs de categorías (por ID) ────────────────────────────────
+function renderTabs() {
     var tabs = document.getElementById('cat-tabs');
     if (!tabs) return;
-    tabs.innerHTML = EQ_TIPOS.map(function(t) {
-        var esPrimero = tipoActivo && tipoActivo.key === t.key;
-        return '<button type="button" class="cat-tab px-3 py-1.5 text-xs font-semibold rounded-lg border transition mb-2' + (esPrimero ? ' activo' : '') + '"'
-             + ' data-tipo-key="' + t.key + '" onclick="seleccionarTipo(\'' + t.key + '\',\'' + t.label.replace(/'/g,"\\'") + '\')">'
-             + t.label + '</button>';
+    if (!EQ_CATS.length) {
+        tabs.innerHTML = '<p class="text-xs text-gray-400 py-1">Sin categorías en familia Partes y Piezas.</p>';
+        return;
+    }
+    tabs.innerHTML = EQ_CATS.map(function(c) {
+        return '<button type="button" class="cat-tab px-3 py-1.5 text-xs font-semibold rounded-lg border transition mb-2"'
+             + ' data-cat-id="' + c.id + '"'
+             + ' onclick="seleccionarCategoria(' + c.id + ',\'' + c.nombre.replace(/'/g,"\\'") + '\')">'
+             + c.nombre
+             + '</button>';
     }).join('');
 }
 
-// ── Seleccionar tipo activo ──────────────────────────────────────────────
-function seleccionarTipo(key, label) {
-    tipoActivo = {key: key, label: label};
+// ── Seleccionar categoría → fetch productos desde backend ─────────────────
+function seleccionarCategoria(catId, catNombre) {
+    catActiva = {id: catId, nombre: catNombre};
+
     document.querySelectorAll('.cat-tab').forEach(function(t) { t.classList.remove('activo'); });
-    var tab = document.querySelector('.cat-tab[data-tipo-key="' + key + '"]');
+    var tab = document.querySelector('.cat-tab[data-cat-id="' + catId + '"]');
     if (tab) tab.classList.add('activo');
-    // Actualizar el badge del modal si está abierto
-    document.getElementById('mag-tipo-display').textContent = label;
-    document.getElementById('mag-tipo').value = key;
+
+    document.getElementById('mag-categoria-id').value = catId;
+    document.getElementById('mag-cat-display').textContent = catNombre;
+
+    fetchProductos(catId);
 }
 
-// ── Render productos en grid (todos, sin filtro por tipo) ─────────────────
-function renderProductos() {
+// ── AJAX: cargar productos de la categoría desde backend ──────────────────
+function fetchProductos(catId) {
+    if (cargando) return;
+    cargando = true;
+
+    var grid  = document.getElementById('prod-grid');
+    var vacio = document.getElementById('prod-vacio');
+
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem 0;">'
+        + '<div style="display:inline-block;width:1.5rem;height:1.5rem;border:2px solid #c7d2fe;border-top-color:#4f46e5;border-radius:50%;animation:eq-spin .7s linear infinite;"></div>'
+        + '</div>';
+    vacio.style.display = 'none';
+
+    fetch(EQ_AJAX + '?cat_id=' + catId, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(prods) { renderProductos(prods); })
+    .catch(function() {
+        grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#ef4444;font-size:0.82rem;padding:2rem;">Error al cargar productos.</p>';
+    })
+    .finally(function() { cargando = false; });
+}
+
+// ── Render de cards de producto ───────────────────────────────────────────
+function renderProductos(prods) {
     var grid  = document.getElementById('prod-grid');
     var vacio = document.getElementById('prod-vacio');
     var dm    = document.documentElement.classList.contains('dark');
-    var prods = EQ_PRODUCTOS;
 
-    if (!prods.length) {
+    if (!prods || !prods.length) {
         grid.innerHTML = '';
         vacio.style.display = '';
         return;
@@ -386,13 +424,9 @@ function renderProductos() {
         var sinStock = p.stock <= 0;
         var stockClr = sinStock ? (dm ? '#f87171' : '#dc2626') : (dm ? '#4ade80' : '#16a34a');
         var precio   = p.precio > 0 ? '$' + Number(p.precio).toLocaleString('es-CL') : '—';
-        var nombre   = p.nombre.replace(/'/g,"\\'");
-        return '<div class="prod-card" style="position:relative;">'
-             + '<button type="button" onclick="deshabilitarProducto(' + p.id + ',\'' + nombre + '\',this)"'
-             + ' title="Deshabilitar producto" style="position:absolute;top:0.4rem;right:0.4rem;width:1.2rem;height:1.2rem;'
-             + 'border:none;background:none;cursor:pointer;color:#d1d5db;font-size:0.85rem;line-height:1;padding:0;">✕</button>'
-             + '<p style="font-size:0.8rem;font-weight:700;color:' + (dm?'#f1f5f9':'#111827') + ';margin:0 0 0.2rem;line-height:1.3;padding-right:1.2rem;">' + p.nombre + '</p>'
-             + '<p style="font-size:0.68rem;color:' + (dm?'#94a3b8':'#6b7280') + ';margin:0 0 0.4rem;">' + p.cat + '</p>'
+        var nombre   = p.nombre.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+        return '<div class="prod-card" style="position:relative;animation:eq-fade-in .18s ease both;">'
+             + '<p style="font-size:0.8rem;font-weight:700;color:' + (dm?'#f1f5f9':'#111827') + ';margin:0 0 0.4rem;line-height:1.3;">' + p.nombre + '</p>'
              + '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">'
              + '<div style="display:flex;flex-direction:column;gap:1px;">'
              + '<span style="font-size:0.7rem;color:' + stockClr + ';font-weight:700;">Stock: ' + p.stock + ' ' + p.unidad + '</span>'
@@ -407,19 +441,19 @@ function renderProductos() {
     }).join('');
 }
 
-// ── Modal Agregar ────────────────────────────────────────────────────────
+// ── Modal Agregar ─────────────────────────────────────────────────────────
 function abrirAgregar(id, nombre, stock, unidad, precio) {
-    if (!tipoActivo) {
-        alert('Selecciona el tipo de componente en los tabs de arriba.');
+    if (!catActiva) {
+        alert('Selecciona una categoría en los tabs de arriba.');
         return;
     }
-    document.getElementById('mag-producto-id').value = id;
-    document.getElementById('mag-tipo').value         = tipoActivo.key;
-    document.getElementById('mag-tipo-display').textContent = tipoActivo.label;
-    document.getElementById('mag-nombre').textContent = nombre;
-    document.getElementById('mag-cantidad').max   = stock;
-    document.getElementById('mag-cantidad').value = 1;
-    document.getElementById('mag-motivo').value   = '';
+    document.getElementById('mag-producto-id').value          = id;
+    document.getElementById('mag-categoria-id').value         = catActiva.id;
+    document.getElementById('mag-cat-display').textContent    = catActiva.nombre;
+    document.getElementById('mag-nombre').textContent         = nombre;
+    document.getElementById('mag-cantidad').max               = stock;
+    document.getElementById('mag-cantidad').value             = 1;
+    document.getElementById('mag-motivo').value               = '';
     document.querySelectorAll('.motivo-chip').forEach(function(c) { c.classList.remove('sel'); });
 
     var info = '<span>Stock: <strong>' + stock + ' ' + unidad + '</strong></span>';
@@ -439,34 +473,44 @@ function selMotivo(val) {
     });
 }
 
-// ── Deshabilitar producto (soft-delete vía activo=false) ──────────────────
-function deshabilitarProducto(id, nombre, btn) {
-    if (!confirm('¿Deshabilitar "' + nombre + '"? El producto quedará inactivo y no aparecerá en el inventario.')) return;
-    var card = btn.closest('.prod-card');
-    if (card) card.style.opacity = '0.4';
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/admin/productos/' + id + '/deshabilitar';
-    form.innerHTML = '<input type="hidden" name="_token" value="{{ csrf_token() }}">'
-                   + '<input type="hidden" name="_method" value="PATCH">';
-    document.body.appendChild(form);
-    form.submit();
+// ── Modal Retirar ─────────────────────────────────────────────────────────
+function abrirRetirar(componenteId, nombre, routeBase) {
+    document.getElementById('retirar-nombre').textContent = nombre;
+    document.getElementById('ret-motivo').value = '';
+    document.querySelectorAll('.motivo-chip-r').forEach(function(c) { c.classList.remove('sel'); });
+    document.getElementById('form-retirar').action = routeBase + '/' + componenteId + '/retirar';
+    document.getElementById('modal-retirar').style.display = 'flex';
+}
+function cerrarRetirar() {
+    document.getElementById('modal-retirar').style.display = 'none';
+}
+function selMotivoRetiro(val) {
+    document.getElementById('ret-motivo').value = val;
+    document.querySelectorAll('.motivo-chip-r').forEach(function(c) {
+        c.classList.toggle('sel', c.textContent.trim() === val);
+    });
 }
 
-// Cerrar modal con click fuera
+// Cerrar modales con click fuera
 document.getElementById('modal-agregar').addEventListener('click', function(e) {
     if (e.target === this) cerrarAgregar();
 });
+document.getElementById('modal-retirar').addEventListener('click', function(e) {
+    if (e.target === this) cerrarRetirar();
+});
 
-// ── Init ─────────────────────────────────────────────────────────────────
-renderTipos();
-renderProductos();
-// Pre-cargar tipo en el modal con el primer tab activo
-if (tipoActivo) {
-    document.getElementById('mag-tipo').value = tipoActivo.key;
-    document.getElementById('mag-tipo-display').textContent = tipoActivo.label;
+// ── Init: cargar primera categoría ───────────────────────────────────────
+renderTabs();
+if (EQ_CATS.length) {
+    seleccionarCategoria(EQ_CATS[0].id, EQ_CATS[0].nombre);
 }
 </script>
+@push('head')
+<style>
+@keyframes eq-spin    { to { transform: rotate(360deg); } }
+@keyframes eq-fade-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+</style>
+@endpush
 @endpush
 
 @endsection

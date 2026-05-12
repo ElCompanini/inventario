@@ -54,6 +54,9 @@ Route::middleware('auth')->group(function () {
 // Rutas solo admin
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/equipos-filtro', [DashboardController::class, 'equiposFiltro'])->name('dashboard.equipos-filtro');
+    Route::get('/dashboard/total-utilizado', [DashboardController::class, 'totalUtilizado'])->name('dashboard.total-utilizado');
+    Route::get('/computadores/productos-categoria', [\App\Http\Controllers\ComputadorController::class, 'productosPorCategoria'])->name('computadores.productos-categoria');
 
     Route::get('/solicitudes', [AdminController::class, 'solicitudes'])->name('solicitudes');
     Route::get('/solicitudes/rechazadas', [AdminController::class, 'rechazadas'])->name('solicitudes.rechazadas');

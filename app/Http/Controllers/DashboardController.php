@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Categoria;
 use App\Models\ComputadorArmado;
+use App\Models\Familia;
 use App\Models\GastoMenor;
 use App\Models\HistorialCambio;
+use App\Models\Marca;
 use App\Models\OrdenCompra;
 use App\Models\Precio;
 use App\Models\Producto;
 use App\Models\ReporteriaIndexada;
 use App\Models\Sicd;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -98,6 +102,12 @@ class DashboardController extends Controller
                 SUM(CASE WHEN estado = 'desarmado'         THEN 1 ELSE 0 END) as desarmados
             ")->first();
 
+        $piezasTotal = (int) DB::table('computador_componentes')
+            ->join('computadores_armados', 'computador_componentes.computador_id', '=', 'computadores_armados.id')
+            ->whereNull('computador_componentes.deleted_at')
+            ->whereNull('computadores_armados.deleted_at')
+            ->sum('computador_componentes.cantidad');
+
         // ── BINCARD / Valorización ─────────────────────────────────────────────
         // Valor total inventario (costo promedio × stock actual, por producto)
         $valorInventario = DB::table('productos')
@@ -159,7 +169,7 @@ class DashboardController extends Controller
 
         // ── Gráfico: Productos más utilizados (salidas 90 días) ───────────────
         $prodMovidos = HistorialCambio::where('tipo', 'salida')
-            ->where('created_at', '>=', now()->subDays(90))
+            ->where('created_at', '>=', now()->subDays(30))
             ->when($ccId, fn($q) => $q->whereHas('producto', fn($p) => $p->withoutGlobalScopes()->where('centro_costo_id', $ccId)))
             ->select('nombre_producto', DB::raw('SUM(cantidad) as total'))
             ->groupBy('nombre_producto')
@@ -203,6 +213,21 @@ class DashboardController extends Controller
         $ocRecientes = OrdenCompra::latest()->take(6)
             ->get(['id', 'numero_oc', 'estado', 'api_proveedor_nombre', 'created_at']);
 
+        // ── Total utilizado — filter data ─────────────────────────────────────
+        $tuFamilias   = Familia::orderBy('nombre')->get(['id', 'nombre']);
+        $tuCategorias = Categoria::orderBy('nombre')->get(['id', 'nombre']);
+        $tuMarcas     = Marca::orderBy('nombre')->get(['id', 'nombre']);
+
+        // ── Total utilizado — métricas de stock ───────────────────────────────
+        $tuMasStock    = Producto::withoutGlobalScope('activo')
+            ->where('activo', true)->where('stock_actual', '>', 0)
+            ->orderByDesc('stock_actual')->first(['nombre', 'stock_actual']);
+
+        $tuMenosStock  = Producto::withoutGlobalScope('activo')
+            ->where('activo', true)->where('stock_actual', '>', 0)
+            ->orderBy('stock_actual')->take(4)
+            ->get(['nombre', 'stock_actual']);
+
         // ── Equipos armados recientes ─────────────────────────────────────────
         $ultimosEquipos = ComputadorArmado::with('componentesActivos')
             ->latest()->take(5)->get(['id', 'codigo', 'nombre', 'estado', 'usuario_asignado', 'created_at']);
@@ -238,7 +263,126 @@ class DashboardController extends Controller
             'sicdRecientes',
             'ocRecientes',
             'ultimosEquipos',
+            'piezasTotal',
             'ultimasReporterias',
+            'tuFamilias',
+            'tuCategorias',
+            'tuMarcas',
+            'tuMasStock',
+            'tuMenosStock',
         ));
+    }
+
+    public function equiposFiltro(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $desde = $request->filled('desde')
+            ? \Carbon\Carbon::parse($request->desde)->startOfDay()
+            : now()->startOfMonth();
+
+        $hasta = $request->filled('hasta')
+            ? \Carbon\Carbon::parse($request->hasta)->endOfDay()
+            : now()->endOfDay();
+
+        $stats = DB::table('computadores_armados')
+            ->whereNull('deleted_at')
+            ->whereBetween('created_at', [$desde, $hasta])
+            ->selectRaw("
+                COUNT(*) as total,
+                SUM(CASE WHEN estado IN ('listo','en_uso') THEN 1 ELSE 0 END) as completos,
+                SUM(CASE WHEN estado = 'en_armado'         THEN 1 ELSE 0 END) as en_armado,
+                SUM(CASE WHEN estado = 'desarmado'         THEN 1 ELSE 0 END) as desarmados
+            ")->first();
+
+        // Piezas utilizadas en el período (suma cantidad de componentes de armados creados en rango)
+        $piezasPeriodo = (int) DB::table('computador_componentes')
+            ->join('computadores_armados', 'computador_componentes.computador_id', '=', 'computadores_armados.id')
+            ->whereNull('computador_componentes.deleted_at')
+            ->whereNull('computadores_armados.deleted_at')
+            ->whereBetween('computadores_armados.created_at', [$desde, $hasta])
+            ->sum('computador_componentes.cantidad');
+
+        // Total histórico acumulado (independiente del filtro)
+        $piezasTotal = (int) DB::table('computador_componentes')
+            ->join('computadores_armados', 'computador_componentes.computador_id', '=', 'computadores_armados.id')
+            ->whereNull('computador_componentes.deleted_at')
+            ->whereNull('computadores_armados.deleted_at')
+            ->sum('computador_componentes.cantidad');
+
+        $equipos = ComputadorArmado::with('componentesActivos')
+            ->whereNull('deleted_at')
+            ->whereBetween('created_at', [$desde, $hasta])
+            ->latest()
+            ->take(5)
+            ->get(['id', 'codigo', 'nombre', 'estado', 'created_at']);
+
+        return response()->json([
+            'stats'         => $stats,
+            'piezas_periodo' => $piezasPeriodo,
+            'piezas_total'  => $piezasTotal,
+            'equipos'       => $equipos->map(fn($eq) => [
+                'id'          => $eq->id,
+                'codigo'      => $eq->codigo,
+                'nombre'      => $eq->nombre,
+                'estado'      => $eq->estado,
+                'componentes' => $eq->componentesActivos->count(),
+                'fecha'       => $eq->created_at->format('d/m/Y'),
+                'url'         => route('admin.computadores.show', $eq->id),
+            ]),
+        ]);
+    }
+
+    public function totalUtilizado(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $desde = $request->filled('desde')
+            ? \Carbon\Carbon::parse($request->desde)->startOfDay()
+            : now()->startOfMonth();
+
+        $hasta = $request->filled('hasta')
+            ? \Carbon\Carbon::parse($request->hasta)->endOfDay()
+            : now()->endOfDay();
+
+        $query = DB::table('historial_cambios as hc')
+            ->leftJoin('productos as p', 'hc.producto_id', '=', 'p.id')
+            ->leftJoin('categorias as cat', 'p.categoria_id', '=', 'cat.id')
+            ->leftJoin('familias as fam', 'cat.familia_id', '=', 'fam.id')
+            ->leftJoin('marcas as m', 'p.marca_id', '=', 'm.id')
+            ->leftJoin(
+                DB::raw('(SELECT producto_id, AVG(precio_neto) as avg_precio FROM precios GROUP BY producto_id) as pr'),
+                'p.id', '=', 'pr.producto_id'
+            )
+            ->where('hc.tipo', 'salida')
+            ->whereBetween('hc.created_at', [$desde, $hasta]);
+
+        $familiaIds  = array_filter((array) $request->input('familia_id', []), 'is_numeric');
+        $catIds      = array_filter((array) $request->input('categoria_id', []), 'is_numeric');
+        $marcaIds    = array_filter((array) $request->input('marca_id', []), 'is_numeric');
+        $origenes    = (array) $request->input('origen', []);
+
+        if (!empty($familiaIds))  { $query->whereIn('fam.id', $familiaIds); }
+        if (!empty($catIds))      { $query->whereIn('cat.id', $catIds); }
+        if (!empty($marcaIds))    { $query->whereIn('m.id', $marcaIds); }
+        if (!empty($origenes))    { $query->whereIn('hc.origen', $origenes); }
+
+        $totals = (clone $query)->selectRaw('
+            COALESCE(SUM(hc.cantidad), 0) as total_cantidad
+        ')->first();
+
+        $ultimoProducto = (clone $query)
+            ->select('hc.nombre_producto', 'hc.cantidad', 'hc.created_at')
+            ->orderByDesc('hc.created_at')
+            ->first();
+
+        return response()->json([
+            'total_cantidad'  => (int) ($totals->total_cantidad ?? 0),
+            'ultimo_producto' => $ultimoProducto ? [
+                'nombre'   => $ultimoProducto->nombre_producto,
+                'cantidad' => (int) $ultimoProducto->cantidad,
+                'fecha'    => \Carbon\Carbon::parse($ultimoProducto->created_at)->format('d/m/Y H:i'),
+            ] : null,
+        ]);
     }
 }

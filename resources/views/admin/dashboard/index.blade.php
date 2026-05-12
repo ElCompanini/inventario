@@ -72,6 +72,51 @@
         display: inline-block; font-size:.68rem; font-weight:600;
         padding:.15rem .55rem; border-radius:999px;
     }
+
+    @keyframes eq-drop-in {
+        from { opacity:0; transform:translateY(-6px) scale(.97); }
+        to   { opacity:1; transform:translateY(0) scale(1); }
+    }
+    @keyframes eq-fade-in {
+        from { opacity:0.4; }
+        to   { opacity:1; }
+    }
+    #eq-lista { transition: opacity .18s ease; }
+    #eq-date-picker .eq-picker-inner { transition: background .2s; }
+    html.dark #eq-date-picker .eq-picker-inner { background: rgba(99,102,241,0.08) !important; }
+
+    /* Ícono calendario nativo visible en dark mode */
+    html.dark .eq-date-input::-webkit-calendar-picker-indicator {
+        filter: invert(1) brightness(1.4);
+        opacity: 0.75;
+        cursor: pointer;
+    }
+    html.dark .eq-date-input::-webkit-calendar-picker-indicator:hover {
+        opacity: 1;
+    }
+    /* Modo día: asegurar que se vea bien */
+    .eq-date-input::-webkit-calendar-picker-indicator {
+        opacity: 0.6;
+        cursor: pointer;
+    }
+    .eq-date-input::-webkit-calendar-picker-indicator:hover {
+        opacity: 1;
+    }
+
+    /* Total Utilizado — misma corrección calendario en dark */
+    html.dark .tu-date-input::-webkit-calendar-picker-indicator {
+        filter: invert(1) brightness(1.4);
+        opacity: 0.75;
+        cursor: pointer;
+    }
+    html.dark .tu-date-input::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+    .tu-date-input::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
+    .tu-date-input::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
+    /* ROW Actividad + Equipos: 60% / 40% en pantallas grandes */
+    @media (min-width: 1024px) {
+        #row-actividad { grid-template-columns: 3fr 2fr !important; }
+    }
 </style>
 @endpush
 
@@ -226,7 +271,353 @@
 </div>
 
 {{-- ══════════════════════════════════════════════════════════
-     ROW 2: GRÁFICO MOVIMIENTO + ALERTAS
+     ROW 2: ACTIVIDAD RECIENTE + EQUIPOS ARMADOS
+══════════════════════════════════════════════════════════ --}}
+<div class="grid grid-cols-1 gap-4 mb-4" id="row-actividad">
+
+    {{-- Actividad Reciente --}}
+    <div class="dash-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <p class="dash-section-title mb-0">Actividad Reciente</p>
+                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">Últimos movimientos del sistema</p>
+            </div>
+            @if($user->tienePermiso('historial'))
+            <a href="{{ route('admin.historial') }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Ver historial →</a>
+            @endif
+        </div>
+
+        <div class="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+            @forelse($actividadReciente as $mov)
+            @php
+                $modulo = match($mov->origen) {
+                    'gasto_menor'   => 'Gasto Menor',
+                    'orden_compra'  => 'OC',
+                    'sicd'          => 'SICD',
+                    'solicitud'     => 'Solicitud',
+                    'retiro'        => 'Retiro',
+                    default         => 'Manual',
+                };
+            @endphp
+            <div class="flex items-center gap-3 px-3 py-2 rounded-lg alert-row">
+                <span class="tipo-badge-{{ $mov->tipo }} text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 text-center shrink-0">
+                    {{ $mov->tipo === 'entrada' ? '↑ Ent.' : '↓ Sal.' }}
+                </span>
+                <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">{{ $mov->nombre_producto }}</span>
+                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 shrink-0">{{ $num(abs($mov->cantidad)) }} u.</span>
+                <span class="hidden sm:inline text-xs text-indigo-500 dark:text-indigo-400 w-20 shrink-0">{{ $modulo }}</span>
+                <span class="hidden sm:inline text-xs text-gray-400 w-20 shrink-0">{{ $mov->usuario?->name ?? '—' }}</span>
+                <span class="text-xs text-gray-400 whitespace-nowrap shrink-0">{{ $mov->created_at->format('d/m H:i') }}</span>
+            </div>
+            @empty
+            <p class="text-sm text-gray-400 text-center py-8">Sin actividad registrada</p>
+            @endforelse
+        </div>
+    </div>
+
+    {{-- Equipos Armados --}}
+    @if($user->tienePermiso('computadores'))
+    <div class="dash-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <p class="dash-section-title mb-0">Equipos Armados</p>
+                <p id="eq-subtitle" class="text-sm font-semibold text-gray-800 dark:text-gray-200">Mes actual</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="eq-cal-toggle" title="Filtrar por fecha"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-150"
+                    style="background:rgba(99,102,241,0.1);"
+                    onmouseover="this.style.background='rgba(99,102,241,0.2)'"
+                    onmouseout="this.style.background='rgba(99,102,241,0.1)'">
+                    <svg class="w-4 h-4 text-indigo-500 dark:text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </button>
+                <a href="{{ route('admin.computadores.index') }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Ver todos →</a>
+            </div>
+        </div>
+
+        {{-- Picker de rango (oculto por defecto) --}}
+        <div id="eq-date-picker" style="display:none; overflow:hidden;">
+            <div class="eq-picker-inner flex flex-wrap items-center gap-2 mb-3 p-2.5 rounded-lg border border-indigo-200 dark:border-indigo-800/50" style="background:rgba(99,102,241,0.05);">
+                <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                    <label class="text-[10px] font-bold text-indigo-500 uppercase shrink-0">Desde</label>
+                    <input type="date" id="eq-desde"
+                        class="eq-date-input flex-1 min-w-0 text-xs rounded-md px-2 py-1 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+                <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                    <label class="text-[10px] font-bold text-indigo-500 uppercase shrink-0">Hasta</label>
+                    <input type="date" id="eq-hasta"
+                        class="eq-date-input flex-1 min-w-0 text-xs rounded-md px-2 py-1 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+                <button id="eq-clear-filter" title="Limpiar filtro"
+                    class="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors shrink-0 px-1">✕</button>
+            </div>
+        </div>
+
+        {{-- Lista equipos (dinámica) --}}
+        <div id="eq-lista" class="space-y-2">
+            @forelse($ultimosEquipos as $eq)
+            @php
+                $estEq = match($eq->estado) {
+                    'listo'     => ['txt' => 'Listo',      'cls' => 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'],
+                    'en_uso'    => ['txt' => 'En uso',     'cls' => 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'],
+                    'en_armado' => ['txt' => 'En armado',  'cls' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'],
+                    'desarmado' => ['txt' => 'Desarmado',  'cls' => 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'],
+                    default     => ['txt' => $eq->estado,  'cls' => 'bg-gray-100 text-gray-500'],
+                };
+                $nComp = $eq->componentesActivos->count();
+            @endphp
+            <div class="alert-row rounded-lg px-3 py-2.5 flex items-center gap-3 cursor-pointer" onclick="window.location='{{ route('admin.computadores.show', $eq->id) }}'">
+                <div class="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{{ $eq->codigo }} – {{ $eq->nombre }}</p>
+                    <p class="text-[11px] text-gray-400">{{ $nComp }} componentes · {{ $eq->created_at->format('d/m/Y') }}</p>
+                </div>
+                <span class="estado-pill {{ $estEq['cls'] }}">{{ $estEq['txt'] }}</span>
+            </div>
+            @empty
+            <p class="text-sm text-gray-400 text-center py-6">Sin equipos en el período</p>
+            @endforelse
+        </div>
+
+        {{-- Resumen contadores (dinámico) --}}
+        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700 grid grid-cols-3 text-center text-xs gap-2">
+            <div><p id="eq-cnt-listos" class="font-bold text-green-600 dark:text-green-400">{{ $num($equiposStats->completos) }}</p><p class="text-gray-400">Listos / En uso</p></div>
+            <div><p id="eq-cnt-armado" class="font-bold text-amber-500">{{ $num($equiposStats->en_armado) }}</p><p class="text-gray-400">En armado</p></div>
+            <div><p id="eq-cnt-desarm" class="font-bold text-gray-400">{{ $num($equiposStats->desarmados) }}</p><p class="text-gray-400">Desarmados</p></div>
+        </div>
+
+        {{-- Métricas de piezas --}}
+        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700 space-y-2">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p id="eq-piezas-periodo" class="text-lg font-bold text-violet-600 dark:text-violet-400">—</p>
+                    <p class="text-[10px] text-gray-400 leading-tight">piezas en período</p>
+                </div>
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(139,92,246,0.1);">
+                    <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="flex items-center justify-between rounded-lg px-3 py-2" style="background:rgba(139,92,246,0.06);">
+                <div>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Total histórico</p>
+                    <p class="text-sm font-bold text-violet-700 dark:text-violet-300">{{ $num($piezasTotal) }} <span class="text-xs font-normal text-gray-400">piezas</span></p>
+                </div>
+                <svg class="w-3.5 h-3.5 text-violet-400 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+    @endif
+
+</div>
+
+{{-- ══════════════════════════════════════════════════════════
+     ROW 3: TOTAL UTILIZADO + PRODUCTOS MÁS UTILIZADOS
+══════════════════════════════════════════════════════════ --}}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+<div class="dash-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
+
+    {{-- Header --}}
+    <div class="flex items-center justify-between mb-3">
+        <div>
+            <p class="dash-section-title mb-0">Total Utilizado</p>
+            <p id="tu-subtitle" class="text-sm font-semibold text-gray-800 dark:text-gray-200">Mes actual</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="tu-cal-toggle" title="Filtrar por fecha"
+                class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-150"
+                style="background:rgba(239,68,68,0.1);"
+                onmouseover="this.style.background='rgba(239,68,68,0.2)'"
+                onmouseout="this.style.background='rgba(239,68,68,0.1)'">
+                <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            </button>
+            <button id="tu-filter-toggle" title="Filtros avanzados"
+                class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-150"
+                style="background:rgba(239,68,68,0.1);"
+                onmouseover="this.style.background='rgba(239,68,68,0.2)'"
+                onmouseout="this.style.background='rgba(239,68,68,0.1)'">
+                <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    {{-- Date picker (oculto por defecto) --}}
+    <div id="tu-date-picker" style="display:none; overflow:hidden;">
+        <div class="flex flex-wrap items-center gap-2 mb-3 p-2.5 rounded-lg border border-rose-200 dark:border-rose-800/50" style="background:rgba(239,68,68,0.05);">
+            <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                <label class="text-[10px] font-bold text-rose-500 uppercase shrink-0">Desde</label>
+                <input type="date" id="tu-desde"
+                    class="tu-date-input flex-1 min-w-0 text-xs rounded-md px-2 py-1 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-rose-400">
+            </div>
+            <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                <label class="text-[10px] font-bold text-rose-500 uppercase shrink-0">Hasta</label>
+                <input type="date" id="tu-hasta"
+                    class="tu-date-input flex-1 min-w-0 text-xs rounded-md px-2 py-1 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-rose-400">
+            </div>
+            <button id="tu-clear-dates" title="Restablecer fechas"
+                class="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors shrink-0 px-1">✕</button>
+        </div>
+    </div>
+
+    {{-- Filter panel (oculto por defecto) --}}
+    <div id="tu-filter-panel" style="display:none; overflow:hidden;">
+        <div class="mb-3 p-3 rounded-lg border border-rose-100 dark:border-rose-900/30" style="background:rgba(239,68,68,0.03);">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                {{-- Familia --}}
+                <div>
+                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Familia</p>
+                    <div class="space-y-1 max-h-28 overflow-y-auto pr-1">
+                        @foreach($tuFamilias as $fam)
+                        <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input type="checkbox" class="tu-check" data-name="familia_id" value="{{ $fam->id }}">
+                            <span class="text-xs text-gray-600 dark:text-gray-400 truncate">{{ $fam->nombre }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Categoría --}}
+                <div>
+                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Categoría</p>
+                    <div class="space-y-1 max-h-28 overflow-y-auto pr-1">
+                        @foreach($tuCategorias as $cat)
+                        <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input type="checkbox" class="tu-check" data-name="categoria_id" value="{{ $cat->id }}">
+                            <span class="text-xs text-gray-600 dark:text-gray-400 truncate">{{ $cat->nombre }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Marca --}}
+                <div>
+                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Marca</p>
+                    <div class="space-y-1 max-h-28 overflow-y-auto pr-1">
+                        @foreach($tuMarcas as $marca)
+                        <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input type="checkbox" class="tu-check" data-name="marca_id" value="{{ $marca->id }}">
+                            <span class="text-xs text-gray-600 dark:text-gray-400 truncate">{{ $marca->nombre }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Origen --}}
+                <div>
+                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Origen</p>
+                    <div class="space-y-1">
+                        @foreach([
+                            'solicitud'         => 'Solicitud',
+                            'orden'             => 'Orden de Compra',
+                            'sicd'              => 'SICD',
+                            'gasto_menor'       => 'Gasto Menor',
+                            'computador_armado' => 'Equipo Armado',
+                        ] as $val => $label)
+                        <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input type="checkbox" class="tu-check" data-name="origen" value="{{ $val }}">
+                            <span class="text-xs text-gray-600 dark:text-gray-400">{{ $label }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-2 pt-2 border-t border-rose-100 dark:border-rose-900/30 flex justify-end">
+                <button id="tu-clear-checks" class="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors">
+                    Limpiar filtros
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Métricas --}}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {{-- Total unidades --}}
+        <div>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Unidades despachadas</p>
+            <p id="tu-cantidad" class="text-3xl font-bold text-rose-600 dark:text-rose-400">—</p>
+            <p class="text-xs text-gray-400 mt-0.5">total salidas en período</p>
+        </div>
+
+        {{-- Último producto utilizado --}}
+        <div>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Último producto utilizado</p>
+            <div id="tu-ultimo-prod">
+                <p class="text-xs text-gray-400">Cargando…</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="dash-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
+
+    <div class="flex items-start gap-6">
+
+        {{-- Gráfico --}}
+        <div class="flex-1 min-w-0">
+            <p class="dash-section-title mb-1">Productos Más Utilizados</p>
+            <p class="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">Salidas últimos 30 días</p>
+            @if(!empty($graficoProductos['labels']))
+            <div style="height:220px">
+                <canvas id="chartProductos"></canvas>
+            </div>
+            @else
+            <p class="text-sm text-gray-400 py-8 text-center">Sin datos de salidas en los últimos 90 días</p>
+            @endif
+        </div>
+
+        {{-- Existencias --}}
+        <div class="w-52 shrink-0 space-y-4 pt-1">
+
+            {{-- Mayor existencia --}}
+            <div>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Mayor existencia</p>
+                @if($tuMasStock)
+                    <div class="flex items-center justify-between gap-2 mt-1">
+                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 leading-tight truncate">{{ $tuMasStock->nombre }}</p>
+                        <span class="text-sm font-bold text-emerald-600 dark:text-emerald-400 shrink-0">{{ number_format($tuMasStock->stock_actual, 0, ',', '.') }} u.</span>
+                    </div>
+                @else
+                    <p class="text-xs text-gray-400">Sin datos</p>
+                @endif
+            </div>
+
+            {{-- Menor existencia --}}
+            <div>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Menor existencia</p>
+                <div class="space-y-1.5">
+                    @forelse($tuMenosStock as $p)
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs text-gray-600 dark:text-gray-400 truncate flex-1">{{ $p->nombre }}</span>
+                        <span class="text-xs font-bold text-amber-600 dark:text-amber-400 shrink-0">{{ $p->stock_actual }} u.</span>
+                    </div>
+                    @empty
+                    <p class="text-xs text-gray-400">Sin datos</p>
+                    @endforelse
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+</div>
+
+{{-- ══════════════════════════════════════════════════════════
+     ROW 4: GRÁFICO MOVIMIENTO + ALERTAS
 ══════════════════════════════════════════════════════════ --}}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
@@ -417,49 +808,9 @@
 </div>
 
 {{-- ══════════════════════════════════════════════════════════
-     ROW 4: ACTIVIDAD RECIENTE + GRÁFICO COMPRAS
+     ROW 4: COMPRAS POR TIPO + REPORTERÍAS
 ══════════════════════════════════════════════════════════ --}}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-
-    {{-- Actividad Reciente --}}
-    <div class="lg:col-span-2 dash-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
-        <div class="flex items-center justify-between mb-4">
-            <div>
-                <p class="dash-section-title mb-0">Actividad Reciente</p>
-                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">Últimos movimientos del sistema</p>
-            </div>
-            @if($user->tienePermiso('historial'))
-            <a href="{{ route('admin.historial') }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Ver historial →</a>
-            @endif
-        </div>
-
-        <div class="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-            @forelse($actividadReciente as $mov)
-            @php
-                $modulo = match($mov->origen) {
-                    'gasto_menor'   => 'Gasto Menor',
-                    'orden_compra'  => 'OC',
-                    'sicd'          => 'SICD',
-                    'solicitud'     => 'Solicitud',
-                    'retiro'        => 'Retiro',
-                    default         => 'Manual',
-                };
-            @endphp
-            <div class="flex items-center gap-3 px-3 py-2 rounded-lg alert-row">
-                <span class="tipo-badge-{{ $mov->tipo }} text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 text-center shrink-0">
-                    {{ $mov->tipo === 'entrada' ? '↑ Ent.' : '↓ Sal.' }}
-                </span>
-                <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">{{ $mov->nombre_producto }}</span>
-                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 shrink-0">{{ $num(abs($mov->cantidad)) }} u.</span>
-                <span class="hidden sm:inline text-xs text-indigo-500 dark:text-indigo-400 w-20 shrink-0">{{ $modulo }}</span>
-                <span class="hidden sm:inline text-xs text-gray-400 w-20 shrink-0">{{ $mov->usuario?->name ?? '—' }}</span>
-                <span class="text-xs text-gray-400 whitespace-nowrap shrink-0">{{ $mov->created_at->format('d/m H:i') }}</span>
-            </div>
-            @empty
-            <p class="text-sm text-gray-400 text-center py-8">Sin actividad registrada</p>
-            @endforelse
-        </div>
-    </div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
     {{-- Gráfico Compras por Fuente --}}
     <div class="dash-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5 flex flex-col">
@@ -480,59 +831,6 @@
             @endforeach
         </div>
     </div>
-</div>
-
-{{-- ══════════════════════════════════════════════════════════
-     ROW 5: EQUIPOS ARMADOS + REPORTERÍAS
-══════════════════════════════════════════════════════════ --}}
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-
-    {{-- Últimos Equipos Armados --}}
-    @if($user->tienePermiso('computadores'))
-    <div class="dash-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
-        <div class="flex items-center justify-between mb-4">
-            <div>
-                <p class="dash-section-title mb-0">Equipos Armados</p>
-                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">Últimos registros</p>
-            </div>
-            <a href="{{ route('admin.computadores.index') }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Ver todos →</a>
-        </div>
-
-        <div class="space-y-2">
-            @forelse($ultimosEquipos as $eq)
-            @php
-                $estEq = match($eq->estado) {
-                    'listo'     => ['txt' => 'Listo',      'cls' => 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'],
-                    'en_uso'    => ['txt' => 'En uso',     'cls' => 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'],
-                    'en_armado' => ['txt' => 'En armado',  'cls' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'],
-                    'desarmado' => ['txt' => 'Desarmado',  'cls' => 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'],
-                    default     => ['txt' => $eq->estado,  'cls' => 'bg-gray-100 text-gray-500'],
-                };
-                $nComp = $eq->componentesActivos->count();
-            @endphp
-            <div class="alert-row rounded-lg px-3 py-2.5 flex items-center gap-3 cursor-pointer" onclick="window.location='{{ route('admin.computadores.show', $eq->id) }}'">
-                <div class="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-4 h-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{{ $eq->codigo }} — {{ $eq->nombre }}</p>
-                    <p class="text-[11px] text-gray-400">{{ $nComp }} componentes · {{ $eq->created_at->format('d/m/Y') }}</p>
-                </div>
-                <span class="estado-pill {{ $estEq['cls'] }}">{{ $estEq['txt'] }}</span>
-            </div>
-            @empty
-            <p class="text-sm text-gray-400 text-center py-6">Sin equipos registrados</p>
-            @endforelse
-        </div>
-
-        {{-- Resumen contadores --}}
-        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700 grid grid-cols-3 text-center text-xs gap-2">
-            <div><p class="font-bold text-green-600 dark:text-green-400">{{ $num($equiposStats->completos) }}</p><p class="text-gray-400">Listos / En uso</p></div>
-            <div><p class="font-bold text-amber-500">{{ $num($equiposStats->en_armado) }}</p><p class="text-gray-400">En armado</p></div>
-            <div><p class="font-bold text-gray-400">{{ $num($equiposStats->desarmados) }}</p><p class="text-gray-400">Desarmados</p></div>
-        </div>
-    </div>
-    @endif
 
     {{-- Últimas Reporterías --}}
     @if($user->tienePermiso('reportes'))
@@ -577,22 +875,6 @@
 
 </div>
 
-{{-- ══════════════════════════════════════════════════════════
-     ROW 6: PRODUCTOS MÁS MOVIDOS
-══════════════════════════════════════════════════════════ --}}
-@if(!empty($graficoProductos['labels']))
-<div class="dash-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5 mb-4">
-    <div class="flex items-center justify-between mb-4">
-        <div>
-            <p class="dash-section-title mb-0">Productos Más Utilizados</p>
-            <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">Salidas últimos 90 días</p>
-        </div>
-    </div>
-    <div style="height:220px">
-        <canvas id="chartProductos"></canvas>
-    </div>
-</div>
-@endif
 
 @push('scripts')
 <script>
@@ -603,7 +885,6 @@
     const COMPRAS    = @json($graficoCom);
     const PRODUCTOS  = @json($graficoProductos);
 
-    // Paleta colores gráficos por fuente
     const COM_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
 
     function isDark() {
@@ -696,7 +977,6 @@
             dots.forEach((el, i) => { el.style.background = COM_COLORS[i % COM_COLORS.length]; });
         }
         setDotColors();
-
         function buildComData() {
             const t = themeColors();
             return {
@@ -727,8 +1007,7 @@
                             cornerRadius: 8,
                             callbacks: {
                                 label: function(ctx) {
-                                    const fmt = (v) => '$' + v.toLocaleString('es-CL');
-                                    return ' ' + fmt(ctx.raw);
+                                    return ' $' + ctx.raw.toLocaleString('es-CL');
                                 }
                             }
                         },
@@ -804,6 +1083,265 @@
         if (chartProd) updateChart(chartProd, buildProdData);
     }).observe(document.documentElement, { attributeFilter: ['class'] });
 
+})();
+</script>
+
+<script>
+// ── Filtro de rango de fechas — card Equipos Armados ──────────────────────
+(function () {
+    const ENDPOINT = '{{ route('admin.dashboard.equipos-filtro') }}';
+
+    const btnToggle  = document.getElementById('eq-cal-toggle');
+    const picker     = document.getElementById('eq-date-picker');
+    const inpDesde   = document.getElementById('eq-desde');
+    const inpHasta   = document.getElementById('eq-hasta');
+    const btnClear   = document.getElementById('eq-clear-filter');
+    const lista      = document.getElementById('eq-lista');
+    const subtitle   = document.getElementById('eq-subtitle');
+    const cntListos       = document.getElementById('eq-cnt-listos');
+    const cntArmado       = document.getElementById('eq-cnt-armado');
+    const cntDesarm       = document.getElementById('eq-cnt-desarm');
+    const elPiezasPeriodo = document.getElementById('eq-piezas-periodo');
+
+    if (!btnToggle) return;
+
+    // Valores por defecto: mes actual
+    const hoy   = new Date();
+    const ymd   = d => d.toISOString().slice(0, 10);
+    const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    inpDesde.value = ymd(inicio);
+    inpHasta.value = ymd(hoy);
+
+    // Toggle picker
+    let pickerOpen = false;
+    btnToggle.addEventListener('click', function () {
+        pickerOpen = !pickerOpen;
+        if (pickerOpen) {
+            picker.style.display = '';
+            picker.style.animation = 'eq-drop-in .18s cubic-bezier(.22,.68,0,1.2) both';
+            btnToggle.style.background = 'rgba(99,102,241,0.25)';
+        } else {
+            picker.style.display = 'none';
+            btnToggle.style.background = 'rgba(99,102,241,0.1)';
+        }
+    });
+
+    // Limpiar filtro → volver a defaults
+    btnClear.addEventListener('click', function () {
+        inpDesde.value = ymd(inicio);
+        inpHasta.value = ymd(hoy);
+        fetchEquipos();
+    });
+
+    // Fetch al cambiar cualquier fecha (con debounce)
+    let timer = null;
+    function onDateChange() {
+        clearTimeout(timer);
+        timer = setTimeout(fetchEquipos, 400);
+    }
+    inpDesde.addEventListener('change', onDateChange);
+    inpHasta.addEventListener('change', onDateChange);
+
+    // Estado de los badges (igual lógica que Blade)
+    const estadoMap = {
+        listo:     { txt: 'Listo',     bg: 'bg-green-100 text-green-700',  bgDark: 'dark:bg-green-900/30 dark:text-green-400' },
+        en_uso:    { txt: 'En uso',    bg: 'bg-blue-100 text-blue-700',    bgDark: 'dark:bg-blue-900/30 dark:text-blue-400' },
+        en_armado: { txt: 'En armado', bg: 'bg-amber-100 text-amber-700',  bgDark: 'dark:bg-amber-900/30 dark:text-amber-400' },
+        desarmado: { txt: 'Desarmado', bg: 'bg-gray-100 text-gray-500',    bgDark: 'dark:bg-gray-700 dark:text-gray-400' },
+    };
+
+    function renderEquipo(eq) {
+        const est   = estadoMap[eq.estado] || { txt: eq.estado, bg: 'bg-gray-100 text-gray-500', bgDark: '' };
+        const cls   = est.bg + ' ' + est.bgDark;
+        return `<div class="alert-row rounded-lg px-3 py-2.5 flex items-center gap-3 cursor-pointer" onclick="window.location='${eq.url}'">
+            <div class="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">${eq.codigo} — ${eq.nombre}</p>
+                <p class="text-[11px] text-gray-400">${eq.componentes} componentes · ${eq.fecha}</p>
+            </div>
+            <span class="estado-pill ${cls}">${est.txt}</span>
+        </div>`;
+    }
+
+    function fmt(n) { return (n || 0).toLocaleString('es-CL'); }
+
+    function fmtLabel(d1, d2) {
+        const opts = { day: '2-digit', month: '2-digit', year: 'numeric' };
+        const f = s => new Date(s + 'T00:00:00').toLocaleDateString('es-CL', opts);
+        return `${f(d1)} → ${f(d2)}`;
+    }
+
+    function fetchEquipos() {
+        const desde = inpDesde.value;
+        const hasta = inpHasta.value;
+        if (!desde || !hasta) return;
+
+        lista.style.opacity = '0.4';
+        lista.style.pointerEvents = 'none';
+
+        const url = ENDPOINT + '?desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta);
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                // Actualizar lista
+                if (data.equipos.length > 0) {
+                    lista.innerHTML = data.equipos.map(renderEquipo).join('');
+                } else {
+                    lista.innerHTML = '<p class="text-sm text-gray-400 text-center py-6">Sin equipos en el período</p>';
+                }
+                lista.style.animation = 'eq-fade-in .22s ease both';
+
+                // Actualizar contadores
+                cntListos.textContent = fmt(data.stats.completos);
+                cntArmado.textContent = fmt(data.stats.en_armado);
+                cntDesarm.textContent = fmt(data.stats.desarmados);
+
+                // Actualizar piezas período
+                if (elPiezasPeriodo) {
+                    elPiezasPeriodo.textContent = fmt(data.piezas_periodo);
+                    elPiezasPeriodo.style.animation = 'eq-fade-in .3s ease both';
+                }
+
+                // Actualizar subtítulo
+                subtitle.textContent = fmtLabel(desde, hasta);
+            })
+            .catch(() => {
+                lista.innerHTML = '<p class="text-sm text-red-400 text-center py-6">Error al cargar equipos</p>';
+            })
+            .finally(() => {
+                lista.style.opacity = '1';
+                lista.style.pointerEvents = '';
+            });
+    }
+
+    // Carga inicial con mes actual
+    fetchEquipos();
+})();
+</script>
+
+<script>
+// ── Total Utilizado — card ────────────────────────────────────────────────
+(function () {
+    const ENDPOINT = '{{ route('admin.dashboard.total-utilizado') }}';
+
+    const btnCal       = document.getElementById('tu-cal-toggle');
+    const btnFilter    = document.getElementById('tu-filter-toggle');
+    const datePicker   = document.getElementById('tu-date-picker');
+    const filterPanel  = document.getElementById('tu-filter-panel');
+    const inpDesde     = document.getElementById('tu-desde');
+    const inpHasta     = document.getElementById('tu-hasta');
+    const btnClrDates  = document.getElementById('tu-clear-dates');
+    const btnClrChecks = document.getElementById('tu-clear-checks');
+    const elCantidad   = document.getElementById('tu-cantidad');
+    const elUltimoProd = document.getElementById('tu-ultimo-prod');
+    const elSubtitle   = document.getElementById('tu-subtitle');
+
+    if (!btnCal) return;
+
+    // Defaults: mes actual
+    const hoy    = new Date();
+    const ymd    = d => d.toISOString().slice(0, 10);
+    const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    inpDesde.value = ymd(inicio);
+    inpHasta.value = ymd(hoy);
+
+    // Toggle calendar
+    let calOpen = false;
+    btnCal.addEventListener('click', function () {
+        calOpen = !calOpen;
+        datePicker.style.display = calOpen ? '' : 'none';
+        if (calOpen) datePicker.style.animation = 'eq-drop-in .18s cubic-bezier(.22,.68,0,1.2) both';
+        btnCal.style.background = calOpen ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.1)';
+    });
+
+    // Toggle filter panel
+    let filterOpen = false;
+    btnFilter.addEventListener('click', function () {
+        filterOpen = !filterOpen;
+        filterPanel.style.display = filterOpen ? '' : 'none';
+        if (filterOpen) filterPanel.style.animation = 'eq-drop-in .18s cubic-bezier(.22,.68,0,1.2) both';
+        btnFilter.style.background = filterOpen ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.1)';
+    });
+
+    // Limpiar fechas
+    btnClrDates && btnClrDates.addEventListener('click', function () {
+        inpDesde.value = ymd(inicio);
+        inpHasta.value = ymd(hoy);
+        schedFetch();
+    });
+
+    // Limpiar checkboxes
+    btnClrChecks && btnClrChecks.addEventListener('click', function () {
+        document.querySelectorAll('.tu-check').forEach(cb => { cb.checked = false; });
+        schedFetch();
+    });
+
+    // Debounce
+    let timer = null;
+    function schedFetch() {
+        clearTimeout(timer);
+        timer = setTimeout(fetchTU, 400);
+    }
+
+    inpDesde.addEventListener('change', schedFetch);
+    inpHasta.addEventListener('change', schedFetch);
+    document.querySelectorAll('.tu-check').forEach(cb => cb.addEventListener('change', schedFetch));
+
+    function getChecked(name) {
+        return [...document.querySelectorAll('.tu-check[data-name="' + name + '"]:checked')].map(cb => cb.value);
+    }
+
+    function fmt(n) { return (n || 0).toLocaleString('es-CL'); }
+
+    function fmtLabel(d1, d2) {
+        const opts = { day: '2-digit', month: '2-digit', year: 'numeric' };
+        const f = s => new Date(s + 'T00:00:00').toLocaleDateString('es-CL', opts);
+        return f(d1) + ' → ' + f(d2);
+    }
+
+    function fetchTU() {
+        const desde = inpDesde.value;
+        const hasta = inpHasta.value;
+        if (!desde || !hasta) return;
+
+        elCantidad.textContent = '…';
+        elUltimoProd.innerHTML = '<p class="text-xs text-gray-400">Cargando…</p>';
+
+        const params = new URLSearchParams({ desde: desde, hasta: hasta });
+        getChecked('familia_id').forEach(v  => params.append('familia_id[]', v));
+        getChecked('categoria_id').forEach(v => params.append('categoria_id[]', v));
+        getChecked('marca_id').forEach(v    => params.append('marca_id[]', v));
+        getChecked('origen').forEach(v      => params.append('origen[]', v));
+
+        fetch(ENDPOINT + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                elCantidad.textContent = fmt(data.total_cantidad);
+                elCantidad.style.animation = 'eq-fade-in .3s ease both';
+                elSubtitle.textContent = fmtLabel(desde, hasta);
+
+                if (data.ultimo_producto) {
+                    const u = data.ultimo_producto;
+                    elUltimoProd.innerHTML =
+                        '<p class="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight">' + u.nombre + '</p>'
+                        + '<p class="text-xs text-gray-400 mt-0.5">' + fmt(u.cantidad) + ' u. · ' + u.fecha + '</p>';
+                } else {
+                    elUltimoProd.innerHTML = '<p class="text-xs text-gray-400">Sin movimientos en el período</p>';
+                }
+            })
+            .catch(function () {
+                elCantidad.textContent = '—';
+                elUltimoProd.innerHTML = '<p class="text-xs text-red-400">Error al cargar</p>';
+            });
+    }
+
+    // Carga inicial
+    fetchTU();
 })();
 </script>
 @endpush

@@ -41,21 +41,6 @@
                 <table class="min-w-full divide-y divide-gray-100 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th colspan="4" class="px-4 py-1"></th>
-                            <th class="px-4 py-1 text-left">
-                                <div style="border:2px solid #3b82f6; border-radius:0.5rem; overflow:hidden;">
-                                    <p style="font-size:0.75rem; font-weight:700; color:#1d4ed8; background:#dbeafe; padding:4px 8px;">Cambiar todos los contenedores a:</p>
-                                    <select class="container-global-sicd" data-sicd="{{ $sicd->id }}"
-                                            style="width:100%; padding:0.375rem 0.5rem; font-size:0.75rem; font-weight:600; color:#1d4ed8; background:#fff; outline:none; border:none;">
-                                        <option value="">— seleccionar —</option>
-                                        @foreach($containers as $c)
-                                            <option value="{{ $c->id }}">{{ $c->nombre }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </th>
-                        </tr>
-                        <tr>
                             <th class="px-4 py-3 text-left font-semibold text-gray-600">Producto</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-600">Stock actual</th>
                             <th class="px-4 py-3 text-center font-semibold text-gray-600">Asignado esta OC</th>
@@ -194,18 +179,6 @@
 
 @push('scripts')
 <script>
-    // Cambio masivo de container por SICD
-    document.querySelectorAll('.container-global-sicd').forEach(function(globalSel) {
-        globalSel.addEventListener('change', function() {
-            const val    = this.value;
-            const sicdId = this.dataset.sicd;
-            if (!val) return;
-            document.querySelectorAll('.select-container-row[data-sicd-id="' + sicdId + '"]').forEach(function(sel) {
-                sel.value = val;
-            });
-        });
-    });
-
     // Mostrar motivo si la cantidad recibida difiere de la asignada
     function verificarMotivo(cantInput) {
         const id         = cantInput.dataset.detid;
