@@ -74,6 +74,8 @@ class ReporteriaService
             'HISTORIAL_STOCK'    => 'Historial de Stock',
             'VALORIZACION'       => 'Valorización',
             'AUDITORIA'          => 'Auditoría',
+            'ACTIVIDAD_EXCEL'    => 'Actividad Reciente – Excel',
+            'ACTIVIDAD_PDF'      => 'Actividad Reciente – PDF',
         ];
     }
 
@@ -86,6 +88,7 @@ class ReporteriaService
             'sicd'           => 'SICD',
             'ordenes'        => 'Órdenes de Compra',
             'historial'      => 'Historial',
+            'dashboard'      => 'Dashboard',
         ];
     }
 }

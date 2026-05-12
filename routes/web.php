@@ -55,6 +55,10 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/equipos-filtro', [DashboardController::class, 'equiposFiltro'])->name('dashboard.equipos-filtro');
+    Route::get('/dashboard/tu-opciones',            [DashboardController::class, 'tuOpciones'])->name('dashboard.tu-opciones');
+    Route::get('/dashboard/actividad-filtro',       [DashboardController::class, 'actividadFiltro'])->name('dashboard.actividad-filtro');
+    Route::get('/dashboard/actividad-excel',        [DashboardController::class, 'exportarActividadExcel'])->name('dashboard.actividad-excel');
+    Route::get('/dashboard/actividad-pdf',          [DashboardController::class, 'exportarActividadPdf'])->name('dashboard.actividad-pdf');
     Route::get('/dashboard/total-utilizado', [DashboardController::class, 'totalUtilizado'])->name('dashboard.total-utilizado');
     Route::get('/computadores/productos-categoria', [\App\Http\Controllers\ComputadorController::class, 'productosPorCategoria'])->name('computadores.productos-categoria');
 

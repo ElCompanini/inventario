@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\ActividadExport;
 use App\Models\Categoria;
 use App\Models\ComputadorArmado;
 use App\Models\Familia;
@@ -13,9 +14,13 @@ use App\Models\Precio;
 use App\Models\Producto;
 use App\Models\ReporteriaIndexada;
 use App\Models\Sicd;
+use App\Services\ReporteriaService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DashboardController extends Controller
 {
@@ -271,6 +276,197 @@ class DashboardController extends Controller
             'tuMasStock',
             'tuMenosStock',
         ));
+    }
+
+    /** Opciones en cascada para los filtros de Total Utilizado */
+    public function tuOpciones(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $familiaIds  = array_filter((array) $request->input('familia_ids', []), 'is_numeric');
+        $categoriaIds = array_filter((array) $request->input('categoria_ids', []), 'is_numeric');
+
+        $categorias = !empty($familiaIds)
+            ? Categoria::orderBy('nombre')->whereIn('familia_id', $familiaIds)->get(['id', 'nombre'])
+            : collect();
+
+        $marcas = !empty($categoriaIds)
+            ? Marca::orderBy('nombre')
+                ->whereHas('productos', fn($q) => $q->withoutGlobalScope('activo')->whereIn('categoria_id', $categoriaIds))
+                ->get(['id', 'nombre'])
+            : collect();
+
+        return response()->json(compact('categorias', 'marcas'));
+    }
+
+    /** Construye la query y el array de filas para los exports de Actividad */
+    private function buildActividadData(Request $request): array
+    {
+        $desde = $request->filled('desde')
+            ? \Carbon\Carbon::parse($request->desde)->startOfDay()
+            : now()->startOfMonth();
+        $hasta = $request->filled('hasta')
+            ? \Carbon\Carbon::parse($request->hasta)->endOfDay()
+            : now()->endOfDay();
+
+        $ccId = auth()->user()->ccFiltro();
+
+        $rows = DB::table('historial_cambios as hc')
+            ->leftJoin('users as u',       'hc.usuario_id', '=', 'u.id')
+            ->leftJoin('productos as p',   'hc.producto_id', '=', 'p.id')
+            ->leftJoin('categorias as cat', 'p.categoria_id', '=', 'cat.id')
+            ->leftJoin('marcas as m',       'p.marca_id',     '=', 'm.id')
+            ->whereNull('hc.deleted_at')
+            ->whereBetween('hc.created_at', [$desde, $hasta])
+            ->when($ccId, fn($q) => $q->where('p.centro_costo_id', $ccId))
+            ->orderByDesc('hc.created_at')
+            ->select(
+                'hc.created_at', 'hc.tipo', 'hc.nombre_producto',
+                'hc.cantidad', 'hc.origen', 'hc.origen_id',
+                'hc.orden_compra_id', 'hc.motivo', 'hc.aprobado_por',
+                'cat.nombre as categoria_nombre',
+                'm.nombre as marca_nombre',
+                'u.name as usuario_nombre'
+            )
+            ->get();
+
+        $origenLabel = [
+            'gasto_menor'       => 'Gasto Menor',
+            'orden_compra'      => 'OC',
+            'sicd'              => 'SICD',
+            'solicitud'         => 'Solicitud',
+            'retiro'            => 'Retiro',
+            'computador_armado' => 'Armado Equipo',
+        ];
+
+        $filas = $rows->map(function ($r) use ($origenLabel) {
+            $dt      = \Carbon\Carbon::parse($r->created_at);
+            $modulo  = $origenLabel[$r->origen] ?? 'Manual';
+            $doc     = $r->orden_compra_id ? 'OC#' . $r->orden_compra_id
+                     : ($r->origen_id       ? '#' . $r->origen_id : '—');
+            return [
+                'fecha'         => $dt->format('d/m/Y'),
+                'hora'          => $dt->format('H:i'),
+                'tipo'          => $r->tipo,
+                'tipo_label'    => $r->tipo === 'entrada' ? 'Entrada' : 'Salida',
+                'producto'      => $r->nombre_producto,
+                'categoria'     => $r->categoria_nombre ?? '—',
+                'marca'         => $r->marca_nombre      ?? '—',
+                'cantidad'      => (int) $r->cantidad,
+                'modulo'        => $modulo,
+                'documento'     => $doc,
+                'usuario'       => $r->aprobado_por ?? $r->usuario_nombre ?? '—',
+                'observaciones' => $r->motivo ?? '',
+            ];
+        })->toArray();
+
+        return [
+            'filas'        => $filas,
+            'total'        => count($filas),
+            'desde'        => $desde->format('d/m/Y'),
+            'hasta'        => $hasta->format('d/m/Y'),
+            'generado_por' => auth()->user()->name,
+            'generado_at'  => now()->format('d/m/Y H:i'),
+            'filtros'      => [
+                'fecha_desde' => $desde->toDateString(),
+                'fecha_hasta' => $hasta->toDateString(),
+            ],
+        ];
+    }
+
+    public function exportarActividadExcel(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $data     = $this->buildActividadData($request);
+        $filename = 'actividad_' . now()->format('Ymd_His') . '.xlsx';
+        $ruta     = 'reportes/' . $filename;
+
+        Excel::store(new ActividadExport($data), $ruta, 'local');
+
+        (new ReporteriaService())->registrar(
+            tipo:          'ACTIVIDAD_EXCEL',
+            nombre:        'Actividad Reciente ' . $data['desde'] . ' → ' . $data['hasta'],
+            modulo:        'dashboard',
+            formato:       'EXCEL',
+            filtros:       $data['filtros'],
+            rutaArchivo:   $ruta,
+            nombreArchivo: $filename,
+        );
+
+        return Excel::download(new ActividadExport($data), $filename);
+    }
+
+    public function exportarActividadPdf(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $data     = $this->buildActividadData($request);
+        $filename = 'actividad_' . now()->format('Ymd_His') . '.pdf';
+        $ruta     = 'reportes/' . $filename;
+
+        $pdf = Pdf::loadView('admin.reportes.actividad_pdf', compact('data'))
+            ->setPaper('a4', 'landscape');
+
+        $content = $pdf->output();
+        Storage::disk('local')->put($ruta, $content);
+
+        (new ReporteriaService())->registrar(
+            tipo:          'ACTIVIDAD_PDF',
+            nombre:        'Actividad Reciente ' . $data['desde'] . ' → ' . $data['hasta'],
+            modulo:        'dashboard',
+            formato:       'PDF',
+            filtros:       $data['filtros'],
+            rutaArchivo:   $ruta,
+            nombreArchivo: $filename,
+        );
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    public function actividadFiltro(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $desde = $request->filled('desde')
+            ? \Carbon\Carbon::parse($request->desde)->startOfDay()
+            : now()->startOfMonth();
+
+        $hasta = $request->filled('hasta')
+            ? \Carbon\Carbon::parse($request->hasta)->endOfDay()
+            : now()->endOfDay();
+
+        $ccId = auth()->user()->ccFiltro();
+
+        $actividad = HistorialCambio::with('usuario:id,name')
+            ->whereBetween('created_at', [$desde, $hasta])
+            ->when($ccId, fn($q) => $q->whereHas('producto', fn($p) => $p->withoutGlobalScopes()->where('centro_costo_id', $ccId)))
+            ->latest()
+            ->take(12)
+            ->get();
+
+        $origenLabel = [
+            'gasto_menor'       => 'Gasto Menor',
+            'orden_compra'      => 'OC',
+            'sicd'              => 'SICD',
+            'solicitud'         => 'Solicitud',
+            'retiro'            => 'Retiro',
+            'computador_armado' => 'Armado Equipo',
+        ];
+
+        return response()->json([
+            'actividad' => $actividad->map(fn($mov) => [
+                'tipo'    => $mov->tipo,
+                'nombre'  => $mov->nombre_producto,
+                'cantidad'=> (int) abs($mov->cantidad),
+                'origen'  => $origenLabel[$mov->origen] ?? 'Manual',
+                'usuario' => $mov->usuario?->name ?? '—',
+                'fecha'   => $mov->created_at->format('d/m H:i'),
+            ])->values(),
+        ]);
     }
 
     public function equiposFiltro(Request $request)

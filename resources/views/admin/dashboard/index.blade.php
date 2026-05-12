@@ -77,6 +77,14 @@
         from { opacity:0; transform:translateY(-6px) scale(.97); }
         to   { opacity:1; transform:translateY(0) scale(1); }
     }
+    @keyframes tu-drop-out {
+        from { opacity:1; transform:translateY(0) scale(1); }
+        to   { opacity:0; transform:translateY(-6px) scale(.97); }
+    }
+    @keyframes tu-item-in {
+        from { opacity:0; transform:translateX(-4px); }
+        to   { opacity:1; transform:translateX(0); }
+    }
     @keyframes eq-fade-in {
         from { opacity:0.4; }
         to   { opacity:1; }
@@ -280,23 +288,73 @@
         <div class="flex items-center justify-between mb-4">
             <div>
                 <p class="dash-section-title mb-0">Actividad Reciente</p>
-                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">Últimos movimientos del sistema</p>
+                <p id="act-subtitle" class="text-sm font-semibold text-gray-800 dark:text-gray-200">Mes actual</p>
             </div>
-            @if($user->tienePermiso('historial'))
-            <a href="{{ route('admin.historial') }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Ver historial →</a>
-            @endif
+            <div class="flex items-center gap-2">
+                <button id="act-cal-toggle" title="Filtrar por fecha"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-150"
+                    style="background:rgba(99,102,241,0.1);"
+                    onmouseover="this.style.background='rgba(99,102,241,0.2)'"
+                    onmouseout="this.style.background='rgba(99,102,241,0.1)'">
+                    <svg class="w-4 h-4 text-indigo-500 dark:text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </button>
+                {{-- Exportar Excel --}}
+                <a id="act-export-excel" href="#" title="Exportar Excel"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-150"
+                    style="background:rgba(34,197,94,0.1);"
+                    onmouseover="this.style.background='rgba(34,197,94,0.2)'"
+                    onmouseout="this.style.background='rgba(34,197,94,0.1)'">
+                    <svg class="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                    </svg>
+                </a>
+                {{-- Exportar PDF --}}
+                <a id="act-export-pdf" href="#" title="Exportar PDF"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-150"
+                    style="background:rgba(239,68,68,0.1);"
+                    onmouseover="this.style.background='rgba(239,68,68,0.2)'"
+                    onmouseout="this.style.background='rgba(239,68,68,0.1)'">
+                    <svg class="w-4 h-4 text-red-500 dark:text-red-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                </a>
+                @if($user->tienePermiso('historial'))
+                <a href="{{ route('admin.historial') }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Ver historial →</a>
+                @endif
+            </div>
         </div>
 
-        <div class="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+        {{-- Picker de rango (oculto por defecto) --}}
+        <div id="act-date-picker" style="display:none; overflow:hidden;">
+            <div class="flex flex-wrap items-center gap-2 mb-3 p-2.5 rounded-lg border border-indigo-200 dark:border-indigo-800/50" style="background:rgba(99,102,241,0.05);">
+                <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                    <label class="text-[10px] font-bold text-indigo-500 uppercase shrink-0">Desde</label>
+                    <input type="date" id="act-desde"
+                        class="flex-1 min-w-0 text-xs rounded-md px-2 py-1 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+                <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                    <label class="text-[10px] font-bold text-indigo-500 uppercase shrink-0">Hasta</label>
+                    <input type="date" id="act-hasta"
+                        class="flex-1 min-w-0 text-xs rounded-md px-2 py-1 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+                <button id="act-clear-filter" title="Limpiar filtro"
+                    class="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors shrink-0 px-1">✕</button>
+            </div>
+        </div>
+
+        <div id="act-lista" class="space-y-1.5 max-h-72 overflow-y-auto pr-1">
             @forelse($actividadReciente as $mov)
             @php
                 $modulo = match($mov->origen) {
-                    'gasto_menor'   => 'Gasto Menor',
-                    'orden_compra'  => 'OC',
-                    'sicd'          => 'SICD',
-                    'solicitud'     => 'Solicitud',
-                    'retiro'        => 'Retiro',
-                    default         => 'Manual',
+                    'gasto_menor'        => 'Gasto Menor',
+                    'orden_compra'       => 'OC',
+                    'sicd'               => 'SICD',
+                    'solicitud'          => 'Solicitud',
+                    'retiro'             => 'Retiro',
+                    'computador_armado'  => 'Armado Equipo',
+                    default              => 'Manual',
                 };
             @endphp
             <div class="flex items-center gap-3 px-3 py-2 rounded-lg alert-row">
@@ -473,65 +531,41 @@
     {{-- Filter panel (oculto por defecto) --}}
     <div id="tu-filter-panel" style="display:none; overflow:hidden;">
         <div class="mb-3 p-3 rounded-lg border border-rose-100 dark:border-rose-900/30" style="background:rgba(239,68,68,0.03);">
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="grid grid-cols-4 gap-4">
 
                 {{-- Familia --}}
-                <div>
+                <div class="col-span-1">
                     <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Familia</p>
-                    <div class="space-y-1 max-h-28 overflow-y-auto pr-1">
+                    <div class="space-y-1 max-h-48 overflow-y-auto pr-1">
                         @foreach($tuFamilias as $fam)
-                        <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                        <label class="flex items-center gap-1.5 cursor-pointer select-none group">
                             <input type="checkbox" class="tu-check" data-name="familia_id" value="{{ $fam->id }}">
-                            <span class="text-xs text-gray-600 dark:text-gray-400 truncate">{{ $fam->nombre }}</span>
+                            <span class="text-xs text-gray-600 dark:text-gray-400 truncate group-hover:text-rose-500 dark:group-hover:text-rose-400 transition-colors">{{ $fam->nombre }}</span>
                         </label>
                         @endforeach
                     </div>
                 </div>
 
-                {{-- Categoría --}}
-                <div>
-                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Categoría</p>
-                    <div class="space-y-1 max-h-28 overflow-y-auto pr-1">
-                        @foreach($tuCategorias as $cat)
-                        <label class="flex items-center gap-1.5 cursor-pointer select-none">
-                            <input type="checkbox" class="tu-check" data-name="categoria_id" value="{{ $cat->id }}">
-                            <span class="text-xs text-gray-600 dark:text-gray-400 truncate">{{ $cat->nombre }}</span>
-                        </label>
-                        @endforeach
+                {{-- Categoría (dinámica según familia) --}}
+                <div class="col-span-2">
+                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                        Categoría <span id="tu-cat-badge" class="text-rose-400 font-normal normal-case hidden">filtrada</span>
+                    </p>
+                    <div id="tu-cat-list" class="grid grid-cols-2 gap-x-3 gap-y-0.5 max-h-48 overflow-y-auto pr-1">
+                        <p class="text-[10px] text-gray-400 italic col-span-2">Seleccione una familia</p>
                     </div>
                 </div>
 
-                {{-- Marca --}}
-                <div>
-                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Marca</p>
-                    <div class="space-y-1 max-h-28 overflow-y-auto pr-1">
-                        @foreach($tuMarcas as $marca)
-                        <label class="flex items-center gap-1.5 cursor-pointer select-none">
-                            <input type="checkbox" class="tu-check" data-name="marca_id" value="{{ $marca->id }}">
-                            <span class="text-xs text-gray-600 dark:text-gray-400 truncate">{{ $marca->nombre }}</span>
-                        </label>
-                        @endforeach
+                {{-- Marca (dinámica según categoría) --}}
+                <div class="col-span-1">
+                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                        Marca <span id="tu-marca-badge" class="text-rose-400 font-normal normal-case hidden">filtrada</span>
+                    </p>
+                    <div id="tu-marca-list" class="space-y-0.5 max-h-48 overflow-y-auto pr-1">
+                        <p class="text-[10px] text-gray-400 italic">Seleccione una familia</p>
                     </div>
                 </div>
 
-                {{-- Origen --}}
-                <div>
-                    <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Origen</p>
-                    <div class="space-y-1">
-                        @foreach([
-                            'solicitud'         => 'Solicitud',
-                            'orden'             => 'Orden de Compra',
-                            'sicd'              => 'SICD',
-                            'gasto_menor'       => 'Gasto Menor',
-                            'computador_armado' => 'Equipo Armado',
-                        ] as $val => $label)
-                        <label class="flex items-center gap-1.5 cursor-pointer select-none">
-                            <input type="checkbox" class="tu-check" data-name="origen" value="{{ $val }}">
-                            <span class="text-xs text-gray-600 dark:text-gray-400">{{ $label }}</span>
-                        </label>
-                        @endforeach
-                    </div>
-                </div>
             </div>
 
             <div class="mt-2 pt-2 border-t border-rose-100 dark:border-rose-900/30 flex justify-end">
@@ -1225,9 +1259,128 @@
 </script>
 
 <script>
+// ── Actividad Reciente — filtro de fechas + exportación ───────────────────
+(function () {
+    const ENDPOINT     = '{{ route('admin.dashboard.actividad-filtro') }}';
+    const EXCEL_BASE   = '{{ route('admin.dashboard.actividad-excel') }}';
+    const PDF_BASE     = '{{ route('admin.dashboard.actividad-pdf') }}';
+
+    const btnToggle  = document.getElementById('act-cal-toggle');
+    const picker     = document.getElementById('act-date-picker');
+    const inpDesde   = document.getElementById('act-desde');
+    const inpHasta   = document.getElementById('act-hasta');
+    const btnClear   = document.getElementById('act-clear-filter');
+    const lista      = document.getElementById('act-lista');
+    const subtitle   = document.getElementById('act-subtitle');
+    const btnExcelEl = document.getElementById('act-export-excel');
+    const btnPdfEl   = document.getElementById('act-export-pdf');
+
+    if (!btnToggle) return;
+
+    const hoy    = new Date();
+    const ymd    = d => d.toISOString().slice(0, 10);
+    const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    inpDesde.value = ymd(inicio);
+    inpHasta.value = ymd(hoy);
+
+    function updateExportLinks() {
+        const p = '?desde=' + encodeURIComponent(inpDesde.value) + '&hasta=' + encodeURIComponent(inpHasta.value);
+        if (btnExcelEl) btnExcelEl.href = EXCEL_BASE + p;
+        if (btnPdfEl)   btnPdfEl.href   = PDF_BASE   + p;
+    }
+    updateExportLinks();
+
+    let pickerOpen = false;
+    btnToggle.addEventListener('click', function () {
+        pickerOpen = !pickerOpen;
+        picker.style.display = pickerOpen ? '' : 'none';
+        if (pickerOpen) picker.style.animation = 'eq-drop-in .18s cubic-bezier(.22,.68,0,1.2) both';
+        btnToggle.style.background = pickerOpen ? 'rgba(99,102,241,0.25)' : 'rgba(99,102,241,0.1)';
+    });
+
+    btnClear.addEventListener('click', function () {
+        inpDesde.value = ymd(inicio);
+        inpHasta.value = ymd(hoy);
+        updateExportLinks();
+        fetchActividad();
+    });
+
+    let timer = null;
+    function onDateChange() {
+        updateExportLinks();
+        clearTimeout(timer);
+        timer = setTimeout(fetchActividad, 400);
+    }
+    inpDesde.addEventListener('change', onDateChange);
+    inpHasta.addEventListener('change', onDateChange);
+
+    const origenColor = {
+        'Armado Equipo': 'text-violet-500 dark:text-violet-400',
+        'Gasto Menor':   'text-orange-500 dark:text-orange-400',
+        'OC':            'text-blue-500 dark:text-blue-400',
+        'SICD':          'text-indigo-500 dark:text-indigo-400',
+        'Solicitud':     'text-teal-500 dark:text-teal-400',
+        'Retiro':        'text-red-500 dark:text-red-400',
+        'Manual':        'text-gray-400',
+    };
+
+    function renderRow(mov) {
+        const badge = mov.tipo === 'entrada'
+            ? '<span class="tipo-badge-entrada text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 text-center shrink-0">↑ Ent.</span>'
+            : '<span class="tipo-badge-salida text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 text-center shrink-0">↓ Sal.</span>';
+        const oCls = origenColor[mov.origen] ?? 'text-gray-400';
+        return `<div class="flex items-center gap-3 px-3 py-2 rounded-lg alert-row">
+            ${badge}
+            <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">${mov.nombre}</span>
+            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 shrink-0">${mov.cantidad} u.</span>
+            <span class="hidden sm:inline text-xs ${oCls} w-20 shrink-0">${mov.origen}</span>
+            <span class="hidden sm:inline text-xs text-gray-400 w-20 shrink-0">${mov.usuario}</span>
+            <span class="text-xs text-gray-400 whitespace-nowrap shrink-0">${mov.fecha}</span>
+        </div>`;
+    }
+
+    function fmtLabel(d1, d2) {
+        const opts = { day: '2-digit', month: '2-digit', year: 'numeric' };
+        const f = s => new Date(s + 'T00:00:00').toLocaleDateString('es-CL', opts);
+        return `${f(d1)} → ${f(d2)}`;
+    }
+
+    function fetchActividad() {
+        const desde = inpDesde.value;
+        const hasta = inpHasta.value;
+        if (!desde || !hasta) return;
+
+        lista.style.opacity = '0.4';
+        lista.style.pointerEvents = 'none';
+
+        fetch(ENDPOINT + '?desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta),
+            { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                lista.innerHTML = data.actividad.length
+                    ? data.actividad.map(renderRow).join('')
+                    : '<p class="text-sm text-gray-400 text-center py-8">Sin actividad en el período</p>';
+                lista.style.animation = 'eq-fade-in .22s ease both';
+                subtitle.textContent = fmtLabel(desde, hasta);
+            })
+            .catch(() => {
+                lista.innerHTML = '<p class="text-sm text-red-400 text-center py-8">Error al cargar actividad</p>';
+            })
+            .finally(() => {
+                lista.style.opacity = '1';
+                lista.style.pointerEvents = '';
+            });
+    }
+
+    fetchActividad();
+})();
+</script>
+
+<script>
 // ── Total Utilizado — card ────────────────────────────────────────────────
 (function () {
-    const ENDPOINT = '{{ route('admin.dashboard.total-utilizado') }}';
+    const ENDPOINT   = '{{ route('admin.dashboard.total-utilizado') }}';
+    const OPC_URL    = '{{ route('admin.dashboard.tu-opciones') }}';
 
     const btnCal       = document.getElementById('tu-cal-toggle');
     const btnFilter    = document.getElementById('tu-filter-toggle');
@@ -1240,17 +1393,20 @@
     const elCantidad   = document.getElementById('tu-cantidad');
     const elUltimoProd = document.getElementById('tu-ultimo-prod');
     const elSubtitle   = document.getElementById('tu-subtitle');
+    const catList      = document.getElementById('tu-cat-list');
+    const marcaList    = document.getElementById('tu-marca-list');
+    const catBadge     = document.getElementById('tu-cat-badge');
+    const marcaBadge   = document.getElementById('tu-marca-badge');
 
     if (!btnCal) return;
 
-    // Defaults: mes actual
     const hoy    = new Date();
     const ymd    = d => d.toISOString().slice(0, 10);
     const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     inpDesde.value = ymd(inicio);
     inpHasta.value = ymd(hoy);
 
-    // Toggle calendar
+    // ── Toggles ──────────────────────────────────────────────────────────
     let calOpen = false;
     btnCal.addEventListener('click', function () {
         calOpen = !calOpen;
@@ -1259,51 +1415,117 @@
         btnCal.style.background = calOpen ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.1)';
     });
 
-    // Toggle filter panel
     let filterOpen = false;
     btnFilter.addEventListener('click', function () {
         filterOpen = !filterOpen;
-        filterPanel.style.display = filterOpen ? '' : 'none';
-        if (filterOpen) filterPanel.style.animation = 'eq-drop-in .18s cubic-bezier(.22,.68,0,1.2) both';
+        if (filterOpen) {
+            filterPanel.style.display = '';
+            filterPanel.style.animation = 'eq-drop-in .18s cubic-bezier(.22,.68,0,1.2) both';
+        } else {
+            filterPanel.style.animation = 'tu-drop-out .14s ease-in both';
+            setTimeout(() => { filterPanel.style.display = 'none'; }, 140);
+        }
         btnFilter.style.background = filterOpen ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.1)';
     });
 
-    // Limpiar fechas
-    btnClrDates && btnClrDates.addEventListener('click', function () {
-        inpDesde.value = ymd(inicio);
-        inpHasta.value = ymd(hoy);
-        schedFetch();
-    });
-
-    // Limpiar checkboxes
-    btnClrChecks && btnClrChecks.addEventListener('click', function () {
-        document.querySelectorAll('.tu-check').forEach(cb => { cb.checked = false; });
-        schedFetch();
-    });
-
-    // Debounce
-    let timer = null;
-    function schedFetch() {
-        clearTimeout(timer);
-        timer = setTimeout(fetchTU, 400);
-    }
-
-    inpDesde.addEventListener('change', schedFetch);
-    inpHasta.addEventListener('change', schedFetch);
-    document.querySelectorAll('.tu-check').forEach(cb => cb.addEventListener('change', schedFetch));
-
+    // ── Helpers ───────────────────────────────────────────────────────────
     function getChecked(name) {
         return [...document.querySelectorAll('.tu-check[data-name="' + name + '"]:checked')].map(cb => cb.value);
     }
-
     function fmt(n) { return (n || 0).toLocaleString('es-CL'); }
-
     function fmtLabel(d1, d2) {
         const opts = { day: '2-digit', month: '2-digit', year: 'numeric' };
         const f = s => new Date(s + 'T00:00:00').toLocaleDateString('es-CL', opts);
         return f(d1) + ' → ' + f(d2);
     }
 
+    function makeCheckbox(name, id, label) {
+        return '<label class="flex items-center gap-1.5 cursor-pointer select-none group" style="animation:tu-item-in .12s ease-out both">'
+            + '<input type="checkbox" class="tu-check" data-name="' + name + '" value="' + id + '">'
+            + '<span class="text-xs text-gray-600 dark:text-gray-400 truncate group-hover:text-rose-500 dark:group-hover:text-rose-400 transition-colors">' + label + '</span>'
+            + '</label>';
+    }
+
+    // ── Cascada de filtros ────────────────────────────────────────────────
+    function loadCascade(familiaIds, categoriaIds, skipCats) {
+        const params = new URLSearchParams();
+        familiaIds.forEach(id  => params.append('familia_ids[]', id));
+        categoriaIds.forEach(id => params.append('categoria_ids[]', id));
+
+        fetch(OPC_URL + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                // Render categorías (saltar si solo cambió una categoría para preservar ticks)
+                if (!skipCats) {
+                    if (familiaIds.length === 0) {
+                        catList.className = 'grid grid-cols-2 gap-x-3 gap-y-0.5 max-h-48 overflow-y-auto pr-1';
+                        catList.innerHTML = '<p class="text-[10px] text-gray-400 italic col-span-2">Seleccione una familia</p>';
+                    } else if (data.categorias.length) {
+                        catList.className = 'grid grid-cols-2 gap-x-3 gap-y-0.5 max-h-48 overflow-y-auto pr-1';
+                        catList.innerHTML = data.categorias.map(c => makeCheckbox('categoria_id', c.id, c.nombre)).join('');
+                    } else {
+                        catList.className = 'grid grid-cols-2 gap-x-3 gap-y-0.5 max-h-48 overflow-y-auto pr-1';
+                        catList.innerHTML = '<p class="text-[10px] text-gray-400 col-span-2">Sin categorías disponibles</p>';
+                    }
+                    if (catBadge) catBadge.classList.toggle('hidden', familiaIds.length === 0);
+                }
+
+                // Render marcas
+                if (categoriaIds.length === 0) {
+                    const msg = familiaIds.length === 0 ? 'Seleccione una familia' : 'Seleccione una categoría';
+                    marcaList.innerHTML = '<p class="text-[10px] text-gray-400 italic">' + msg + '</p>';
+                } else if (data.marcas.length) {
+                    marcaList.innerHTML = data.marcas.map(m => makeCheckbox('marca_id', m.id, m.nombre)).join('');
+                } else {
+                    marcaList.innerHTML = '<p class="text-[10px] text-gray-400">Sin marcas disponibles</p>';
+                }
+                if (marcaBadge) marcaBadge.classList.toggle('hidden', categoriaIds.length === 0);
+            });
+    }
+
+    // ── Event delegation en el panel de filtros ───────────────────────────
+    filterPanel.addEventListener('change', function (e) {
+        const cb = e.target;
+        if (!cb.classList.contains('tu-check')) return;
+
+        const famIds = getChecked('familia_id');
+        const catIds = getChecked('categoria_id');
+
+        if (cb.dataset.name === 'familia_id') {
+            // Familia cambió → re-render categorías filtradas + reset marcas
+            loadCascade(famIds, [], false);
+        } else if (cb.dataset.name === 'categoria_id') {
+            // Categoría cambió → solo actualizar marcas, preservar ticks de categorías
+            loadCascade(famIds, catIds, true);
+        }
+
+        schedFetch();
+    });
+
+    // ── Limpiar ───────────────────────────────────────────────────────────
+    btnClrDates && btnClrDates.addEventListener('click', function () {
+        inpDesde.value = ymd(inicio);
+        inpHasta.value = ymd(hoy);
+        schedFetch();
+    });
+
+    btnClrChecks && btnClrChecks.addEventListener('click', function () {
+        document.querySelectorAll('.tu-check').forEach(cb => { cb.checked = false; });
+        loadCascade([], [], false);
+        schedFetch();
+    });
+
+    inpDesde.addEventListener('change', schedFetch);
+    inpHasta.addEventListener('change', schedFetch);
+
+    // ── Debounce fetch ────────────────────────────────────────────────────
+    let timer = null;
+    function schedFetch() {
+        clearTimeout(timer);
+        timer = setTimeout(fetchTU, 400);
+    }
+
+    // ── Fetch datos ───────────────────────────────────────────────────────
     function fetchTU() {
         const desde = inpDesde.value;
         const hasta = inpHasta.value;
@@ -1312,15 +1534,14 @@
         elCantidad.textContent = '…';
         elUltimoProd.innerHTML = '<p class="text-xs text-gray-400">Cargando…</p>';
 
-        const params = new URLSearchParams({ desde: desde, hasta: hasta });
-        getChecked('familia_id').forEach(v  => params.append('familia_id[]', v));
+        const params = new URLSearchParams({ desde, hasta });
+        getChecked('familia_id').forEach(v   => params.append('familia_id[]', v));
         getChecked('categoria_id').forEach(v => params.append('categoria_id[]', v));
-        getChecked('marca_id').forEach(v    => params.append('marca_id[]', v));
-        getChecked('origen').forEach(v      => params.append('origen[]', v));
+        getChecked('marca_id').forEach(v     => params.append('marca_id[]', v));
 
         fetch(ENDPOINT + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
+            .then(r => r.json())
+            .then(data => {
                 elCantidad.textContent = fmt(data.total_cantidad);
                 elCantidad.style.animation = 'eq-fade-in .3s ease both';
                 elSubtitle.textContent = fmtLabel(desde, hasta);
@@ -1334,13 +1555,14 @@
                     elUltimoProd.innerHTML = '<p class="text-xs text-gray-400">Sin movimientos en el período</p>';
                 }
             })
-            .catch(function () {
+            .catch(() => {
                 elCantidad.textContent = '—';
                 elUltimoProd.innerHTML = '<p class="text-xs text-red-400">Error al cargar</p>';
             });
     }
 
-    // Carga inicial
+    // ── Carga inicial ─────────────────────────────────────────────────────
+    loadCascade([], [], false);
     fetchTU();
 })();
 </script>
