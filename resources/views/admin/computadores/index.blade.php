@@ -107,14 +107,6 @@
                 </div>
             </div>
 
-            @if($activos->isNotEmpty())
-            <div class="px-5 py-2 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-                <span class="text-xs text-gray-500">Valorización:</span>
-                <span class="text-xs font-bold text-gray-800">
-                    ${{ number_format($pc->valorizacionTotal(), 0, ',', '.') }}
-                </span>
-            </div>
-            @endif
         </div>
         @endforeach
     </div>

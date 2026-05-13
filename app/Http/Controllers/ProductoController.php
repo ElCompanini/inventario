@@ -36,7 +36,9 @@ class ProductoController extends Controller
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get();
 
-        $familias = Familia::with('categorias')->where('activo', true)
+        $familias = Familia::with([
+            'categorias' => fn($q) => $q->with(['marcas' => fn($q2) => $q2->activas()]),
+        ])->where('activo', true)
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->orderBy('nombre')->get();
 
@@ -45,6 +47,19 @@ class ProductoController extends Controller
             : collect();
 
         return view('dashboard', compact('productos', 'containers', 'familias', 'centrosCostoConProductos'));
+    }
+
+    public function apiSeleccion(\Illuminate\Http\Request $request)
+    {
+        $ccId = auth()->user()->ccFiltro();
+        return response()->json(
+            Producto::query()
+                ->when($request->categoria_id, fn($q) => $q->where('categoria_id', $request->categoria_id))
+                ->when($request->marca_id, fn($q) => $q->where('marca_id', $request->marca_id))
+                ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+                ->orderBy('nombre')
+                ->get(['id', 'nombre'])
+        );
     }
 
     public function show(int $id)

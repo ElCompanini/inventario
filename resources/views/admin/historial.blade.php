@@ -68,7 +68,24 @@
                focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
 </div>
 
-<div class="bg-white rounded-xl shadow overflow-hidden p-4">
+@if($historial->isEmpty())
+<div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-gray-100 dark:border-slate-700
+            flex flex-col items-center justify-center text-center gap-5 mb-6"
+     style="min-height:340px; padding:3rem 2rem;">
+    <svg class="w-14 h-14 text-gray-300 dark:text-slate-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <div class="max-w-sm">
+        <p class="text-lg font-semibold text-gray-700 dark:text-gray-200">Sin movimientos registrados</p>
+        <p class="text-sm text-gray-400 dark:text-slate-500 mt-2 leading-relaxed">
+            Aún no hay movimientos de stock en el historial de cambios.
+        </p>
+    </div>
+</div>
+@endif
+
+<div class="bg-white rounded-xl shadow overflow-hidden p-4" @if($historial->isEmpty()) style="display:none" @endif>
     <p class="font-medium text-gray-900 text-sm mb-1">Exportar archivo:</p>
     <table id="tabla-historial" class="w-full text-sm">
         <thead class="bg-gray-50 text-left">
@@ -127,15 +144,24 @@
                 <td class="px-4 py-3 text-gray-700">{{ $primero->aprobado_por ?? '—' }}</td>
                 <td class="px-4 py-3">
                     @if($primero->origen === 'sicd')
+                        @php
+                            $sicdCodigo = $primero->sicd?->codigo_sicd;
+                            if (!$sicdCodigo && $primero->motivo && str_contains($primero->motivo, 'SICD ')) {
+                                $after = trim(substr($primero->motivo, strpos($primero->motivo, 'SICD ') + 5));
+                                $pos   = strpos($after, ' (');
+                                $sicdCodigo = $pos !== false ? rtrim(substr($after, 0, $pos)) : $after;
+                            }
+                            $sicdCodigo = $sicdCodigo ?: ('SICD #' . $primero->origen_id);
+                        @endphp
                         <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                         @if(auth()->user()->tienePermiso('sicd'))
                         <a href="{{ route('admin.sicd.show', $primero->origen_id) }}"
                            class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-indigo-200 transition">
-                            {{ $primero->sicd?->codigo_sicd ?? 'SICD #' . $primero->origen_id }}
+                            {{ $sicdCodigo }}
                         </a>
                         @else
                         <span class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">
-                            {{ $primero->sicd?->codigo_sicd ?? 'SICD #' . $primero->origen_id }}
+                            {{ $sicdCodigo }}
                         </span>
                         @endif
                         @if($primero->sicd?->boleta)
@@ -150,12 +176,13 @@
                             Solicitud #{{ $primero->origen_id }}
                         </span>
                     @elseif($primero->origen === 'gasto_menor')
-                        <a href="{{ route('admin.gastos-menores.index') }}{{ $primero->origen_id ? '?gm=' . $primero->origen_id : '' }}"
+                        @php $gmNum = $primero->gastoMenor?->id_gm ?? null; @endphp
+                        <a href="{{ route('admin.gastos-menores.index') }}{{ $gmNum ? '?gm=' . $gmNum : '' }}"
                            class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full transition"
                            style="background:#fef3c7;color:#b45309;"
                            onmouseover="this.style.background='#fde68a'"
                            onmouseout="this.style.background='#fef3c7'">
-                            {{ $primero->origen_id ? 'GM-' . str_pad($primero->origen_id, 4, '0', STR_PAD_LEFT) : 'Gasto Menor' }}
+                            {{ $gmNum ? 'GM-' . str_pad($gmNum, 4, '0', STR_PAD_LEFT) : 'Gasto Menor' }}
                         </a>
                     @else
                         <span class="text-gray-400 text-xs">—</span>
@@ -203,15 +230,24 @@
                 <td class="px-4 py-3 text-gray-700">{{ $registro->aprobado_por ?? '—' }}</td>
                 <td class="px-4 py-3">
                     @if($registro->origen === 'sicd')
+                    @php
+                        $sicdCodigo = $registro->sicd?->codigo_sicd;
+                        if (!$sicdCodigo && $registro->motivo && str_contains($registro->motivo, 'SICD ')) {
+                            $after = trim(substr($registro->motivo, strpos($registro->motivo, 'SICD ') + 5));
+                            $pos   = strpos($after, ' (');
+                            $sicdCodigo = $pos !== false ? rtrim(substr($after, 0, $pos)) : $after;
+                        }
+                        $sicdCodigo = $sicdCodigo ?: ('SICD #' . $registro->origen_id);
+                    @endphp
                     <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                     @if(auth()->user()->tienePermiso('sicd'))
                     <a href="{{ route('admin.sicd.show', $registro->origen_id) }}"
                         class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-indigo-200 transition">
-                        {{ $registro->sicd?->codigo_sicd ?? 'SICD #' . $registro->origen_id }}
+                        {{ $sicdCodigo }}
                     </a>
                     @else
                     <span class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">
-                        {{ $registro->sicd?->codigo_sicd ?? 'SICD #' . $registro->origen_id }}
+                        {{ $sicdCodigo }}
                     </span>
                     @endif
                     @if($registro->sicd?->boleta)
@@ -226,12 +262,13 @@
                         Solicitud #{{ $registro->origen_id }}
                     </span>
                     @elseif($registro->origen === 'gasto_menor')
-                    <a href="{{ route('admin.gastos-menores.index') }}{{ $registro->origen_id ? '?gm=' . $registro->origen_id : '' }}"
+                    @php $gmNum = $registro->gastoMenor?->id_gm ?? null; @endphp
+                    <a href="{{ route('admin.gastos-menores.index') }}{{ $gmNum ? '?gm=' . $gmNum : '' }}"
                        class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full font-mono transition"
                        style="background:#fef3c7; color:#b45309;"
                        onmouseover="this.style.background='#fde68a'"
                        onmouseout="this.style.background='#fef3c7'">
-                        {{ $registro->origen_id ? 'GM-' . str_pad($registro->origen_id, 4, '0', STR_PAD_LEFT) : 'Gasto Menor' }}
+                        {{ $gmNum ? 'GM-' . str_pad($gmNum, 4, '0', STR_PAD_LEFT) : 'Gasto Menor' }}
                     </a>
                     @else
                     <span class="text-gray-400 text-xs">—</span>

@@ -65,7 +65,7 @@ class OrdenCompraController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'numero_oc'                       => ['required', 'string', 'max:100', 'unique:ordenes_compra,numero_oc'],
+            'numero_oc'                       => ['required', 'string', 'max:100'],
             'sicd_ids'                        => ['required', 'array', 'min:1'],
             'sicd_ids.*'                      => ['integer', 'exists:sicds,id'],
             'archivo_oc'                      => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
@@ -76,11 +76,17 @@ class OrdenCompraController extends Controller
             'oc_detalles.*.total_neto'        => ['nullable', 'numeric', 'min:0'],
         ], [
             'numero_oc.required'                    => 'El número de OC es obligatorio.',
-            'numero_oc.unique'                      => 'Ya existe una OC con ese número.',
             'sicd_ids.required'                     => 'Debes seleccionar al menos un SICD.',
             'oc_detalles.required'                  => 'Debes asignar al menos un producto a esta OC.',
             'oc_detalles.*.cantidad_asignada.min'   => 'La cantidad debe ser al menos 1.',
         ]);
+
+        // Si la OC ya existe (doble envío o navegación hacia atrás), redirigir a ella
+        $ocExistente = OrdenCompra::where('numero_oc', strtoupper(trim($data['numero_oc'])))->first();
+        if ($ocExistente) {
+            return redirect()->route('admin.ordenes.show', $ocExistente->id)
+                ->with('info', "La OC {$ocExistente->numero_oc} ya estaba registrada.");
+        }
 
         // Validar que las cantidades no excedan el disponible en cada detalle
         foreach ($data['oc_detalles'] as $det) {
@@ -295,7 +301,7 @@ class OrdenCompraController extends Controller
                 ->with('error', 'Debes subir la factura antes de registrar la recepción.');
         }
 
-        $containers = Container::orderBy('nombre')->get(['id', 'nombre']);
+        $containers = Container::with('centroCosto')->orderBy('nombre')->get(['id', 'nombre', 'centro_costo_id']);
 
         return view('admin.ordenes.recepcion', compact('oc', 'containers'));
     }

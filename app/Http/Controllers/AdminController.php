@@ -10,6 +10,7 @@ use App\Models\Container;
 use App\Models\HistorialCambio;
 use App\Models\Precio;
 use App\Models\Sicd;
+use App\Models\UnidadMedida;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -147,8 +148,10 @@ class AdminController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('historial'), 403);
         $user  = auth()->user();
-        $query = HistorialCambio::with(['usuario', 'sicd', 'container',
-            'producto' => fn($q) => $q->withoutGlobalScopes(),
+        $query = HistorialCambio::with(['usuario', 'container',
+            'sicd'       => fn($q) => $q->withTrashed(),
+            'producto'   => fn($q) => $q->withoutGlobalScopes(),
+            'gastoMenor' => fn($q) => $q->select('id', 'id_gm'),
         ])
             ->orderByDesc('created_at');
 
@@ -316,6 +319,29 @@ class AdminController extends Controller
         return back()->with('success', "Producto «{$producto->nombre}» deshabilitado. No aparecerá en el inventario activo.");
     }
 
+    private static function normalizarTexto(string $s): string
+    {
+        $s = mb_strtolower(trim($s), 'UTF-8');
+        $s = strtr($s, [
+            'á'=>'a','à'=>'a','ä'=>'a','â'=>'a',
+            'é'=>'e','è'=>'e','ë'=>'e','ê'=>'e',
+            'í'=>'i','ì'=>'i','ï'=>'i','î'=>'i',
+            'ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o',
+            'ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u',
+            'ñ'=>'n',
+        ]);
+        return preg_replace('/[^a-z0-9]/u', '', $s);
+    }
+
+    private static function calcSimilitud(string $aNorm, string $bNorm): float
+    {
+        if ($aNorm === $bNorm) return 100.0;
+        if ($aNorm === '' || $bNorm === '') return 0.0;
+        $dist   = levenshtein($aNorm, $bNorm);
+        $maxLen = max(strlen($aNorm), strlen($bNorm));
+        return round((1 - $dist / $maxLen) * 100, 1);
+    }
+
     public function cargaMasiva(Request $request)
     {
         abort_unless(auth()->user()->esAdmin(), 403);
@@ -381,69 +407,164 @@ class AdminController extends Controller
 
         $descripcion = $request->input('descripcion');
 
-        $ccIdMasiva  = $user->ccFiltro();
-        $productosDB = Producto::when($ccIdMasiva, fn($q) => $q->where('centro_costo_id', $ccIdMasiva))->get(['id', 'nombre', 'contenedor']);
-        $exactos     = [];
-        $conflictos  = [];
+        set_time_limit(300);
+        $ccIdMasiva = $user->ccFiltro();
+
+        // ── Precarga en memoria — elimina N+1 y timeouts ──────────────────
+        $productosDB    = Producto::when($ccIdMasiva, fn($q) => $q->where('centro_costo_id', $ccIdMasiva))
+                            ->get(['id', 'nombre', 'contenedor']);
+        $unidadesMedida = UnidadMedida::activas()->get(['id', 'nombre', 'abreviacion']);
+
+        // Índice normalizado → Producto (búsqueda O(1) sin query por fila)
+        $prodIdx = [];
+        foreach ($productosDB as $p) {
+            $k = self::normalizarTexto($p->nombre);
+            if ($k !== '') $prodIdx[$k] = $p;
+        }
+
+        // Índice normalizado → UnidadMedida (abreviacion + nombre)
+        $unidIdx = [];
+        foreach ($unidadesMedida as $u) {
+            $kAbr = self::normalizarTexto($u->abreviacion);
+            $kNom = self::normalizarTexto($u->nombre);
+            if ($kAbr !== '') $unidIdx[$kAbr] = $u;
+            if ($kNom !== '') $unidIdx[$kNom] = $u;
+        }
+        // ──────────────────────────────────────────────────────────────────
+
+        $exactos    = [];
+        $conflictos = [];
 
         foreach ($rows as $row) {
-            $desc       = trim((string) ($row[0] ?? ''));
-            $unidad     = trim((string) ($row[1] ?? ''));
-            $cantidad   = (int) ($row[2] ?? 0);
-            $precioNeto = is_numeric($row[3] ?? '') ? (float) $row[3] : null;
-            $totalNeto  = is_numeric($row[4] ?? '') ? (float) $row[4] : null;
+            $desc        = trim((string) ($row[0] ?? ''));
+            $unidadExcel = trim((string) ($row[1] ?? ''));
+            $cantidad    = (int) ($row[2] ?? 0);
+            $precioNeto  = is_numeric($row[3] ?? '') ? (float) $row[3] : null;
+            $totalNeto   = is_numeric($row[4] ?? '') ? (float) $row[4] : null;
 
             if ($desc === '' || $cantidad <= 0) continue;
 
             $item = [
-                'descripcion' => $desc,
-                'unidad'      => $unidad,
-                'cantidad'    => $cantidad,
-                'precioNeto'  => $precioNeto,
-                'totalNeto'   => $totalNeto,
+                'descripcion'      => $desc,
+                'unidad'           => $unidadExcel,
+                'cantidad'         => $cantidad,
+                'precioNeto'       => $precioNeto,
+                'totalNeto'        => $totalNeto,
+                'unidad_medida_id' => null,
+                'unidad_warning'   => null,
+                'monto_warning'    => null,
             ];
 
-            // Coincidencia exacta: por nombre dentro del mismo CC
-            $producto = Producto::where('nombre', $desc)
-                ->when($ccIdMasiva, fn($q) => $q->where('centro_costo_id', $ccIdMasiva))
-                ->first();
-            if ($producto) {
-                $item['producto_id']     = $producto->id;
-                $item['producto_nombre'] = $producto->nombre;
-                $item['contenedor_id']   = $producto->contenedor;
-                $exactos[] = $item;
+            // ── Validación monetaria ───────────────────────────────────────
+            if ($precioNeto !== null && $totalNeto !== null && $cantidad > 0) {
+                $calculado = round($cantidad * $precioNeto);
+                if (abs($calculado - $totalNeto) > 1) {
+                    $item['monto_warning'] = [
+                        'calculado' => $calculado,
+                        'excel'     => $totalNeto,
+                    ];
+                }
+            }
+
+            // ── Detección de unidad (in-memory, soft-delete excluido) ──────
+            if ($unidadExcel !== '') {
+                $unidNorm = self::normalizarTexto($unidadExcel);
+                if (isset($unidIdx[$unidNorm])) {
+                    $u = $unidIdx[$unidNorm];
+                    $item['unidad_medida_id']     = $u->id;
+                    $item['unidad_medida_nombre'] = $u->abreviacion;
+                } else {
+                    $mejorUPct = 0;
+                    $mejorUnid = null;
+                    foreach ($unidadesMedida as $u) {
+                        $pct = max(
+                            self::calcSimilitud($unidNorm, self::normalizarTexto($u->abreviacion)),
+                            self::calcSimilitud($unidNorm, self::normalizarTexto($u->nombre))
+                        );
+                        if ($pct > $mejorUPct) { $mejorUPct = $pct; $mejorUnid = $u; }
+                    }
+                    if ($mejorUPct >= 95 && $mejorUnid) {
+                        $item['unidad_medida_id']     = $mejorUnid->id;
+                        $item['unidad_medida_nombre'] = $mejorUnid->abreviacion;
+                    } else {
+                        $item['unidad_warning'] = [
+                            'excel'         => $unidadExcel,
+                            'sugerencia'    => $mejorUnid?->abreviacion,
+                            'sugerencia_id' => $mejorUnid?->id,
+                            'similitud'     => round(min($mejorUPct, 100), 1),
+                        ];
+                    }
+                }
+            }
+
+            // ── Coincidencia de producto (in-memory, sin query por fila) ──
+            $descNorm      = self::normalizarTexto($desc);
+            $tieneWarnings = $item['unidad_warning'] !== null || $item['monto_warning'] !== null;
+
+            if (isset($prodIdx[$descNorm])) {
+                $producto = $prodIdx[$descNorm];
+                $item['producto_id']       = $producto->id;
+                $item['producto_nombre']   = $producto->nombre;
+                $item['contenedor_id']     = $producto->contenedor;
+                $item['similitud']         = 100.0;
+                $item['sugerencia_id']     = $producto->id;
+                $item['sugerencia_nombre'] = $producto->nombre;
+                $tieneWarnings ? ($conflictos[] = $item) : ($exactos[] = $item);
                 continue;
             }
 
-            // Fuzzy matching
-            $descNorm  = strtolower($desc);
+            // Fuzzy matching en memoria — un solo recorrido sin queries BD
             $mejorPct  = 0;
             $mejorProd = null;
             foreach ($productosDB as $p) {
-                $dist   = levenshtein($descNorm, strtolower($p->nombre));
-                $maxLen = max(strlen($descNorm), strlen($p->nombre));
-                $pct    = $maxLen > 0 ? (1 - $dist / $maxLen) * 100 : 0;
+                $pct = self::calcSimilitud($descNorm, self::normalizarTexto($p->nombre));
                 if ($pct > $mejorPct) { $mejorPct = $pct; $mejorProd = $p; }
             }
 
             $item['similitud']         = round(min($mejorPct, 100), 1);
             $item['sugerencia_id']     = $mejorProd?->id;
             $item['sugerencia_nombre'] = $mejorProd?->nombre;
-            $conflictos[] = $item;
+
+            // ≥95% sin advertencias → auto-enlazar como exacto
+            if ($mejorPct >= 95 && !$tieneWarnings && $mejorProd) {
+                $item['producto_id']     = $mejorProd->id;
+                $item['producto_nombre'] = $mejorProd->nombre;
+                $item['contenedor_id']   = $mejorProd->contenedor;
+                $exactos[] = $item;
+            } else {
+                $conflictos[] = $item;
+            }
         }
+
+        // Leer ID de SICD pre-enlazada desde el modal del dashboard (puede ser null)
+        $sicdPreEnlazadoId = (int)($request->input('sicd_preenlazado_id')) ?: null;
+
+        // Crear SICD temporal para rastrear el proceso — se activará al confirmar
+        // o se eliminará (soft delete) si el usuario cancela/abandona.
+        // Solo crear si no hay una SICD pre-enlazada que ya la cubra.
+        $sicdTemporal = \App\Models\Sicd::withoutGlobalScope('sin_temporales')->create([
+            'codigo_sicd' => $codigoSicd,
+            'descripcion' => $descripcion,
+            'estado'      => 'pendiente',
+            'es_temporal' => true,
+            'usuario_id'  => Auth::id(),
+        ]);
+        $sicdTempId = $sicdTemporal->id;
 
         // Si hay conflictos → guardar en sesión y resolver primero
         if (!empty($conflictos)) {
             session([
                 'carga_masiva_pendiente' => [
-                    'codigo_sicd'        => $codigoSicd,
-                    'descripcion'        => $descripcion,
-                    'motivo'             => $motivo,
-                    'vincular_oc'        => $vincularOc,
-                    'boleta_ruta'        => $boletaTempRuta,
-                    'boleta_nombre'      => $boletaNombreOrig,
-                    'exactos'            => $exactos,
-                    'conflictos'         => $conflictos,
+                    'codigo_sicd'          => $codigoSicd,
+                    'descripcion'          => $descripcion,
+                    'motivo'               => $motivo,
+                    'vincular_oc'          => $vincularOc,
+                    'boleta_ruta'          => $boletaTempRuta,
+                    'boleta_nombre'        => $boletaNombreOrig,
+                    'sicd_id_temporal'     => $sicdTempId,
+                    'sicd_id_preenlazado'  => $sicdPreEnlazadoId,
+                    'exactos'              => $exactos,
+                    'conflictos'           => $conflictos,
                 ],
             ]);
             return redirect()->route('admin.productos.carga.masiva.resolver');
@@ -452,13 +573,15 @@ class AdminController extends Controller
         // Sin conflictos → ir a asignar contenedores
         session([
             'carga_masiva_items' => [
-                'codigo_sicd'   => $codigoSicd,
-                'descripcion'   => $descripcion,
-                'motivo'        => $motivo,
-                'vincular_oc'   => $vincularOc,
-                'boleta_ruta'   => $boletaTempRuta,
-                'boleta_nombre' => $boletaNombreOrig,
-                'items'         => $exactos,
+                'codigo_sicd'         => $codigoSicd,
+                'descripcion'         => $descripcion,
+                'motivo'              => $motivo,
+                'vincular_oc'         => $vincularOc,
+                'boleta_ruta'         => $boletaTempRuta,
+                'boleta_nombre'       => $boletaNombreOrig,
+                'sicd_id_temporal'    => $sicdTempId,
+                'sicd_id_preenlazado' => $sicdPreEnlazadoId,
+                'items'               => $exactos,
             ],
         ]);
         return redirect()->route('admin.productos.carga.masiva.contenedores');
@@ -472,10 +595,13 @@ class AdminController extends Controller
             return redirect()->route('dashboard')->with('error', 'Sesión expirada. Vuelve a cargar el Excel.');
         }
         $ccId       = auth()->user()->ccFiltro();
-        $productos  = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
-        $familias   = Familia::with('categorias')->where('activo', true)->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->orderBy('nombre')->get();
+        $productos  = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre', 'categoria_id', 'marca_id']);
+        $familias   = Familia::with([
+            'categorias' => fn($q) => $q->with(['marcas' => fn($q2) => $q2->activas()]),
+        ])->where('activo', true)->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->orderBy('nombre')->get();
         $containers = Container::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
-        return view('admin.productos.resolver-carga-masiva', compact('pendiente', 'productos', 'familias', 'containers'));
+        $unidades   = UnidadMedida::activas()->orderBy('abreviacion')->get(['id', 'abreviacion', 'nombre']);
+        return view('admin.productos.resolver-carga-masiva', compact('pendiente', 'productos', 'familias', 'containers', 'unidades'));
     }
 
     public function confirmarCargaMasiva(Request $request)
@@ -493,18 +619,31 @@ class AdminController extends Controller
             $res    = $resoluciones[$idx] ?? [];
             $accion = $res['accion'] ?? 'omitir';
 
+            // ── Resolución de unidad ───────────────────────────────────────
+            if ($conflicto['unidad_warning'] !== null) {
+                $unidAccion = $res['unidad_accion'] ?? 'aceptar';
+                if ($unidAccion === 'manual' && !empty($res['unidad_medida_id_manual'])) {
+                    $conflicto['unidad_medida_id'] = (int) $res['unidad_medida_id_manual'];
+                } elseif ($unidAccion === 'aceptar' && !empty($conflicto['unidad_warning']['sugerencia_id'])) {
+                    $conflicto['unidad_medida_id'] = (int) $conflicto['unidad_warning']['sugerencia_id'];
+                } else {
+                    $conflicto['unidad_medida_id'] = null;
+                }
+            }
+
+            // ── Resolución de producto ─────────────────────────────────────
             if ($accion === 'enlazar' && !empty($res['producto_id'])) {
                 $linked = Producto::find((int) $res['producto_id']);
                 $conflicto['producto_id']     = (int) $res['producto_id'];
                 $conflicto['producto_nombre'] = $linked?->nombre;
                 $conflicto['contenedor_id']   = $linked?->contenedor;
             } elseif ($accion === 'nuevo') {
-                $categoria = Categoria::find((int) ($res['nuevo_categoria_id'] ?? 0));
-                $conflicto['producto_id']       = null;
-                $conflicto['accion']            = 'nuevo';
-                $conflicto['nuevo_nombre']      = $conflicto['descripcion'];
-                $conflicto['nuevo_categoria_id']= $categoria?->id;
-                $conflicto['contenedor_id']     = null;
+                $conflicto['producto_id']        = null;
+                $conflicto['accion']             = 'nuevo';
+                $conflicto['nuevo_nombre']       = $conflicto['descripcion'];
+                $conflicto['nuevo_categoria_id'] = !empty($res['nuevo_categoria_id']) ? (int) $res['nuevo_categoria_id'] : null;
+                $conflicto['nuevo_marca_id']     = !empty($res['nuevo_marca_id'])     ? (int) $res['nuevo_marca_id']     : null;
+                $conflicto['contenedor_id']      = null;
             } else {
                 $conflicto['producto_id'] = null;
             }
@@ -515,16 +654,66 @@ class AdminController extends Controller
         session()->forget('carga_masiva_pendiente');
         session([
             'carga_masiva_items' => [
-                'codigo_sicd'   => $pendiente['codigo_sicd'],
-                'descripcion'   => $pendiente['descripcion'],
-                'motivo'        => $pendiente['motivo'],
-                'vincular_oc'   => $pendiente['vincular_oc'],
-                'boleta_ruta'   => $pendiente['boleta_ruta'] ?? null,
-                'boleta_nombre' => $pendiente['boleta_nombre'] ?? null,
-                'items'         => $items,
+                'codigo_sicd'         => $pendiente['codigo_sicd'],
+                'descripcion'         => $pendiente['descripcion'],
+                'motivo'              => $pendiente['motivo'],
+                'vincular_oc'         => $pendiente['vincular_oc'],
+                'boleta_ruta'         => $pendiente['boleta_ruta'] ?? null,
+                'boleta_nombre'       => $pendiente['boleta_nombre'] ?? null,
+                'sicd_id_temporal'    => $pendiente['sicd_id_temporal'] ?? null,
+                'sicd_id_preenlazado' => $pendiente['sicd_id_preenlazado'] ?? null,
+                'items'               => $items,
             ],
         ]);
         return redirect()->route('admin.productos.carga.masiva.contenedores');
+    }
+
+    public function cancelarCargaMasiva(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $pendientePasos = session('carga_masiva_pendiente');
+        $pendienteItems = session('carga_masiva_items');
+        $pendiente      = $pendientePasos ?? $pendienteItems;
+
+        // Eliminar boleta temporal
+        if ($pendiente && !empty($pendiente['boleta_ruta'])) {
+            Storage::disk('local')->delete($pendiente['boleta_ruta']);
+        }
+
+        // Soft-delete la SICD temporal (puede estar en cualquiera de los dos pasos)
+        $sicdTempId = $pendientePasos['sicd_id_temporal']
+            ?? $pendienteItems['sicd_id_temporal']
+            ?? null;
+        if ($sicdTempId) {
+            \App\Models\Sicd::withoutGlobalScope('sin_temporales')
+                ->where('id', $sicdTempId)
+                ->where('es_temporal', true)
+                ->whereNull('deleted_at')
+                ->first()
+                ?->delete();
+        }
+
+        // Soft-delete la SICD pre-enlazada desde el modal (también es temporal)
+        $sicdPreEnlazadoId = $pendientePasos['sicd_id_preenlazado']
+            ?? $pendienteItems['sicd_id_preenlazado']
+            ?? null;
+        if ($sicdPreEnlazadoId) {
+            \App\Models\Sicd::withoutGlobalScope('sin_temporales')
+                ->where('id', $sicdPreEnlazadoId)
+                ->where('es_temporal', true)
+                ->whereNull('deleted_at')
+                ->first()
+                ?->delete();
+        }
+
+        session()->forget('carga_masiva_pendiente');
+        session()->forget('carga_masiva_items');
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['ok' => true]);
+        }
+        return redirect()->route('dashboard')->with('info', 'Carga masiva cancelada.');
     }
 
     public function asignarContenedoresMasiva()
@@ -562,12 +751,14 @@ class AdminController extends Controller
             $pendiente['descripcion'],
             $pendiente['motivo'],
             $pendiente['vincular_oc'],
-            $pendiente['boleta_ruta']   ?? null,
-            $pendiente['boleta_nombre'] ?? null
+            $pendiente['boleta_ruta']         ?? null,
+            $pendiente['boleta_nombre']       ?? null,
+            $pendiente['sicd_id_temporal']    ?? null,
+            $pendiente['sicd_id_preenlazado'] ?? null
         );
     }
 
-    private function procesarCargaMasiva(array $items, string $codigoSicd, ?string $descripcion, string $motivo, bool $vincularOc, ?string $boletaTempRuta = null, ?string $boletaNombre = null)
+    private function procesarCargaMasiva(array $items, string $codigoSicd, ?string $descripcion, string $motivo, bool $vincularOc, ?string $boletaTempRuta = null, ?string $boletaNombre = null, ?int $sicdTempId = null, ?int $sicdPreEnlazadoId = null)
     {
         $sicd         = null;
         $actualizados = 0;
@@ -585,21 +776,71 @@ class AdminController extends Controller
                 $boletaId = $boleta->id;
             }
 
-            // Reutilizar SICD pre-enlazado (usuario hizo clic en "Enlazar PDF" antes de confirmar)
-            $sicd = Sicd::where('codigo_sicd', $codigoSicd)
-                ->whereNotNull('documento_blob')
-                ->whereDoesntHave('detalles')
-                ->latest()
-                ->first();
+            // Prioridad 1: SICD pre-enlazada por el modal del dashboard (tiene PDF y es temporal)
+            // Buscar primero por ID directo, luego por código como fallback
+            $sicdPreLinked = null;
+            if ($sicdPreEnlazadoId) {
+                $sicdPreLinked = Sicd::withoutGlobalScope('sin_temporales')
+                    ->where('id', $sicdPreEnlazadoId)
+                    ->whereNotNull('documento_blob')
+                    ->whereDoesntHave('detalles')
+                    ->first();
+            }
+            if (!$sicdPreLinked) {
+                $sicdPreLinked = Sicd::withoutGlobalScope('sin_temporales')
+                    ->where('codigo_sicd', $codigoSicd)
+                    ->whereNotNull('documento_blob')
+                    ->whereDoesntHave('detalles')
+                    ->latest()
+                    ->first();
+            }
 
-            if ($sicd) {
+            if ($sicdPreLinked) {
+                // Usar el pre-enlazado; eliminar la temporal para evitar duplicado
+                if ($sicdTempId) {
+                    Sicd::withoutGlobalScope('sin_temporales')
+                        ->where('id', $sicdTempId)
+                        ->where('es_temporal', true)
+                        ->whereNull('deleted_at')
+                        ->first()
+                        ?->delete();
+                }
+                $sicd = $sicdPreLinked;
                 $sicd->fill([
+                    'es_temporal' => false,
                     'boleta_id'   => $boletaId,
                     'descripcion' => $descripcion,
                     'estado'      => $vincularOc ? 'pendiente' : 'recibido',
                     'usuario_id'  => Auth::id(),
                 ])->save();
+            } elseif ($sicdTempId) {
+                // Prioridad 2: activar la SICD temporal creada al inicio del proceso
+                $tempSicd = Sicd::withoutGlobalScope('sin_temporales')
+                    ->where('id', $sicdTempId)
+                    ->where('es_temporal', true)
+                    ->first();
+                if ($tempSicd) {
+                    $tempSicd->fill([
+                        'es_temporal' => false,
+                        'boleta_id'   => $boletaId,
+                        'descripcion' => $descripcion,
+                        'estado'      => $vincularOc ? 'pendiente' : 'recibido',
+                        'usuario_id'  => Auth::id(),
+                    ])->save();
+                    $sicd = $tempSicd;
+                }
+                // Fallback si la temporal ya fue eliminada por alguna razón
+                if (!$sicd) {
+                    $sicd = Sicd::create([
+                        'codigo_sicd' => $codigoSicd,
+                        'boleta_id'   => $boletaId,
+                        'descripcion' => $descripcion,
+                        'estado'      => $vincularOc ? 'pendiente' : 'recibido',
+                        'usuario_id'  => Auth::id(),
+                    ]);
+                }
             } else {
+                // Sin SICD temporal (ruta legacy) — crear nuevo
                 $sicd = Sicd::create([
                     'codigo_sicd' => $codigoSicd,
                     'boleta_id'   => $boletaId,
@@ -619,13 +860,15 @@ class AdminController extends Controller
                 // Crear producto nuevo si el usuario eligió esa opción
                 if (!$productoId && ($item['accion'] ?? '') === 'nuevo' && !empty($item['nuevo_nombre'])) {
                     $nuevo = Producto::create([
-                        'nombre'          => $item['nuevo_nombre'],
-                        'categoria_id'    => $item['nuevo_categoria_id'] ?? null,
-                        'stock_actual'    => 0,
-                        'stock_minimo'    => (int) ($item['nuevo_stock_minimo']  ?? 0),
-                        'stock_critico'   => (int) ($item['nuevo_stock_critico'] ?? 0),
-                        'contenedor'      => $item['contenedor_id'] ?? 1,
-                        'centro_costo_id' => $ccId,
+                        'nombre'           => $item['nuevo_nombre'],
+                        'categoria_id'     => $item['nuevo_categoria_id']  ?? null,
+                        'marca_id'         => $item['nuevo_marca_id']      ?? null,
+                        'unidad_medida_id' => $item['unidad_medida_id']    ?? null,
+                        'stock_actual'     => 0,
+                        'stock_minimo'     => (int) ($item['nuevo_stock_minimo']  ?? 0),
+                        'stock_critico'    => (int) ($item['nuevo_stock_critico'] ?? 0),
+                        'contenedor'       => $item['contenedor_id'] ?? 1,
+                        'centro_costo_id'  => $ccId,
                     ]);
                     $productoId = $nuevo->id;
                 }
@@ -895,6 +1138,7 @@ class AdminController extends Controller
 
         $request->validate([
             'categoria_id'    => ['required', 'integer', 'exists:categorias,id'],
+            'marca_id'        => ['nullable', 'integer', 'exists:marcas,id'],
             'nombre'          => ['required', 'string', 'max:500'],
             'stock_minimo'    => ['nullable', 'integer', 'min:0'],
             'stock_critico'   => ['nullable', 'integer', 'min:0'],
@@ -910,6 +1154,7 @@ class AdminController extends Controller
             'stock_critico'    => (int) ($request->stock_critico ?? 0),
             'contenedor'       => null,
             'categoria_id'     => $categoria->id,
+            'marca_id'         => $request->marca_id ?: null,
             'centro_costo_id'  => auth()->user()->centro_costo_id,
             'unidad_medida_id' => $request->unidad_medida_id ?: null,
         ]);

@@ -615,7 +615,11 @@ html.dark tr.child                              { background-color: var(--c-surf
 html.dark tr.child > td                         { background-color: var(--c-surface-2) !important; }
 
 /* ── Scrollbar ──────────────────────────────────────────────── */
-html.dark ::-webkit-scrollbar              { width: 6px; height: 6px; }
-html.dark ::-webkit-scrollbar-track       { background: #0f172a; }
-html.dark ::-webkit-scrollbar-thumb       { background: #334155; border-radius: 4px; }
-html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+::-webkit-scrollbar              { width: 6px; height: 6px; }
+::-webkit-scrollbar-track        { background: #e5e7eb; }
+::-webkit-scrollbar-thumb        { background: #9ca3af; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover  { background: #6b7280; }
+
+html.dark ::-webkit-scrollbar-track        { background: #0f172a; }
+html.dark ::-webkit-scrollbar-thumb        { background: #334155; border-radius: 4px; }
+html.dark ::-webkit-scrollbar-thumb:hover  { background: #475569; }

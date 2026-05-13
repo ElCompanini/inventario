@@ -231,8 +231,26 @@
     </div>
 </div>
 
+{{-- Estado vacío --}}
+@if($productos->isEmpty())
+<div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-gray-100 dark:border-slate-700
+            flex flex-col items-center justify-center text-center gap-5 mb-6"
+     style="min-height:340px; padding:3rem 2rem;">
+    <svg class="w-14 h-14 text-gray-300 dark:text-slate-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
+    </svg>
+    <div class="max-w-sm">
+        <p class="text-lg font-semibold text-gray-700 dark:text-gray-200">No hay productos registrados</p>
+        <p class="text-sm text-gray-400 dark:text-slate-500 mt-2 leading-relaxed">
+            Aún no se han agregado productos al inventario.<br>Comienza usando el botón <strong class="text-gray-500 dark:text-slate-400">+ Agregar Inventario</strong>.
+        </p>
+    </div>
+</div>
+@endif
+
 {{-- Tabla de productos --}}
-<div class="bg-white rounded-xl shadow overflow-hidden p-4">
+<div class="bg-white rounded-xl shadow overflow-hidden p-4" @if($productos->isEmpty()) style="display:none" @endif>
 
     <p class="font-medium text-gray-900 text-sm mb-1">Exportar archivo:</p>
     <div class="overflow-x-auto">
@@ -1121,6 +1139,7 @@ function escHtmlGm(str) {
                 data-url-manual="{{ route('admin.productos.carga.manual') }}">
                 <input type="hidden" name="_modo" value="nuevo">
                 <input type="hidden" name="confirmar_duplicado" id="ai-confirmar-duplicado" value="0">
+                <input type="hidden" name="sicd_preenlazado_id" id="ai-sicd-preenlazado-id" value="">
                 @csrf
                 <div style="padding:1.25rem; display:flex; flex-direction:column; gap:1rem;">
 
@@ -1396,7 +1415,7 @@ function escHtmlGm(str) {
                 </div>
 
                 {{-- Toast de validación --}}
-                <div id="ai-toast-error" style="display:none; margin:0 1.25rem 0.75rem; padding:0.6rem 1rem; background:#fef2f2; border:1px solid #fca5a5; border-radius:0.5rem; color:#991b1b; font-size:0.8rem; font-weight:500; align-items:center; gap:0.5rem;">
+                <div id="ai-toast-error" class="ai-toast-err" style="display:none; margin:0 1.25rem 0.75rem; padding:0.6rem 1rem; background:#fef2f2; border:1px solid #fca5a5; border-radius:0.5rem; color:#991b1b; font-size:0.8rem; font-weight:500; align-items:center; gap:0.5rem;">
                     <span>⚠</span>
                     <span id="ai-toast-msg"></span>
                 </div>
@@ -1594,6 +1613,8 @@ function escHtmlGm(str) {
     html.dark .btn-accion-blue:hover   { background:#2563eb !important; box-shadow:0 0 14px 4px rgba(37,99,235,0.4) !important; }
     html.dark .btn-accion-green:hover  { background:#16a34a !important; box-shadow:0 0 14px 4px rgba(22,163,74,0.4) !important; }
     html.dark .btn-accion-orange:hover { background:#ea580c !important; box-shadow:0 0 14px 4px rgba(234,88,12,0.4) !important; }
+
+    html.dark .ai-toast-err { background:#450a0a !important; border-color:#7f1d1d !important; color:#fca5a5 !important; }
 </style>
 @endpush
 
@@ -1959,6 +1980,11 @@ function escHtmlGm(str) {
             @endif
         </div>
 
+        <div id="ai-crear-marca-wrapper" style="display:none; margin-bottom:0.85rem;">
+            <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.5rem;">Marca <span style="color:#ef4444;">*</span></label>
+            <div id="ai-crear-marcas-btns" style="display:flex; flex-wrap:wrap; gap:0.4rem;"></div>
+        </div>
+
         <div style="margin-bottom:0.85rem;">
             <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
                 Unidad de Medida <span style="color:#ef4444;">*</span>
@@ -2026,7 +2052,11 @@ $aiFamiliasJson = json_encode(
     ($familias ?? collect())->map(fn($f) => [
         'id'         => $f->id,
         'nombre'     => $f->nombre,
-        'categorias' => $f->categorias->map(fn($c) => ['id' => $c->id, 'nombre' => $c->nombre])->values(),
+        'categorias' => $f->categorias->map(fn($c) => [
+            'id'     => $c->id,
+            'nombre' => $c->nombre,
+            'marcas' => $c->marcas->map(fn($m) => ['id' => $m->id, 'nombre' => $m->nombre])->values(),
+        ])->values(),
     ])->values(),
     JSON_HEX_TAG | JSON_HEX_AMP
 );
@@ -2386,6 +2416,8 @@ function aiEnviar() {
         }
     }
 
+    var preenlazadoInput = document.getElementById('ai-sicd-preenlazado-id');
+    if (preenlazadoInput) preenlazadoInput.value = _aiSicdEnlazadoId || '';
     sessionStorage.removeItem('ai_sicd_pending');
     sessionStorage.removeItem('ai_prods_creados');
     _aiProductosCreados = [];
@@ -2516,13 +2548,8 @@ function aiEnlazarSolicitud() {
                 btn.disabled = false;
                 if (res.ok) {
                     if (res.id) { _aiSicdEnlazadoId = res.id; sessionStorage.setItem('ai_sicd_pending', String(res.id)); }
-                    window._aiSicdUrl = res.url;
-                    var link = document.createElement('a');
-                    link.href = res.url;
-                    link.target = '_blank';
-                    link.textContent = '✓ Ver SICD';
-                    link.style.cssText = 'font-size:0.7rem;font-weight:600;background:#dcfce7;color:#166534;padding:3px 12px;border-radius:5px;text-decoration:none;';
-                    btn.replaceWith(link);
+                    btn.innerHTML = '✓ PDF SICD enlazado';
+                    btn.style.cssText += ';background:#dcfce7;color:#166534;cursor:default;';
                 } else {
                     btn.textContent = 'Error: ' + (res.msg || 'desconocido');
                     btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
@@ -2559,6 +2586,25 @@ function aiValidarCodigo(codigo) {
     fetch(aiUrlValidar + '?codigo=' + encodeURIComponent(codigo))
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            // Número de compra autorizada: requiere selección de año
+            if (data.tipo === 'num_sol_compra_aut' && !data.resuelto) {
+                aiSicdValido = false;
+                var _dm2 = document.documentElement.classList.contains('dark');
+                var btnBg = _dm2 ? '#1e1b4b' : '#e0e7ff';
+                var btnTx = _dm2 ? '#a5b4fc' : '#3730a3';
+                var h = '<div style="margin-top:0.3rem;display:flex;flex-direction:column;gap:0.4rem;">'
+                      + '<span style="font-size:0.73rem;color:#f59e0b;font-weight:600;">N° compra <strong>' + data.num + '</strong> encontrado — selecciona el año:</span>'
+                      + '<div style="display:flex;gap:0.4rem;flex-wrap:wrap;">';
+                data.anios.forEach(function(anio) {
+                    h += '<button onclick="aiResolverNumSolCompra(\'' + data.num + '\',\'' + anio + '\')" '
+                       + 'style="font-size:0.75rem;font-weight:600;padding:4px 14px;border-radius:6px;border:none;cursor:pointer;background:' + btnBg + ';color:' + btnTx + ';">'
+                       + anio + '</button>';
+                });
+                h += '</div></div>';
+                hint.innerHTML = h;
+                return;
+            }
+
             if (data.valido) {
                 aiSicdValido = true;
                 // Si se buscó por ID numérico, reemplazar el campo con el código real
@@ -2731,6 +2777,28 @@ function aiValidarCodigo(codigo) {
             aiSicdValido = false;
             hint.innerHTML = '<span style="color:#d97706;">⚠️ Sin conexión al sistema externo.</span>';
             document.getElementById('ai-codigo-sicd').style.borderColor = '#d1d5db';
+        });
+}
+
+function aiResolverNumSolCompra(num, anio) {
+    var hint = document.getElementById('ai-codigo-hint');
+    var info = document.getElementById('ai-sicd-info');
+    info.style.display = 'none';
+    hint.innerHTML = '<span style="color:#6b7280;">⏳ Verificando año ' + anio + '...</span>';
+
+    fetch(aiUrlValidar + '?codigo=' + encodeURIComponent(num) + '&anio=' + encodeURIComponent(anio))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.codigo_resuelto) {
+                document.getElementById('ai-codigo-sicd').value = data.codigo_resuelto;
+                aiValidarCodigo(data.codigo_resuelto);
+            } else {
+                hint.innerHTML = '<svg style="width:13px;height:13px;flex-shrink:0" fill="none" stroke="#dc2626" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>'
+                              + '<span style="color:#dc2626;font-weight:600;">Sin SICD para el año ' + anio + '.</span>';
+            }
+        })
+        .catch(function() {
+            hint.innerHTML = '<span style="color:#d97706;">⚠️ Error de conexión.</span>';
         });
 }
 
@@ -3054,6 +3122,7 @@ function aiGetUnidad(productoId) {
 
 var aiCrearFamiliaId = null;
 var aiCrearCatId     = null;
+var aiCrearMarcaId   = null;
 var aiCrearNombre    = '';
 var aiEditandoIdx    = null;
 
@@ -3076,9 +3145,11 @@ function aiAbrirModalCrear(nombre, editIdx) {
     aiEditandoIdx    = (editIdx !== undefined) ? editIdx : null;
     aiCrearFamiliaId = null;
     aiCrearCatId     = null;
+    aiCrearMarcaId   = null;
     aiCrearNombre    = nombre;
     document.getElementById('ai-crear-error').style.display = 'none';
     document.getElementById('ai-crear-cat-wrapper').style.display = 'none';
+    document.getElementById('ai-crear-marca-wrapper').style.display = 'none';
     document.getElementById('ai-crear-stock-minimo').value  = '0';
     document.getElementById('ai-crear-stock-critico').value = '0';
     var selUm = document.getElementById('ai-crear-unidad-id');
@@ -3149,10 +3220,36 @@ function aiRenderCrearCategorias() {
             btn.textContent = c.nombre;
             btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;'
                 + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : 'background:#fff;color:#374151;border-color:#d1d5db;');
-            btn.onclick = function() { aiCrearCatId = c.id; aiRenderCrearCategorias(); };
+            btn.onclick = function() { aiCrearCatId = c.id; aiCrearMarcaId = null; aiRenderCrearCategorias(); };
             cont.appendChild(btn);
         });
     }
+    wrapper.style.display = 'block';
+    aiRenderCrearMarcas();
+}
+
+function aiRenderCrearMarcas() {
+    var wrapper = document.getElementById('ai-crear-marca-wrapper');
+    var cont    = document.getElementById('ai-crear-marcas-btns');
+    if (!wrapper || !cont) return;
+    if (!aiCrearCatId) { wrapper.style.display = 'none'; return; }
+    var lista   = aiFamilias || [];
+    var familia = lista.find(function(f) { return f.id === aiCrearFamiliaId; });
+    var cats    = (familia ? familia.categorias : []) || [];
+    var cat     = cats.find(function(c) { return c.id === aiCrearCatId; });
+    var marcas  = (cat && cat.marcas ? cat.marcas : []);
+    if (marcas.length === 0) { wrapper.style.display = 'none'; return; }
+    cont.innerHTML = '';
+    marcas.forEach(function(m) {
+        var sel = m.id === aiCrearMarcaId;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = m.nombre;
+        btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;'
+            + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : 'background:#fff;color:#374151;border-color:#d1d5db;');
+        btn.onclick = function() { aiCrearMarcaId = m.id; aiRenderCrearMarcas(); };
+        cont.appendChild(btn);
+    });
     wrapper.style.display = 'block';
 }
 
@@ -3175,6 +3272,14 @@ function aiConfirmarCrearProducto() {
     if (!aiCrearFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.style.display = 'block'; return; }
     if (!aiCrearCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.style.display = 'block'; return; }
 
+    // Verificar si la categoría tiene marcas y exigir selección
+    var _marcasRequeridas = (function() {
+        var f = (aiFamilias || []).find(function(f) { return f.id === aiCrearFamiliaId; });
+        var c = f ? (f.categorias || []).find(function(c) { return c.id === aiCrearCatId; }) : null;
+        return c && c.marcas && c.marcas.length > 0;
+    })();
+    if (_marcasRequeridas && !aiCrearMarcaId) { errDiv.textContent = 'Selecciona una marca.'; errDiv.style.display = 'block'; return; }
+
     var minimo  = parseInt(document.getElementById('ai-crear-stock-minimo').value)  || 0;
     var critico = parseInt(document.getElementById('ai-crear-stock-critico').value) || 0;
 
@@ -3184,7 +3289,7 @@ function aiConfirmarCrearProducto() {
     fetch(AI_URL_CREAR, {
         method: 'POST',
         headers: { 'X-CSRF-TOKEN': AI_CSRF, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoria_id: aiCrearCatId, nombre: aiCrearNombre, stock_minimo: minimo, stock_critico: critico, unidad_medida_id: parseInt(document.getElementById('ai-crear-unidad-id')?.value) || null }),
+        body: JSON.stringify({ categoria_id: aiCrearCatId, marca_id: aiCrearMarcaId || null, nombre: aiCrearNombre, stock_minimo: minimo, stock_critico: critico, unidad_medida_id: parseInt(document.getElementById('ai-crear-unidad-id')?.value) || null }),
     })
     .then(function(res) { return res.json().then(function(p) { return { ok: res.ok, p: p }; }); })
     .then(function(data) {

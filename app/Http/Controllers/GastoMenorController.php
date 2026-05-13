@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Container;
+use App\Models\Familia;
 use App\Models\GastoMenor;
 use App\Models\HistorialCambio;
 use App\Models\Precio;
@@ -19,8 +20,15 @@ class GastoMenorController extends Controller
         abort_unless(auth()->user()->tienePermiso('gastos_menores'), 403);
 
         $user  = auth()->user();
-        $query = GastoMenor::with(['producto', 'user', 'historialCambio.container'])
-            ->orderByDesc('created_at');
+        $query = GastoMenor::with([
+            'producto' => fn($q) => $q->withoutGlobalScopes()->with([
+                'categoria'    => fn($q2) => $q2->withTrashed(),
+                'marca'        => fn($q2) => $q2->withTrashed(),
+                'unidadMedida' => fn($q2) => $q2->withTrashed(),
+            ]),
+            'user',
+            'historialCambio.container',
+        ])->orderByDesc('created_at');
 
         $ccId = $user->ccFiltro();
         if ($ccId) {
@@ -28,18 +36,25 @@ class GastoMenorController extends Controller
         }
 
         $registros  = $query->get()->groupBy('folio');
-        $productos  = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get();
+        $productos  = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre', 'stock_actual', 'categoria_id', 'marca_id']);
         $containers = Container::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
+        $familias   = Familia::with([
+            'categorias' => fn($q) => $q->with(['marcas' => fn($q2) => $q2->activas()]),
+        ])->where('activo', true)
+            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+            ->orderBy('nombre')->get();
 
-        return view('admin.gastos-menores.index', compact('registros', 'productos', 'containers'));
+        return view('admin.gastos-menores.index', compact('registros', 'productos', 'containers', 'familias'));
     }
 
     public function edit(Request $request, string $folio)
     {
         abort_unless(auth()->user()->tienePermiso('gastos_menores'), 403);
         $folio = urldecode($folio);
-        $items = GastoMenor::with(['producto', 'historialCambio'])
-            ->where('folio', $folio)
+        $items = GastoMenor::with([
+            'producto'       => fn($q) => $q->withoutGlobalScopes(),
+            'historialCambio',
+        ])->where('folio', $folio)
             ->orderBy('id')
             ->get();
         abort_if($items->isEmpty(), 404);

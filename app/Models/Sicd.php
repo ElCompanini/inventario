@@ -20,9 +20,19 @@ class Sicd extends Model
         'proveedor_nombre',
         'folio',
         'estado',
+        'es_temporal',
         'permite_mas_oc',
         'usuario_id',
     ];
+
+    protected static function booted(): void
+    {
+        // Exclude in-progress temporal SICDs from all normal queries.
+        // Abandoned temporals are soft-deleted so already invisible.
+        static::addGlobalScope('sin_temporales', function ($query) {
+            $query->where('es_temporal', false);
+        });
+    }
 
     public function boleta()
     {

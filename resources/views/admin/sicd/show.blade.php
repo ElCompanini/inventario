@@ -446,7 +446,7 @@
             </p>
         </div>
 
-        {{-- Comparativa financiera SICD vs OC --}}
+        {{-- Variación Presupuestaria SICD vs OC --}}
         @php
             $sicdTotalRef  = $sicd->detalles->sum(fn($d) => (float)($d->total_neto_original ?? $d->total_neto ?? 0));
             $ocTotalAdj    = (float) $sicd->ordenesCompra->sum('api_total');
@@ -459,7 +459,7 @@
                 <svg class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
                 </svg>
-                <p class="text-xs font-semibold text-gray-600">Comparativa financiera</p>
+                <p class="text-xs font-semibold text-gray-600">Variación Presupuestaria</p>
             </div>
             <div class="px-4 py-3 space-y-2.5">
                 {{-- SICD referencial --}}
@@ -489,17 +489,17 @@
                 <div class="pt-2 border-t border-gray-100">
                     <div class="flex items-center justify-between gap-2">
                         @if(abs($difSicdOc) < 1)
-                            <span class="text-xs font-semibold text-gray-500">Sin diferencia</span>
+                            <span class="text-xs font-semibold text-gray-500">Sin variación</span>
                         @elseif($difSicdOc < 0)
                             <div class="flex items-center gap-1">
                                 <svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                                <span class="text-xs font-bold text-green-600">Ahorro</span>
+                                <span class="text-xs font-bold text-green-600">Dif. Favorable</span>
                             </div>
                             <span class="text-xs font-bold text-green-600 tabular-nums">{{ $fmt($difSicdOc) }}</span>
                         @else
                             <div class="flex items-center gap-1">
                                 <svg class="w-3 h-3 text-red-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
-                                <span class="text-xs font-bold text-red-500">Sobrecosto</span>
+                                <span class="text-xs font-bold text-red-500">Dif. Desfavorable</span>
                             </div>
                             <span class="text-xs font-bold text-red-500 tabular-nums">{{ $fmt($difSicdOc) }}</span>
                         @endif

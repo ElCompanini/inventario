@@ -44,6 +44,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/productos', [ProductoController::class, 'index'])->name('dashboard');
     Route::get('/mis-solicitudes', [SolicitudController::class, 'index'])->name('solicitudes.mis');
     Route::post('/solicitudes', [SolicitudController::class, 'store'])->name('solicitudes.store');
+    Route::get('/api/sel-productos', [ProductoController::class, 'apiSeleccion'])->name('api.sel.productos');
 
     // Retiro de piezas (todos los usuarios autenticados)
     Route::get('/retiro', [RetiroController::class, 'form'])->name('retiro.form');
@@ -73,6 +74,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/productos/carga-masiva/confirmar', [AdminController::class, 'confirmarCargaMasiva'])->name('productos.carga.masiva.confirmar');
     Route::get('/productos/carga-masiva/contenedores', [AdminController::class, 'asignarContenedoresMasiva'])->name('productos.carga.masiva.contenedores');
     Route::post('/productos/carga-masiva/contenedores/confirmar', [AdminController::class, 'confirmarContenedoresMasiva'])->name('productos.carga.masiva.contenedores.confirmar');
+    Route::post('/productos/carga-masiva/cancelar', [AdminController::class, 'cancelarCargaMasiva'])->name('productos.carga.masiva.cancelar');
     Route::post('/productos/carga-manual', [AdminController::class, 'cargaManual'])->name('productos.carga.manual');
     Route::post('/productos/crear-rapido', [AdminController::class, 'crearProductoRapido'])->name('productos.crear.rapido');
     // Wildcard {id} al final para no capturar rutas estáticas
@@ -167,7 +169,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/computadores/{id}',                                          [ComputadorController::class, 'destroy'])->name('computadores.destroy');
     Route::post('/computadores/{id}/componentes',                                [ComputadorController::class, 'agregarComponente'])->name('computadores.componentes.agregar');
     Route::patch('/computadores/{computadorId}/componentes/{componenteId}/retirar', [ComputadorController::class, 'retirarComponente'])->name('computadores.componentes.retirar');
-    Route::post('/computadores/{id}/desarmar',                                   [ComputadorController::class, 'desarmar'])->name('computadores.desarmar');
+    Route::post('/computadores/{id}/desarmar',     [ComputadorController::class, 'desarmar'])->name('computadores.desarmar');
+    Route::post('/computadores/{id}/marcar-listo', [ComputadorController::class, 'marcarListo'])->name('computadores.marcar-listo');
+    Route::post('/computadores/{id}/reabrir',      [ComputadorController::class, 'reabrir'])->name('computadores.reabrir');
 
     // Historial de Reporterías
     Route::get('/reportes/historial',                    [ReporteriaIndexController::class, 'index'])->name('reportes.historial');

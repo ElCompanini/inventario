@@ -11,13 +11,6 @@
     </div>
     <div class="flex items-center gap-3">
         <span id="mp-api-badge" class="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-400">● API MP…</span>
-        <a href="{{ route('admin.ordenes.create') }}"
-           class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-            </svg>
-            Nueva OC
-        </a>
     </div>
 </div>
 
@@ -27,7 +20,24 @@
                   focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
 </div>
 
-<div class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden p-4">
+@if($ordenes->isEmpty())
+<div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-gray-100 dark:border-slate-700
+            flex flex-col items-center justify-center text-center gap-5 mb-6"
+     style="min-height:340px; padding:3rem 2rem;">
+    <svg class="w-14 h-14 text-gray-300 dark:text-slate-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+    </svg>
+    <div class="max-w-sm">
+        <p class="text-lg font-semibold text-gray-700 dark:text-gray-200">No hay Órdenes de Compra</p>
+        <p class="text-sm text-gray-400 dark:text-slate-500 mt-2 leading-relaxed">
+            Aún no se han creado órdenes de compra.
+        </p>
+    </div>
+</div>
+@endif
+
+<div class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden p-4" @if($ordenes->isEmpty()) style="display:none" @endif>
     <p class="font-medium text-gray-900 text-sm mb-1">Exportar archivo:</p>
     <table id="tabla-ordenes" class="min-w-full text-sm">
         <thead class="bg-gray-50 text-left">

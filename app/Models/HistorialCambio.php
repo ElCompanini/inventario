@@ -50,4 +50,9 @@ class HistorialCambio extends Model
     {
         return $this->belongsTo(\App\Models\OrdenCompra::class, 'orden_compra_id');
     }
+
+    public function gastoMenor()
+    {
+        return $this->belongsTo(\App\Models\GastoMenor::class, 'origen_id');
+    }
 }

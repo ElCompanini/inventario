@@ -41,7 +41,7 @@ class BincardService
         $gmIds    = $movimientos->where('origen', 'gasto_menor')->pluck('origen_id')->unique()->filter();
         $ocIds    = $movimientos->whereNotNull('orden_compra_id')->pluck('orden_compra_id')->unique()->filter();
 
-        $sicds  = Sicd::whereIn('id', $sicdIds)->get()->keyBy('id');
+        $sicds  = Sicd::withTrashed()->whereIn('id', $sicdIds)->get()->keyBy('id');
         $gastos = GastoMenor::whereIn('id', $gmIds)->get()->keyBy('id');
 
         // OCs directamente vinculadas a cada movimiento (link granular)
@@ -51,7 +51,7 @@ class BincardService
             ->keyBy('id');
 
         // Fallback: OCs por SICD (para registros históricos sin orden_compra_id)
-        $ocsPorSicd = Sicd::whereIn('id', $sicdIds)
+        $ocsPorSicd = Sicd::withTrashed()->whereIn('id', $sicdIds)
             ->with(['ordenesCompra' => fn($q) => $q->select('ordenes_compra.id', 'numero_oc', 'api_proveedor_nombre', 'api_proveedor_rut')])
             ->get()
             ->keyBy('id');

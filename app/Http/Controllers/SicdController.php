@@ -30,6 +30,71 @@ class SicdController extends Controller
             // Si el input es numérico, buscar por id; si no, por num_int_sol
             if (ctype_digit($input)) {
                 $solicitud = SicdExterno::find((int) $input);
+
+                // Fallback: podría ser num_sol_compra_aut (número de compra autorizada)
+                if (!$solicitud) {
+                    $anio = trim($request->query('anio', ''));
+
+                    if ($anio !== '') {
+                        // Año ya seleccionado: resolver y devolver el código SICD
+                        $row = DB::connection('sicd_externa')
+                            ->table('solicitud_full')
+                            ->where('num_sol_compra_aut', (int) $input)
+                            ->where('num_sol_compra_aut', '>', 0)
+                            ->whereRaw('RIGHT(TRIM(fecha_creacion), 4) = ?', [$anio])
+                            ->select('num_int_sol')
+                            ->first();
+
+                        if ($row) {
+                            return response()->json([
+                                'valido'          => false,
+                                'tipo'            => 'num_sol_compra_aut',
+                                'resuelto'        => true,
+                                'codigo_resuelto' => $row->num_int_sol,
+                            ]);
+                        }
+                        // Si no encontró combinación válida → cae al "no encontrado" genérico
+                    } else {
+                        // Sin año: obtener años distintos disponibles para ese número
+                        $anios = DB::connection('sicd_externa')
+                            ->table('solicitud_full')
+                            ->where('num_sol_compra_aut', (int) $input)
+                            ->where('num_sol_compra_aut', '>', 0)
+                            ->whereNotNull('fecha_creacion')
+                            ->selectRaw('RIGHT(TRIM(fecha_creacion), 4) AS anio')
+                            ->groupByRaw('RIGHT(TRIM(fecha_creacion), 4)')
+                            ->orderByRaw('RIGHT(TRIM(fecha_creacion), 4) DESC')
+                            ->pluck('anio')
+                            ->filter()
+                            ->values()
+                            ->toArray();
+
+                        if (!empty($anios)) {
+                            if (count($anios) === 1) {
+                                // Un solo año → resolver directamente sin pedir al usuario
+                                $row = DB::connection('sicd_externa')
+                                    ->table('solicitud_full')
+                                    ->where('num_sol_compra_aut', (int) $input)
+                                    ->where('num_sol_compra_aut', '>', 0)
+                                    ->whereRaw('RIGHT(TRIM(fecha_creacion), 4) = ?', [$anios[0]])
+                                    ->select('num_int_sol')
+                                    ->first();
+                                if ($row) {
+                                    $solicitud = SicdExterno::buscar($row->num_int_sol);
+                                }
+                            } else {
+                                // Varios años → pedir selección
+                                return response()->json([
+                                    'valido'  => false,
+                                    'tipo'    => 'num_sol_compra_aut',
+                                    'num'     => $input,
+                                    'anios'   => $anios,
+                                    'mensaje' => 'Número de compra encontrado. Selecciona el año.',
+                                ]);
+                            }
+                        }
+                    }
+                }
             } else {
                 $solicitud = SicdExterno::buscar($input);
             }
@@ -241,9 +306,14 @@ class SicdController extends Controller
         }
 
         $ccId      = auth()->user()->ccFiltro();
-        $productos = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
+        $productos = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre', 'categoria_id', 'marca_id']);
+        $familias  = Familia::with([
+            'categorias' => fn($q) => $q->with(['marcas' => fn($q2) => $q2->activas()]),
+        ])->where('activo', true)
+            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+            ->orderBy('nombre')->get();
 
-        return view('admin.sicd.resolver', compact('pendiente', 'productos'));
+        return view('admin.sicd.resolver', compact('pendiente', 'productos', 'familias'));
     }
 
     /**
@@ -554,9 +624,9 @@ class SicdController extends Controller
     {
         $codigo = strtoupper(trim($request->query('codigo', '')));
 
-        // Prefer the record that still doesn't have documento_blob
-        $sicd = Sicd::where('codigo_sicd', $codigo)->whereNull('documento_blob')->latest()->first()
-             ?? Sicd::where('codigo_sicd', $codigo)->latest()->first();
+        // Include temporals so the flow can reuse an already-created temporal SICD.
+        $sicd = Sicd::withoutGlobalScope('sin_temporales')->where('codigo_sicd', $codigo)->whereNull('documento_blob')->latest()->first()
+             ?? Sicd::withoutGlobalScope('sin_temporales')->where('codigo_sicd', $codigo)->latest()->first();
 
         if (!$sicd) {
             return response()->json(['encontrado' => false]);
@@ -592,14 +662,15 @@ class SicdController extends Controller
             return response()->json(['ok' => false, 'msg' => 'Código no encontrado en el sistema externo.'], 404);
         }
 
-        // Obtener o crear el SICD en la BD interna
-        $sicd = Sicd::where('codigo_sicd', $codigo)->whereNull('documento_blob')->latest()->first()
-             ?? Sicd::where('codigo_sicd', $codigo)->latest()->first();
+        // Obtener o crear el SICD en la BD interna (incluir temporales para reutilizar)
+        $sicd = Sicd::withoutGlobalScope('sin_temporales')->where('codigo_sicd', $codigo)->whereNull('documento_blob')->latest()->first()
+             ?? Sicd::withoutGlobalScope('sin_temporales')->where('codigo_sicd', $codigo)->latest()->first();
 
         if (!$sicd) {
-            $sicd = Sicd::create([
+            $sicd = Sicd::withoutGlobalScope('sin_temporales')->create([
                 'codigo_sicd' => $codigo,
                 'estado'      => 'pendiente',
+                'es_temporal' => true,
                 'usuario_id'  => Auth::id(),
             ]);
         }
@@ -630,15 +701,14 @@ class SicdController extends Controller
         }
 
         return response()->json([
-            'ok'  => true,
-            'id'  => $sicd->id,
-            'url' => route('admin.sicd.show', $sicd->id),
+            'ok' => true,
+            'id' => $sicd->id,
         ]);
     }
 
     public function enlazarPdf(int $id)
     {
-        $sicd = Sicd::findOrFail($id);
+        $sicd = Sicd::withoutGlobalScope('sin_temporales')->findOrFail($id);
 
         if ($sicd->documento_blob) {
             return response()->json(['ok' => true, 'ya_tenia' => true, 'msg' => 'Ya tiene documento SICD enlazado.']);
@@ -668,7 +738,7 @@ class SicdController extends Controller
             return response()->json(['ok' => false, 'msg' => 'Error al guardar el documento: ' . $e->getMessage()], 500);
         }
 
-        return response()->json(['ok' => true, 'id' => $sicd->id, 'url' => route('admin.sicd.show', $sicd->id)]);
+        return response()->json(['ok' => true, 'id' => $sicd->id]);
     }
 
     public function updateDetalles(int $id, Request $request)
@@ -716,7 +786,7 @@ class SicdController extends Controller
     {
         // Soft delete: preserva trazabilidad y auditoría.
         // El modelo Sicd usa SoftDeletes (deleted_at), igual que Boleta.
-        $sicd = Sicd::with('boleta')->findOrFail($id);
+        $sicd = Sicd::withoutGlobalScope('sin_temporales')->with('boleta')->findOrFail($id);
 
         $sicd->estado = 'cancelado';
         $sicd->save();

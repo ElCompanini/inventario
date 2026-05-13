@@ -348,6 +348,38 @@ class ComputadorController extends Controller
         return back()->with('success', "Equipo {$computador->codigo} desarmado. Todos los componentes devueltos al stock.");
     }
 
+    /** Reabrir equipo (listo/en_uso → en_armado) para modificar componentes */
+    public function reabrir(int $id)
+    {
+        abort_unless(auth()->user()->tienePermiso('computadores'), 403);
+
+        $computador = ComputadorArmado::findOrFail($id);
+
+        if (!in_array($computador->estado, ['listo', 'en_uso'])) {
+            return back()->withErrors(['error' => 'Solo se pueden reabrir equipos en estado Listo o En uso.']);
+        }
+
+        $computador->update(['estado' => 'en_armado']);
+
+        return back()->with('success', "Equipo {$computador->codigo} reabierto para modificación de componentes.");
+    }
+
+    /** Marcar equipo como listo (terminado) */
+    public function marcarListo(int $id)
+    {
+        abort_unless(auth()->user()->tienePermiso('computadores'), 403);
+
+        $computador = ComputadorArmado::findOrFail($id);
+
+        if ($computador->componentesActivos()->doesntExist()) {
+            return back()->withErrors(['error' => 'El equipo no tiene componentes instalados.']);
+        }
+
+        $computador->update(['estado' => 'listo']);
+
+        return back()->with('success', "Equipo {$computador->codigo} marcado como Listo.");
+    }
+
     public function destroy(int $id)
     {
         abort_unless(auth()->user()->tienePermiso('computadores'), 403);

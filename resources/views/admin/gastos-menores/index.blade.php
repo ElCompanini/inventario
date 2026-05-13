@@ -81,8 +81,8 @@ if (strlen($limpio) < 2) return $rut;
         <div class="bg-white rounded-xl shadow overflow-hidden gm-card" data-search="{{ $searchText }}">
             {{-- Header de boleta --}}
             <div style="background:#fef3c7; border-left:4px solid #d97706;"
-                class="px-5 py-3 flex items-center justify-between gap-3">
-                <div style="display:grid; grid-template-columns:90px 110px 200px 110px 140px 110px 100px; align-items:stretch; gap:0; flex:1; overflow:hidden;">
+                class="px-5 py-3 flex items-center justify-between gap-3 gm-card-header">
+                <div style="display:grid; grid-template-columns:90px 110px 1fr 110px 140px 110px 100px; align-items:stretch; gap:0; flex:1; overflow:hidden;">
                     <div style="background:#d97706; border-radius:0.4rem; display:flex; align-items:center; justify-content:center; padding:0.2rem 0; margin:0.25rem 0;">
                         <span style="color:#fff; font-size:0.85rem; font-weight:800; font-family:monospace; letter-spacing:0.03em; white-space:nowrap; display:inline-block;">
                             GM-{{ str_pad($primero->id_gm ?? 0, 4, '0', STR_PAD_LEFT) }}
@@ -94,7 +94,7 @@ if (strlen($limpio) < 2) return $rut;
                     </div>
                     <div style="padding:0 0.5rem;">
                         <p class="text-xs text-amber-600 font-semibold uppercase tracking-wide">Proveedor</p>
-                        <p class="text-sm font-bold text-amber-900 truncate">{{ $primero->proveedor_nombre ?? '—' }}</p>
+                        <p class="text-sm font-bold text-amber-900">{{ $primero->proveedor_nombre ?? '—' }}</p>
                         <p class="text-xs text-amber-700 truncate font-mono">{{ formatearRut($primero->rut_proveedor) }}</p>
                     </div>
                     <div style="padding:0 0.5rem;">
@@ -145,50 +145,81 @@ if (strlen($limpio) < 2) return $rut;
             </div>
 
             {{-- Tabla de productos --}}
-            <table class="w-full text-sm" style="table-layout:fixed;">
-                <colgroup>
-                    <col style="width:52px;">
-                    <col>
-                    <col style="width:80px;">
-                    <col style="width:120px;">
-                    <col style="width:120px;">
-                    <col style="width:150px;">
-                </colgroup>
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">#</th>
-                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Producto</th>
-                        <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500">Cantidad</th>
-                        <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Precio Neto</th>
-                        <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Total Neto</th>
-                        <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Contenedor</th>
+            <div style="overflow-x:auto;">
+            <table class="w-full text-sm" style="min-width:700px; border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+                        <th style="padding:0.5rem 1rem; text-align:left; font-size:0.72rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; width:52px;">#</th>
+                        <th style="padding:0.5rem 1rem; text-align:left; font-size:0.72rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em;">Producto · Categoría · Marca</th>
+                        <th style="padding:0.5rem 1rem; text-align:center; font-size:0.72rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; width:100px;">Cant.</th>
+                        <th style="padding:0.5rem 1rem; text-align:right; font-size:0.72rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; width:120px;">P. Neto</th>
+                        <th style="padding:0.5rem 1rem; text-align:right; font-size:0.72rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; width:120px;">Total</th>
+                        <th style="padding:0.5rem 1rem; text-align:center; font-size:0.72rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; width:130px;">Contenedor</th>
+                        <th style="padding:0.5rem 1rem; text-align:center; font-size:0.72rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; width:90px;">Tipo</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
+                <tbody>
                     @foreach($items as $item)
-                    <tr class="hover:bg-gray-50 transition">
-                        <td class="px-4 py-2.5 text-xs text-gray-400 font-mono">#{{ $item->id }}</td>
-                        <td class="px-4 py-2.5 font-medium text-gray-800" style="overflow:hidden;">
-                            <p class="truncate">{{ $item->producto->nombre ?? '—' }}</p>
+                    @php
+                        $prod = $item->producto;
+                        $unidad = $prod?->unidadMedida?->abreviacion ?? $prod?->unidad ?? null;
+                        $tipoMov = $item->historialCambio?->tipo ?? 'entrada';
+                    @endphp
+                    <tr style="border-bottom:1px solid #f3f4f6;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+                        <td style="padding:0.6rem 1rem; font-size:0.72rem; color:#9ca3af; font-family:monospace;">#{{ $item->id }}</td>
+                        <td style="padding:0.6rem 1rem;">
+                            @if($prod)
+                                <p class="gm-prod-nombre" style="font-size:0.8rem; font-weight:600; margin:0;">{{ $prod->nombre }}</p>
+                                <p class="gm-prod-meta" style="font-size:0.72rem; margin:0.1rem 0 0;">
+                                    {{ $prod->categoria?->nombre ?? '—' }}
+                                    @if($prod->marca)
+                                        · <span class="gm-marca-text">{{ $prod->marca->nombre }}</span>
+                                    @endif
+                                    @if(!$prod->activo)
+                                        <span class="gm-badge-inactivo" style="font-size:0.68rem; font-weight:600; margin-left:0.25rem;">[inactivo]</span>
+                                    @endif
+                                </p>
+                            @else
+                                <p style="font-size:0.8rem; color:#9ca3af; font-style:italic; margin:0;">Producto no encontrado</p>
+                            @endif
                         </td>
-                        <td class="px-4 py-2.5 text-center text-gray-700">{{ $item->cantidad }}</td>
-                        <td class="px-4 py-2.5 text-right text-gray-700">
+                        <td style="padding:0.6rem 1rem; text-align:center;">
+                            <span style="font-size:0.85rem; font-weight:600; color:#1f2937;">{{ $item->cantidad }}</span>
+                            @if($unidad)
+                                <span style="font-size:0.68rem; color:#9ca3af; margin-left:0.2rem;">{{ $unidad }}</span>
+                            @endif
+                        </td>
+                        <td style="padding:0.6rem 1rem; text-align:right; font-size:0.82rem; color:#374151;">
                             {{ $item->precio_neto ? '$' . number_format($item->precio_neto, 0, ',', '.') : '—' }}
                         </td>
-                        <td class="px-4 py-2.5 text-right font-semibold text-gray-800">${{ number_format($item->monto, 0, ',', '.') }}</td>
-                        <td class="px-4 py-2.5 text-right">
+                        <td style="padding:0.6rem 1rem; text-align:right; font-size:0.82rem; font-weight:600; color:#111827;">
+                            ${{ number_format($item->monto, 0, ',', '.') }}
+                        </td>
+                        <td style="padding:0.6rem 1rem; text-align:center;">
                             @if($item->historialCambio?->container)
-                                <span class="inline-block bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full text-xs">
+                                <span class="gm-badge-container" style="display:inline-block; background:#eef2ff; color:#4338ca; font-size:0.72rem; font-weight:600; padding:0.15rem 0.5rem; border-radius:9999px; white-space:nowrap;">
                                     {{ $item->historialCambio->container->nombre }}
                                 </span>
                             @else
-                                <span class="text-gray-400 text-xs">—</span>
+                                <span style="color:#9ca3af; font-size:0.75rem;">—</span>
+                            @endif
+                        </td>
+                        <td style="padding:0.6rem 1rem; text-align:center;">
+                            @if($tipoMov === 'entrada')
+                                <span class="gm-badge-tipo gm-badge-entrada" style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:0.68rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:9999px; text-transform:uppercase; letter-spacing:0.03em;">Entrada</span>
+                            @elseif($tipoMov === 'salida')
+                                <span class="gm-badge-tipo gm-badge-salida" style="display:inline-block; background:#fef2f2; color:#dc2626; font-size:0.68rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:9999px; text-transform:uppercase; letter-spacing:0.03em;">Salida</span>
+                            @elseif($tipoMov === 'ajuste')
+                                <span class="gm-badge-tipo gm-badge-ajuste" style="display:inline-block; background:#fef3c7; color:#d97706; font-size:0.68rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:9999px; text-transform:uppercase; letter-spacing:0.03em;">Ajuste</span>
+                            @else
+                                <span style="color:#9ca3af; font-size:0.75rem;">{{ $tipoMov }}</span>
                             @endif
                         </td>
                     </tr>
                     @endforeach
                 </tbody>
             </table>
+            </div>
         </div>
         @endforeach
     </div>
@@ -269,19 +300,27 @@ if (strlen($limpio) < 2) return $rut;
                             </div>
                         </div>
 
-                        {{-- Buscador de productos --}}
+                        {{-- Selector cascade Familia → Categoría → Marca → Producto --}}
                         <div style="border-top:1px solid #e5e7eb; padding-top:0.75rem;">
                             <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.4rem;">
                                 Agregar productos <span style="color:#ef4444;">*</span>
                             </label>
-                            <div style="position:relative;">
-                                <input type="text" id="gm-buscador"
-                                    placeholder="🔍 Buscar producto por nombre o descripción..."
-                                    autocomplete="off"
-                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
-                                <div id="gm-resultados"
-                                    style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #e5e7eb; border-radius:0.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.1); max-height:200px; overflow-y:auto; margin-top:2px;"></div>
+                            <div style="display:flex; gap:0.45rem; flex-wrap:wrap; margin-bottom:0.45rem;">
+                                <select id="gm-sel-familia"
+                                        style="border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.6rem; font-size:0.78rem; min-width:140px; outline:none; background:#fff; color:#374151;">
+                                    <option value="">— Familia —</option>
+                                </select>
+                                <select id="gm-sel-cat"
+                                        style="display:none; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.6rem; font-size:0.78rem; min-width:140px; outline:none; background:#fff; color:#374151;">
+                                    <option value="">— Categoría —</option>
+                                </select>
+                                <select id="gm-sel-marca"
+                                        style="display:none; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.6rem; font-size:0.78rem; min-width:140px; outline:none; background:#fff; color:#374151;">
+                                    <option value="">— Marca —</option>
+                                </select>
                             </div>
+                            <div id="gm-productos-lista"
+                                 style="display:none; border:1px solid #e5e7eb; border-radius:0.5rem; max-height:200px; overflow-y:auto; background:#fff; margin-bottom:0.35rem;"></div>
                             <p id="gm-limite-msg" style="display:none; font-size:0.75rem; color:#dc2626; font-weight:600; margin-top:0.4rem;">
                                 ⚠ Límite de 25 productos por compra alcanzado.
                             </p>
@@ -375,19 +414,154 @@ if (strlen($limpio) < 2) return $rut;
             box-shadow: none;
             filter: brightness(.88);
         }
+
+        /* Dark mode — tarjetas gasto menor */
+        html.dark .gm-card { background:#1e293b; }
+
+        /* Header de boleta */
+        html.dark .gm-card-header { background:#1c1917 !important; border-left-color:#d97706 !important; }
+        html.dark .gm-card-header p { color:#fde68a !important; }
+
+        /* Tabla encabezado */
+        html.dark .gm-card table thead tr { background:#0f172a; border-color:#334155; }
+        html.dark .gm-card table thead th { color:#94a3b8 !important; }
+
+        /* Tabla cuerpo */
+        html.dark .gm-card table tbody tr { border-color:#334155; }
+        html.dark .gm-card table tbody tr:hover { background:#0f172a !important; }
+        html.dark .gm-card table tbody td { color:#cbd5e1 !important; }
+        /* Nombre y meta del producto — día */
+        .gm-prod-nombre { color:#111827; }
+        .gm-prod-meta   { color:#6b7280; }
+        .gm-marca-text  { color:#7c3aed; }
+        .gm-badge-inactivo { color:#dc2626; }
+        /* Nombre y meta del producto — noche */
+        html.dark .gm-prod-nombre { color:#f1f5f9; }
+        html.dark .gm-prod-meta   { color:#94a3b8; }
+        html.dark .gm-marca-text  { color:#c4b5fd; }
+        html.dark .gm-badge-inactivo { color:#f87171; }
+
+        /* Badges tipo movimiento */
+        html.dark .gm-badge-entrada { background:#14532d !important; color:#86efac !important; }
+        html.dark .gm-badge-salida  { background:#450a0a !important; color:#fca5a5 !important; }
+        html.dark .gm-badge-ajuste  { background:#451a03 !important; color:#fcd34d !important; }
+
+        /* Badge contenedor */
+        html.dark .gm-badge-container { background:#1e1b4b !important; color:#a5b4fc !important; }
     </style>
     @endpush
 
 @push('scripts')
 @php
 $gmProductosJson = json_encode(
-    $productos->map(fn($p) => ['id'=>$p->id,'nombre'=>$p->nombre,'stock'=>$p->stock_actual])->values(),
+    $productos->map(fn($p) => ['id'=>$p->id,'nombre'=>$p->nombre,'stock'=>$p->stock_actual,'categoria_id'=>$p->categoria_id,'marca_id'=>$p->marca_id])->values(),
+    JSON_HEX_TAG | JSON_HEX_AMP
+);
+$gmFamiliasJson = json_encode(
+    $familias->map(fn($f) => [
+        'id'         => $f->id,
+        'nombre'     => $f->nombre,
+        'categorias' => $f->categorias->map(fn($c) => [
+            'id'     => $c->id,
+            'nombre' => $c->nombre,
+            'marcas' => $c->marcas->map(fn($m) => ['id'=>$m->id,'nombre'=>$m->nombre])->values(),
+        ])->values(),
+    ])->values(),
     JSON_HEX_TAG | JSON_HEX_AMP
 );
 @endphp
 <script type="application/json" id="gm-data">{!! $gmProductosJson !!}</script>
+<script type="application/json" id="gm-familias-data">{!! $gmFamiliasJson !!}</script>
 <script>
 var gmProductos = JSON.parse(document.getElementById('gm-data').textContent);
+var gmFamilias  = JSON.parse(document.getElementById('gm-familias-data').textContent);
+
+// Inicializar select de familias
+(function() {
+    var sel = document.getElementById('gm-sel-familia');
+    gmFamilias.forEach(function(f) {
+        var opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.nombre;
+        sel.appendChild(opt);
+    });
+    sel.addEventListener('change', gmCambiarFamilia);
+    document.getElementById('gm-sel-cat').addEventListener('change', gmCambiarCat);
+    document.getElementById('gm-sel-marca').addEventListener('change', gmCambiarMarca);
+})();
+
+function gmCambiarFamilia() {
+    var famId  = parseInt(this.value) || null;
+    var selCat = document.getElementById('gm-sel-cat');
+    var selMarca = document.getElementById('gm-sel-marca');
+    selCat.innerHTML = '<option value="">— Categoría —</option>';
+    selMarca.innerHTML = '<option value="">— Marca —</option>';
+    selMarca.style.display = 'none';
+    document.getElementById('gm-productos-lista').style.display = 'none';
+    if (!famId) { selCat.style.display = 'none'; return; }
+    var familia = gmFamilias.find(function(f) { return f.id === famId; });
+    if (!familia) { selCat.style.display = 'none'; return; }
+    familia.categorias.forEach(function(c) {
+        var opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.nombre;
+        selCat.appendChild(opt);
+    });
+    selCat.style.display = '';
+    selCat.value = '';
+}
+
+function gmCambiarCat() {
+    var catId  = parseInt(this.value) || null;
+    var famId  = parseInt(document.getElementById('gm-sel-familia').value) || null;
+    var selMarca = document.getElementById('gm-sel-marca');
+    selMarca.innerHTML = '<option value="">— Marca —</option>';
+    selMarca.style.display = 'none';
+    document.getElementById('gm-productos-lista').style.display = 'none';
+    if (!catId) return;
+    var familia = gmFamilias.find(function(f) { return f.id === famId; });
+    var cat = familia ? familia.categorias.find(function(c) { return c.id === catId; }) : null;
+    if (!cat) return;
+    if (cat.marcas && cat.marcas.length > 0) {
+        cat.marcas.forEach(function(m) {
+            var opt = document.createElement('option');
+            opt.value = m.id; opt.textContent = m.nombre;
+            selMarca.appendChild(opt);
+        });
+        selMarca.style.display = '';
+        selMarca.value = '';
+    } else {
+        gmMostrarProductosFiltrados(catId, null);
+    }
+}
+
+function gmCambiarMarca() {
+    var catId   = parseInt(document.getElementById('gm-sel-cat').value)   || null;
+    var marcaId = parseInt(this.value) || null;
+    if (!catId) return;
+    gmMostrarProductosFiltrados(catId, marcaId);
+}
+
+function gmMostrarProductosFiltrados(catId, marcaId) {
+    var lista = document.getElementById('gm-productos-lista');
+    var filtrados = gmProductos.filter(function(p) {
+        if (p.categoria_id !== catId) return false;
+        if (marcaId && p.marca_id !== marcaId) return false;
+        return true;
+    });
+    if (!filtrados.length) {
+        lista.innerHTML = '<p style="font-size:0.78rem;color:#9ca3af;padding:0.5rem 0.75rem;">Sin productos en esta selección.</p>';
+        lista.style.display = 'block';
+        return;
+    }
+    lista.innerHTML = filtrados.map(function(p) {
+        return '<div onclick="gmAgregar(' + p.id + ',\'' + p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')" '
+            + 'style="padding:0.45rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;" '
+            + 'onmouseover="this.style.background=\'#fef3c7\'" onmouseout="this.style.background=\'\'">'
+            + '<span style="font-size:0.8rem;font-weight:600;color:#1f2937;">' + escHtmlGm(p.nombre) + '</span>'
+            + '<span style="font-size:0.72rem;color:#6b7280;margin-left:0.5rem;">Stock: ' + p.stock + '</span>'
+            + '</div>';
+    }).join('');
+    lista.style.display = 'block';
+}
 var gmItems = [];
 var gmCounter = 0;
 
@@ -404,48 +578,26 @@ document.getElementById('btn-abrir-gasto-menor').addEventListener('click', funct
 function cerrarModalGastoMenor() {
     document.getElementById('modal-gasto-menor').style.display = 'none';
     document.body.style.overflow = '';
+    // Resetear cascade y lista de productos
+    document.getElementById('gm-sel-familia').value = '';
+    var selCat = document.getElementById('gm-sel-cat');
+    var selMarca = document.getElementById('gm-sel-marca');
+    selCat.innerHTML = '<option value="">— Categoría —</option>';
+    selCat.style.display = 'none';
+    selMarca.innerHTML = '<option value="">— Marca —</option>';
+    selMarca.style.display = 'none';
+    document.getElementById('gm-productos-lista').style.display = 'none';
 }
 
 document.getElementById('modal-gasto-menor').addEventListener('click', function(e) {
     if (e.target === this) cerrarModalGastoMenor();
 });
 
-document.getElementById('gm-buscador').addEventListener('input', function() {
-    var q = this.value.trim().toLowerCase();
-    var res = document.getElementById('gm-resultados');
-    if (q.length < 1) { res.style.display = 'none'; return; }
-    var matches = gmProductos.filter(function(p) {
-        return p.nombre.toLowerCase().includes(q);
-    }).slice(0, 10);
-    if (!matches.length) { res.style.display = 'none'; return; }
-    res.innerHTML = matches.map(function(p) {
-        return '<div onclick="gmAgregar(' + p.id + ',\'' + p.nombre.replace(/'/g, "\\'") + '\')" '
-            + 'style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;" '
-            + 'onmouseover="this.style.background=\'#fef3c7\'" onmouseout="this.style.background=\'\'">'
-            + '<p style="font-size:0.8rem;font-weight:600;color:#1f2937;">' + escHtmlGm(p.nombre) + '</p>'
-            + '<p style="font-size:0.72rem;color:#6b7280;">Stock: ' + p.stock + '</p>'
-            + '</div>';
-    }).join('');
-    res.style.display = 'block';
-});
-
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('#gm-buscador') && !e.target.closest('#gm-resultados')) {
-        document.getElementById('gm-resultados').style.display = 'none';
-    }
-});
-
 var GM_MAX_ITEMS = 25;
 
 function gmAgregar(id, nombre) {
-    if (gmItems.find(function(i) { return i.id === id; })) {
-        document.getElementById('gm-buscador').value = '';
-        document.getElementById('gm-resultados').style.display = 'none';
-        return;
-    }
+    if (gmItems.find(function(i) { return i.id === id; })) return;
     if (gmItems.length >= GM_MAX_ITEMS) {
-        document.getElementById('gm-buscador').value = '';
-        document.getElementById('gm-resultados').style.display = 'none';
         document.getElementById('gm-limite-msg').style.display = '';
         return;
     }
@@ -453,8 +605,6 @@ function gmAgregar(id, nombre) {
     var idx = gmCounter++;
     gmItems.push({ idx: idx, id: id, nombre: nombre });
     gmRenderFila(idx, id, nombre);
-    document.getElementById('gm-buscador').value = '';
-    document.getElementById('gm-resultados').style.display = 'none';
     gmActualizarTabla();
 }
 

@@ -89,7 +89,7 @@
                                             @foreach($containers as $c)
                                                 <option value="{{ $c->id }}"
                                                     {{ $det->producto->contenedor == $c->id ? 'selected' : '' }}>
-                                                    {{ $c->nombre }}
+                                                    {{ $c->nombre }}{{ $c->centroCosto ? ' — ' . $c->centroCosto->acronimo : '' }}
                                                 </option>
                                             @endforeach
                                         </select>

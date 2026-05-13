@@ -1,3 +1,4 @@
+/.ai-context
 /.phpunit.cache
 /node_modules
 /public/build

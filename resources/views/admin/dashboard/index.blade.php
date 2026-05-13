@@ -166,11 +166,11 @@
                 <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/></svg>
             </div>
         </div>
-        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $num($stockStats->total_productos) }}</p>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">productos activos</p>
+        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $num($stockStats->total_unidades) }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">unidades en inventario</p>
         <div class="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700">
-            <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{{ $num($stockStats->total_unidades) }}</span>
-            <span class="text-xs text-gray-400"> unidades en inventario</span>
+            <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{{ $num($stockStats->total_productos) }}</span>
+            <span class="text-xs text-gray-400"> productos activos</span>
         </div>
     </a>
 
@@ -205,15 +205,15 @@
         </p>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">pendientes</p>
         <div class="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700 flex gap-2 text-xs">
-            <span class="text-green-600 dark:text-green-400 font-semibold">{{ $num($solicitudesStats->aprobadas) }} aprob.</span>
-            <span class="text-red-500 font-semibold">{{ $num($solicitudesStats->rechazadas) }} rechaz.</span>
+            <span class="text-green-600 dark:text-green-400 font-semibold">{{ $num($solicitudesStats->aprobadas) }} aprobadas</span>
+            <span class="text-red-500 font-semibold">{{ $num($solicitudesStats->rechazadas) }} rechazadas</span>
         </div>
     </a>
 
     {{-- ÓRDENES DE COMPRA --}}
     <a href="{{ route('admin.ordenes.index') }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
         <div class="flex items-center justify-between mb-2">
-            <span class="dash-section-title">Órd. Compra</span>
+            <span class="dash-section-title">Órdenes de Compra</span>
             <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/25 flex items-center justify-center">
                 <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
             </div>
@@ -221,15 +221,15 @@
         <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $num($ocStats->total) }}</p>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">total registradas</p>
         <div class="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700 flex gap-2 text-xs">
-            <span class="text-amber-500 font-semibold">{{ $num($ocStats->pendientes) }} pend.</span>
-            <span class="text-green-600 dark:text-green-400 font-semibold">{{ $num($ocStats->recibidas) }} recib.</span>
+            <span class="text-amber-500 font-semibold">{{ $num($ocStats->pendientes) }} pendientes</span>
+            <span class="text-green-600 dark:text-green-400 font-semibold">{{ $num($ocStats->recibidas) }} recibidas</span>
         </div>
     </a>
 
-    {{-- SICD vs OC --}}
+    {{-- Variación Presupuestaria --}}
     <a href="{{ route('admin.ordenes.index') }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
         <div class="flex items-center justify-between mb-2">
-            <span class="dash-section-title">SICD vs OC</span>
+            <span class="dash-section-title">Variación Presupuestaria</span>
             <div class="kpi-icon-emerald w-8 h-8 rounded-lg flex items-center justify-center">
                 <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
             </div>
@@ -248,11 +248,11 @@
         <div class="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700">
             @if($sicdRefMes > 0 || $ocFinalMes > 0)
                 @if($difFinanciera < 0)
-                    <span class="text-xs font-bold text-green-600 dark:text-green-400">↓ Ahorro {{ $moneda(abs($difFinanciera)) }}</span>
+                    <span class="text-xs font-bold text-green-600 dark:text-green-400">↓ Dif. Favorable {{ $moneda(abs($difFinanciera)) }}</span>
                 @elseif($difFinanciera > 0)
-                    <span class="text-xs font-bold text-red-500">↑ Sobrecosto {{ $moneda($difFinanciera) }}</span>
+                    <span class="text-xs font-bold text-red-500">↑ Dif. Desfavorable {{ $moneda($difFinanciera) }}</span>
                 @else
-                    <span class="text-xs text-gray-400">Sin diferencia</span>
+                    <span class="text-xs text-gray-400">Sin variación</span>
                 @endif
             @else
                 <span class="text-xs text-gray-400">Sin movimientos este mes</span>
@@ -807,9 +807,9 @@
                 <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">SICD &amp; Órdenes de Compra</p>
             </div>
             <div class="flex gap-3 text-xs">
-                <span class="font-semibold text-amber-500">{{ $num($sicdStats->pendientes) }} pend.</span>
-                <span class="font-semibold text-blue-500">{{ $num($sicdStats->agrupadas) }} agrup.</span>
-                <span class="font-semibold text-green-600 dark:text-green-400">{{ $num($sicdStats->recibidas) }} recib.</span>
+                <span class="font-semibold text-amber-500">{{ $num($sicdStats->pendientes) }} pendientes</span>
+                <span class="font-semibold text-blue-500">{{ $num($sicdStats->agrupadas) }} agrupadas</span>
+                <span class="font-semibold text-green-600 dark:text-green-400">{{ $num($sicdStats->recibidas) }} recibidas</span>
             </div>
         </div>
 

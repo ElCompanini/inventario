@@ -11,7 +11,9 @@
         ->filter(fn($g, $k) => $k !== null && $k !== '')
         ->map(fn($g) => $g->sum('cantidad'));
 
-    $catIdsInstaladas = $cantidadesPorCat->keys()->toArray();
+    $catIdsInstaladas  = $cantidadesPorCat->keys()->toArray();
+    $componentesPorCat = $computador->componentesActivos
+        ->groupBy(fn($c) => $c->categoria_id ?? $c->producto?->categoria_id);
     $statusClass = match($computador->estado) {
         'listo'     => 'bg-green-100 text-green-700 border-green-300',
         'en_uso'    => 'bg-blue-100 text-blue-700 border-blue-300',
@@ -40,14 +42,28 @@
     </div>
     <div class="flex items-center gap-2">
         <a href="{{ route('admin.computadores.edit', $computador->id) }}"
-           class="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+           class="px-3 py-1.5 text-xs font-semibold rounded-lg transition"
+           style="background:#374151; color:#fff;"
+           onmouseover="this.style.background='#1f2937'" onmouseout="this.style.background='#374151'">
             Editar equipo
         </a>
+        @if($computador->estado === 'en_armado' && $computador->componentesActivos->isNotEmpty())
+        <button type="button" onclick="document.getElementById('modal-listo').style.display='flex'"
+                class="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition">
+            ✓ Equipo terminado
+        </button>
+        @endif
+        @if(in_array($computador->estado, ['listo', 'en_uso']))
+        <button type="button" onclick="document.getElementById('modal-reabrir').style.display='flex'"
+                class="btn-modificar px-3 py-1.5 text-xs font-semibold rounded-lg transition">
+            ✎ Modificar componentes
+        </button>
+        @endif
         @if($computador->componentesActivos->isNotEmpty() && $computador->estado !== 'desarmado')
         <form method="POST" action="{{ route('admin.computadores.desarmar', $computador->id) }}"
               onsubmit="return confirm('¿Desarmar completamente? Todos los componentes vuelven al stock.')">
             @csrf
-            <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition">
+            <button type="submit" class="btn-desarmar px-3 py-1.5 text-xs font-semibold rounded-lg transition">
                 Desarmar todo
             </button>
         </form>
@@ -55,9 +71,6 @@
     </div>
 </div>
 
-@if(session('success'))
-<div class="mb-4 bg-green-50 border border-green-300 text-green-700 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>
-@endif
 @if($errors->any())
 <div class="mb-4 bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm">{{ $errors->first() }}</div>
 @endif
@@ -79,8 +92,14 @@
                     $instalado  = in_array($cat->id, $catIdsInstaladas);
                     $cantidad   = $cantidadesPorCat[$cat->id] ?? 0;
                 @endphp
-                <div class="flex items-center gap-2 py-1 border-b border-gray-50 dark:border-slate-700/60 last:border-0">
-                    @if($instalado)
+                @if($instalado)
+                @php
+                    $compsEnCat  = ($computador->estado === 'en_armado') ? ($componentesPorCat[$cat->id] ?? collect()) : collect();
+                    $collapsible = $compsEnCat->count() >= 2;
+                @endphp
+                <div class="border-b border-gray-50 dark:border-slate-700/60 last:border-0">
+                    <div class="flex items-center gap-2 py-1 {{ $collapsible ? 'cursor-pointer select-none' : '' }}"
+                         @if($collapsible) onclick="toggleClist({{ $cat->id }})" @endif>
                         <span class="w-4 h-4 text-green-500 flex-shrink-0">
                             <svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
@@ -90,15 +109,39 @@
                         <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 shrink-0">
                             {{ $cantidad }}
                         </span>
-                    @else
-                        <span class="w-4 h-4 text-gray-500 dark:text-slate-400 flex-shrink-0">
-                            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="9" stroke-dasharray="3"/>
-                            </svg>
-                        </span>
-                        <span class="text-xs text-gray-600 dark:text-slate-300 flex-1">{{ $cat->nombre }}</span>
+                        @if($collapsible)
+                        <svg id="chev-{{ $cat->id }}" class="w-3 h-3 text-gray-400 dark:text-slate-500 flex-shrink-0 transition-transform duration-150" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                        @endif
+                    </div>
+                    @if($compsEnCat->isNotEmpty())
+                    <div id="clist-{{ $cat->id }}">
+                        @foreach($compsEnCat as $comp)
+                        <div class="flex items-center gap-1.5 pl-6 pb-1.5">
+                            <span class="text-[11px] text-gray-600 dark:text-slate-300 flex-1 truncate leading-tight">
+                                {{ $comp->producto?->nombre ?? '—' }}@if($comp->cantidad > 1) <span class="font-semibold">×{{ $comp->cantidad }}</span>@endif
+                            </span>
+                            <button type="button"
+                                    onclick="abrirRetirar({{ $comp->id }}, '{{ addslashes($comp->producto?->nombre ?? 'componente') }}', EQ_RETIRAR_BASE)"
+                                    class="text-[10px] text-red-500 hover:text-red-700 font-semibold border border-red-200 hover:border-red-400 rounded px-1.5 py-0.5 transition flex-shrink-0">
+                                Retirar
+                            </button>
+                        </div>
+                        @endforeach
+                    </div>
                     @endif
                 </div>
+                @else
+                <div class="flex items-center gap-2 py-1 border-b border-gray-50 dark:border-slate-700/60 last:border-0">
+                    <span class="w-4 h-4 text-gray-500 dark:text-slate-400 flex-shrink-0">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="9" stroke-dasharray="3"/>
+                        </svg>
+                    </span>
+                    <span class="text-xs text-gray-600 dark:text-slate-300 flex-1">{{ $cat->nombre }}</span>
+                </div>
+                @endif
                 @empty
                 <p class="text-xs text-gray-400 dark:text-slate-500 py-2">Sin categorías en familia Partes y Piezas.</p>
                 @endforelse
@@ -342,15 +385,27 @@ html.dark #modal-retirar > div { background:var(--c-surface) !important; }
 html.dark .prod-card { background:var(--c-surface); border-color:var(--c-border); }
 html.dark .cat-tab   { background:var(--c-surface-2); color:var(--c-text-3); border-color:var(--c-border); }
 html.dark .cat-tab.activo { background:#4f46e5; color:#fff; border-color:#4f46e5; }
+
+/* Botones de acción header */
+.btn-modificar       { background:#d97706; color:#fff; }
+.btn-modificar:hover { background:#b45309; }
+html.dark .btn-modificar       { background:#78350f; color:#fed7aa; }
+html.dark .btn-modificar:hover { background:#92400e; }
+
+.btn-desarmar       { background:#ef4444; color:#fff; }
+.btn-desarmar:hover { background:#dc2626; }
+html.dark .btn-desarmar       { background:#7f1d1d; color:#fca5a5; }
+html.dark .btn-desarmar:hover { background:#991b1b; }
 </style>
 @endpush
 
 @push('scripts')
 <script>
-var EQ_CATS    = @json($categoriasJson);   // [{id, nombre}, ...]
-var EQ_AJAX    = '{{ route('admin.computadores.productos-categoria') }}';
-var catActiva  = null;   // {id, nombre}
-var cargando   = false;
+var EQ_CATS         = @json($categoriasJson);
+var EQ_AJAX         = '{{ route('admin.computadores.productos-categoria') }}';
+var EQ_RETIRAR_BASE = '{{ route('admin.computadores.componentes.retirar', [$computador->id, '__ID__']) }}'.replace('/__ID__/retirar', '');
+var catActiva       = null;
+var cargando        = false;
 
 // ── Renderizar tabs de categorías (por ID) ────────────────────────────────
 function renderTabs() {
@@ -498,6 +553,20 @@ document.getElementById('modal-agregar').addEventListener('click', function(e) {
 document.getElementById('modal-retirar').addEventListener('click', function(e) {
     if (e.target === this) cerrarRetirar();
 });
+['modal-listo','modal-reabrir'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('click', function(e) { if (e.target === this) this.style.display = 'none'; });
+});
+
+// ── Desplegable de componentes por categoría ──────────────────────────────
+function toggleClist(catId) {
+    var list = document.getElementById('clist-' + catId);
+    var chev = document.getElementById('chev-' + catId);
+    if (!list) return;
+    var hidden = list.style.display === 'none';
+    list.style.display = hidden ? '' : 'none';
+    if (chev) chev.style.transform = hidden ? '' : 'rotate(-90deg)';
+}
 
 // ── Init: cargar primera categoría ───────────────────────────────────────
 renderTabs();
@@ -512,5 +581,95 @@ if (EQ_CATS.length) {
 </style>
 @endpush
 @endpush
+
+{{-- Modal: Marcar como Listo --}}
+@if($computador->estado === 'en_armado' && $computador->componentesActivos->isNotEmpty())
+<div id="modal-listo"
+     style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55);
+            align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 60px rgba(0,0,0,.3);
+                width:100%; max-width:380px; animation:eqIn .2s cubic-bezier(.22,.68,0,1.2) both;">
+
+        <div style="display:flex; flex-direction:column; align-items:center; padding:1.75rem 1.75rem 1.25rem; text-align:center;">
+            <div style="width:3.5rem; height:3.5rem; border-radius:9999px; background:#dcfce7;
+                        display:flex; align-items:center; justify-content:center; margin-bottom:1rem;">
+                <svg style="width:1.75rem; height:1.75rem; color:#16a34a;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                </svg>
+            </div>
+            <p style="font-size:0.65rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.08em; margin:0 0 0.25rem;">{{ $computador->codigo }}</p>
+            <h3 style="font-size:1.1rem; font-weight:700; color:#111827; margin:0 0 0.5rem;">¿Marcar equipo como Listo?</h3>
+            <p style="font-size:0.82rem; color:#6b7280; margin:0; line-height:1.5;">
+                El equipo <strong style="color:#374151;">{{ $computador->nombre }}</strong>
+                pasará al estado <strong style="color:#16a34a;">Listo</strong>.
+                Podrás seguir editándolo después.
+            </p>
+        </div>
+
+        <div style="display:flex; gap:0.6rem; padding:0 1.5rem 1.5rem;">
+            <button type="button"
+                    onclick="document.getElementById('modal-listo').style.display='none'"
+                    style="flex:1; padding:0.6rem 1rem; font-size:0.85rem; font-weight:600; color:#374151;
+                           background:#f3f4f6; border:none; border-radius:0.6rem; cursor:pointer;">
+                Cancelar
+            </button>
+            <form method="POST" action="{{ route('admin.computadores.marcar-listo', $computador->id) }}" style="flex:1;">
+                @csrf
+                <button type="submit"
+                        style="width:100%; padding:0.6rem 1rem; font-size:0.85rem; font-weight:700; color:#fff;
+                               background:#16a34a; border:none; border-radius:0.6rem; cursor:pointer; transition:background .15s;"
+                        onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">
+                    Confirmar
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+
+{{-- Modal: Modificar componentes (reabrir) --}}
+@if(in_array($computador->estado, ['listo', 'en_uso']))
+<div id="modal-reabrir"
+     style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55);
+            align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 60px rgba(0,0,0,.3);
+                width:100%; max-width:380px; animation:eqIn .2s cubic-bezier(.22,.68,0,1.2) both;">
+
+        <div style="display:flex; flex-direction:column; align-items:center; padding:1.75rem 1.75rem 1.25rem; text-align:center;">
+            <div style="width:3.5rem; height:3.5rem; border-radius:9999px; background:#fef3c7;
+                        display:flex; align-items:center; justify-content:center; margin-bottom:1rem;">
+                <svg style="width:1.75rem; height:1.75rem; color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </div>
+            <p style="font-size:0.65rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.08em; margin:0 0 0.25rem;">{{ $computador->codigo }}</p>
+            <h3 style="font-size:1.1rem; font-weight:700; color:#111827; margin:0 0 0.5rem;">¿Modificar componentes?</h3>
+            <p style="font-size:0.82rem; color:#6b7280; margin:0; line-height:1.5;">
+                El equipo <strong style="color:#374151;">{{ $computador->nombre }}</strong>
+                volverá al estado <strong style="color:#d97706;">En armado</strong>
+                para que puedas agregar o retirar componentes.
+            </p>
+        </div>
+
+        <div style="display:flex; gap:0.6rem; padding:0 1.5rem 1.5rem;">
+            <button type="button"
+                    onclick="document.getElementById('modal-reabrir').style.display='none'"
+                    style="flex:1; padding:0.6rem 1rem; font-size:0.85rem; font-weight:600; color:#374151;
+                           background:#f3f4f6; border:none; border-radius:0.6rem; cursor:pointer;">
+                Cancelar
+            </button>
+            <form method="POST" action="{{ route('admin.computadores.reabrir', $computador->id) }}" style="flex:1;">
+                @csrf
+                <button type="submit"
+                        style="width:100%; padding:0.6rem 1rem; font-size:0.85rem; font-weight:700; color:#fff;
+                               background:#d97706; border:none; border-radius:0.6rem; cursor:pointer; transition:background .15s;"
+                        onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#d97706'">
+                    Sí, modificar
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
 
 @endsection

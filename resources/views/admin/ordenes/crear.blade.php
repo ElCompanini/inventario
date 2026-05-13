@@ -230,6 +230,68 @@
 <style>
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes masOcIn { from { opacity:0; transform:scale(.93) translateY(-10px); } to { opacity:1; transform:none; } }
+
+/* ── MP Validation — Día ─────────────────────────────────────────── */
+.mp-bdg { font-size:.65rem; font-weight:700; padding:2px 8px; border-radius:9999px; white-space:nowrap; flex-shrink:0; }
+.mp-bdg-loading { background:#f3f4f6; color:#6b7280; }
+.mp-bdg-oc      { background:#dcfce7; color:#15803d; }
+.mp-bdg-lic     { background:#fef3c7; color:#92400e; }
+.mp-bdg-err     { background:#fee2e2; color:#b91c1c; }
+
+.mp-oc-type { font-size:.7rem; font-weight:700; padding:3px 10px; border-radius:9999px; white-space:nowrap; flex-shrink:0; }
+.mp-type-green   { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+.mp-type-indigo  { background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; }
+.mp-type-amber   { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+.mp-type-blue    { background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
+.mp-type-purple  { background:#f3e8ff; color:#6b21a8; border:1px solid #e9d5ff; }
+.mp-type-default { background:#f3f4f6; color:#374151; border:1px solid #d1d5db; }
+
+.mp-type-big { display:inline-flex; align-items:center; gap:.4rem; font-size:1.35rem; font-weight:800; padding:.45rem 1.4rem; border-radius:1rem; letter-spacing:-.01em; }
+.mp-type-big.mp-type-green   { background:#dcfce7; color:#166534; border:2px solid #86efac; }
+.mp-type-big.mp-type-indigo  { background:#e0e7ff; color:#3730a3; border:2px solid #a5b4fc; }
+.mp-type-big.mp-type-amber   { background:#fef3c7; color:#92400e; border:2px solid #fcd34d; }
+.mp-type-big.mp-type-blue    { background:#dbeafe; color:#1e40af; border:2px solid #93c5fd; }
+.mp-type-big.mp-type-purple  { background:#f3e8ff; color:#6b21a8; border:2px solid #d8b4fe; }
+.mp-type-big.mp-type-default { background:#f3f4f6; color:#374151; border:2px solid #d1d5db; }
+
+.mp-card-header { background:#f9fafb; border-bottom:1px solid #e5e7eb; }
+.mp-info-bar    { background:#f9fafb; border:1px solid #f3f4f6; }
+.mp-lbl         { color:#9ca3af; }
+.mp-val         { color:#374151; }
+.mp-val-bold    { color:#1f2937; font-weight:600; }
+.mp-cmp-box     { background:#f9fafb; border:1px solid #e5e7eb; }
+.mp-cmp-sep     { border-top:1px solid #f3f4f6; }
+.mp-success-box { background:#f0fdf4; border:1px solid #bbf7d0; }
+.mp-success-txt { color:#15803d; }
+
+/* ── MP Validation — Noche ───────────────────────────────────────── */
+html.dark .mp-bdg-loading { background:#1e293b; color:#64748b; }
+html.dark .mp-bdg-oc      { background:#14532d; color:#86efac; }
+html.dark .mp-bdg-lic     { background:#451a03; color:#fcd34d; }
+html.dark .mp-bdg-err     { background:#450a0a; color:#fca5a5; }
+
+html.dark .mp-type-green   { background:#14532d; color:#86efac; border-color:#166534; }
+html.dark .mp-type-indigo  { background:#1e1b4b; color:#a5b4fc; border-color:#3730a3; }
+html.dark .mp-type-amber   { background:#451a03; color:#fcd34d; border-color:#92400e; }
+html.dark .mp-type-blue    { background:#172554; color:#93c5fd; border-color:#1e40af; }
+html.dark .mp-type-purple  { background:#2e1065; color:#d8b4fe; border-color:#6b21a8; }
+html.dark .mp-type-default { background:#1e293b; color:#cbd5e1; border-color:#334155; }
+
+html.dark .mp-type-big.mp-type-green   { background:#14532d; color:#86efac; border-color:#166534; }
+html.dark .mp-type-big.mp-type-indigo  { background:#1e1b4b; color:#a5b4fc; border-color:#3730a3; }
+html.dark .mp-type-big.mp-type-amber   { background:#451a03; color:#fcd34d; border-color:#92400e; }
+html.dark .mp-type-big.mp-type-blue    { background:#172554; color:#93c5fd; border-color:#1e40af; }
+html.dark .mp-type-big.mp-type-purple  { background:#2e1065; color:#d8b4fe; border-color:#6b21a8; }
+html.dark .mp-type-big.mp-type-default { background:#1e293b; color:#cbd5e1; border-color:#334155; }
+
+html.dark .mp-card-header { background:#1e293b; border-bottom-color:#334155; }
+html.dark .mp-info-bar    { background:#0f172a; border-color:#334155; }
+html.dark .mp-lbl         { color:#64748b; }
+html.dark .mp-val         { color:#e2e8f0; }
+html.dark .mp-val-bold    { color:#f1f5f9; }
+html.dark .mp-cmp-box     { background:#0f172a; border-color:#334155; }
+html.dark .mp-success-box { background:#052e16; border-color:#166534; }
+html.dark .mp-success-txt { color:#86efac; }
 </style>
 @endpush
 
@@ -455,7 +517,10 @@ function abrirModalMasOc() {
     document.getElementById('modal-mas-oc').style.display = 'flex';
 }
 
+var _submittingOc = false;
 function confirmarMasOc(masOc) {
+    if (_submittingOc) return;
+    _submittingOc = true;
     document.getElementById('modal-mas-oc').style.display = 'none';
     document.getElementById('hidden-permite-mas-oc').value = masOc ? '1' : '0';
 
@@ -728,7 +793,7 @@ function _buildCard(e) {
     }
 
     return '<div data-oc-card="' + codeEsc + '" style="border:2px solid;border-radius:0.75rem;overflow:hidden;margin-bottom:0.75rem;transition:border-color .15s,box-shadow .15s;' + borderStyle + '">'
-        + '<div style="display:flex;align-items:center;gap:0.65rem;padding:0.55rem 0.9rem;background:#f9fafb;border-bottom:1px solid #e5e7eb;">'
+        + '<div class="mp-card-header" style="display:flex;align-items:center;gap:0.65rem;padding:0.55rem 0.9rem;">'
         + '<span style="font-family:monospace;font-size:0.85rem;font-weight:700;color:#1f2937;flex:1;">' + codeEsc + '</span>'
         + headerBadge
         + headerExtra
@@ -749,27 +814,27 @@ function _buildOCBody(e) {
 
     // Tipo de proceso — grande y destacado
     if (ti.label) {
-        var styleMap = {
-            'bg-green-100 text-green-800 border-green-200':    'background:#dcfce7;color:#166534;border:2px solid #86efac;',
-            'bg-indigo-100 text-indigo-800 border-indigo-200': 'background:#e0e7ff;color:#3730a3;border:2px solid #a5b4fc;',
-            'bg-amber-100 text-amber-800 border-amber-200':    'background:#fef3c7;color:#92400e;border:2px solid #fcd34d;',
-            'bg-blue-100 text-blue-800 border-blue-200':       'background:#dbeafe;color:#1e40af;border:2px solid #93c5fd;',
-            'bg-purple-100 text-purple-800 border-purple-200': 'background:#f3e8ff;color:#6b21a8;border:2px solid #d8b4fe;',
+        var clsMap = {
+            'bg-green-100 text-green-800 border-green-200':    'mp-type-green',
+            'bg-indigo-100 text-indigo-800 border-indigo-200': 'mp-type-indigo',
+            'bg-amber-100 text-amber-800 border-amber-200':    'mp-type-amber',
+            'bg-blue-100 text-blue-800 border-blue-200':       'mp-type-blue',
+            'bg-purple-100 text-purple-800 border-purple-200': 'mp-type-purple',
         };
-        var s = styleMap[ti.clase] || 'background:#f3f4f6;color:#374151;border:2px solid #d1d5db;';
+        var cls = clsMap[ti.clase] || 'mp-type-default';
         html += '<div style="text-align:center;margin-bottom:0.75rem;">'
-              + '<span style="display:inline-flex;align-items:center;gap:0.4rem;font-size:1.35rem;font-weight:800;padding:0.45rem 1.4rem;border-radius:1rem;letter-spacing:-0.01em;' + s + '">'
+              + '<span class="mp-type-big ' + cls + '">'
               + esc((ti.icono || '') + ' ' + ti.label)
               + '</span>'
               + '</div>';
     }
 
-    html += '<div style="background:#f9fafb;border-radius:0.5rem;padding:0.45rem 0.7rem;display:flex;flex-wrap:wrap;gap:0.3rem 1.25rem;font-size:0.7rem;margin-bottom:0.5rem;border:1px solid #f3f4f6;">'
-          + '<div><span style="color:#9ca3af;">Proveedor: </span><b style="color:#1f2937;">' + esc(d.proveedor_nombre || '—') + '</b></div>'
-          + '<div><span style="color:#9ca3af;">RUT: </span><span style="color:#374151;">' + esc(d.proveedor_rut || '—') + '</span></div>'
-          + '<div><span style="color:#9ca3af;">Estado: </span><span style="color:#374151;">' + esc(d.estado || '—') + '</span></div>'
-          + '<div><span style="color:#9ca3af;">Envío: </span><span style="color:#374151;">' + (d.fecha_envio ? (function(s){ var dt=new Date(s); return dt.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+dt.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); })(d.fecha_envio) : '—') + '</span></div>'
-          + (licLink ? '<div><span style="color:#9ca3af;">Licitación: </span><span style="font-family:monospace;font-weight:600;color:#4338ca;">' + esc(licLink) + '</span></div>' : '')
+    html += '<div class="mp-info-bar" style="border-radius:0.5rem;padding:0.45rem 0.7rem;display:flex;flex-wrap:wrap;gap:0.3rem 1.25rem;font-size:0.7rem;margin-bottom:0.5rem;">'
+          + '<div><span class="mp-lbl">Proveedor: </span><b class="mp-val-bold">' + esc(d.proveedor_nombre || '—') + '</b></div>'
+          + '<div><span class="mp-lbl">RUT: </span><span class="mp-val">' + esc(d.proveedor_rut || '—') + '</span></div>'
+          + '<div><span class="mp-lbl">Estado: </span><span class="mp-val">' + esc(d.estado || '—') + '</span></div>'
+          + '<div><span class="mp-lbl">Envío: </span><span class="mp-val">' + (d.fecha_envio ? (function(s){ var dt=new Date(s); return dt.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+dt.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); })(d.fecha_envio) : '—') + '</span></div>'
+          + (licLink ? '<div><span class="mp-lbl">Licitación: </span><span style="font-family:monospace;font-weight:600;color:#4338ca;">' + esc(licLink) + '</span></div>' : '')
           + '</div>';
 
     if (d.nombre) {
@@ -784,16 +849,16 @@ function _buildOCBody(e) {
         var diff = Math.abs(totalSC - comp.total_mp);
         var pct  = ((diff / comp.total_mp) * 100).toFixed(1);
         var ok   = comp.coincide;
-        html += '<div style="margin-top:0.5rem;background:#f9fafb;border-radius:0.5rem;padding:0.45rem 0.7rem;font-size:0.7rem;border:1px solid #e5e7eb;">'
-              + '<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:#6b7280;">Total SICDs</span><span style="font-weight:600;">' + formatCLP(totalSC) + '</span></div>'
-              + '<div style="display:flex;justify-content:space-between;padding:2px 0;border-top:1px solid #f3f4f6;"><span style="color:#6b7280;">Total MP</span><span style="font-weight:600;">' + formatCLP(comp.total_mp) + '</span></div>'
-              + '<div style="display:flex;justify-content:space-between;padding:2px 0;border-top:1px solid #f3f4f6;"><span style="color:#6b7280;">Diferencia</span><span style="font-weight:700;color:' + (ok ? '#16a34a' : '#d97706') + ';">' + pct + '%&nbsp;' + (ok ? '✓ Aceptable' : '⚠ Revisar') + '</span></div>'
+        html += '<div class="mp-cmp-box" style="margin-top:0.5rem;border-radius:0.5rem;padding:0.45rem 0.7rem;font-size:0.7rem;">'
+              + '<div style="display:flex;justify-content:space-between;padding:2px 0;"><span class="mp-lbl">Total SICDs</span><span class="mp-val-bold">' + formatCLP(totalSC) + '</span></div>'
+              + '<div style="display:flex;justify-content:space-between;padding:2px 0;border-top:1px solid #f3f4f6;"><span class="mp-lbl">Total MP</span><span class="mp-val-bold">' + formatCLP(comp.total_mp) + '</span></div>'
+              + '<div style="display:flex;justify-content:space-between;padding:2px 0;border-top:1px solid #f3f4f6;"><span class="mp-lbl">Diferencia</span><span style="font-weight:700;color:' + (ok ? '#16a34a' : '#d97706') + ';">' + pct + '%&nbsp;' + (ok ? '✓ Aceptable' : '⚠ Revisar') + '</span></div>'
               + '</div>';
     }
 
-    html += '<div style="margin-top:0.6rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:0.6rem;padding:0.45rem 0.7rem;display:flex;align-items:center;gap:0.5rem;">'
+    html += '<div class="mp-success-box" style="margin-top:0.6rem;border-radius:0.6rem;padding:0.45rem 0.7rem;display:flex;align-items:center;gap:0.5rem;">'
           + '<span>✅</span>'
-          + '<p style="font-size:0.7rem;font-weight:700;color:#15803d;">OC validada correctamente en Mercado Público</p>'
+          + '<p class="mp-success-txt" style="font-size:0.7rem;font-weight:700;">OC validada correctamente en Mercado Público</p>'
           + '</div>';
 
     return html;
@@ -820,27 +885,27 @@ function _buildLicitacionBody(e) {
 // ─── Badges ─────────────────────────────────────────────────────────────────
 function _badgeHtml(estado) {
     var cfgs = {
-        cargando:      { bg:'#f3f4f6', color:'#6b7280',  text:'⟳ Consultando…' },
-        oc:            { bg:'#dcfce7', color:'#15803d',  text:'✓ OC' },
-        licitacion:    { bg:'#fef3c7', color:'#92400e',  text:'⚠ Licitación' },
-        no_encontrado: { bg:'#fee2e2', color:'#b91c1c',  text:'✗ No encontrado' },
-        error:         { bg:'#fee2e2', color:'#b91c1c',  text:'⚠ Error' },
+        cargando:      { cls:'mp-bdg-loading', text:'⟳ Consultando…' },
+        oc:            { cls:'mp-bdg-oc',      text:'✓ OC' },
+        licitacion:    { cls:'mp-bdg-lic',     text:'⚠ Licitación' },
+        no_encontrado: { cls:'mp-bdg-err',     text:'✗ No encontrado' },
+        error:         { cls:'mp-bdg-err',     text:'⚠ Error' },
     };
     var c = cfgs[estado] || cfgs.error;
-    return '<span style="font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:9999px;background:' + c.bg + ';color:' + c.color + ';white-space:nowrap;flex-shrink:0;">' + c.text + '</span>';
+    return '<span class="mp-bdg ' + c.cls + '">' + c.text + '</span>';
 }
 
 function _ocTypeBadgeHtml(ti) {
     if (!ti || !ti.label) return _badgeHtml('oc');
-    var styleMap = {
-        'bg-green-100 text-green-800 border-green-200':    'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
-        'bg-indigo-100 text-indigo-800 border-indigo-200': 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
-        'bg-amber-100 text-amber-800 border-amber-200':    'background:#fef3c7;color:#92400e;border:1px solid #fde68a;',
-        'bg-blue-100 text-blue-800 border-blue-200':       'background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;',
-        'bg-purple-100 text-purple-800 border-purple-200': 'background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff;',
+    var clsMap = {
+        'bg-green-100 text-green-800 border-green-200':    'mp-type-green',
+        'bg-indigo-100 text-indigo-800 border-indigo-200': 'mp-type-indigo',
+        'bg-amber-100 text-amber-800 border-amber-200':    'mp-type-amber',
+        'bg-blue-100 text-blue-800 border-blue-200':       'mp-type-blue',
+        'bg-purple-100 text-purple-800 border-purple-200': 'mp-type-purple',
     };
-    var s = styleMap[ti.clase] || 'background:#f3f4f6;color:#374151;border:1px solid #d1d5db;';
-    return '<span style="font-size:0.7rem;font-weight:700;padding:3px 10px;border-radius:9999px;white-space:nowrap;flex-shrink:0;' + s + '">' + esc((ti.icono || '') + ' ' + (ti.label || 'OC')) + '</span>';
+    var cls = clsMap[ti.clase] || 'mp-type-default';
+    return '<span class="mp-oc-type ' + cls + '">' + esc((ti.icono || '') + ' ' + (ti.label || 'OC')) + '</span>';
 }
 
 // ─── Tabla de ítems + resumen financiero ────────────────────────────────────
