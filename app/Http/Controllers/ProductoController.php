@@ -7,6 +7,7 @@ use App\Models\Container;
 use App\Models\Familia;
 use App\Models\GastoMenor;
 use App\Models\HistorialCambio;
+use App\Models\Marca;
 use App\Models\OrdenCompra;
 use App\Models\Precio;
 use App\Models\Producto;
@@ -28,6 +29,8 @@ class ProductoController extends Controller
             'unidadMedida:id,nombre,abreviacion',
             'solicitudes' => fn($q) => $q->where('tipo', 'salida')->where('estado', 'pendiente')->with('usuario:id,name'),
         ])
+        ->where('es_servicio', false)
+        ->whereDoesntHave('categoria.familia', fn($q) => $q->where('tipo', 'servicios'))
         ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
         ->orderBy('nombre')->get();
 
@@ -36,16 +39,20 @@ class ProductoController extends Controller
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get();
 
+        // Incluye familias de CC nulo (SIN FAMILIA, PARTES Y PIEZAS) para todos los usuarios
         $familias = Familia::with([
             'categorias' => fn($q) => $q->with(['marcas' => fn($q2) => $q2->activas()]),
         ])->where('activo', true)
-            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+            ->when($ccId, fn($q) => $q->where(function ($inner) use ($ccId) {
+                $inner->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id');
+            }))
             ->orderBy('nombre')->get();
 
         $centrosCostoConProductos = $isDev
             ? CentroCosto::orderBy('nombre_completo')->get(['id', 'nombre_completo'])
             : collect();
 
+        // tipo column drives SIN FAMILIA / PYP detection in JS (no hardcoded IDs needed)
         return view('dashboard', compact('productos', 'containers', 'familias', 'centrosCostoConProductos'));
     }
 

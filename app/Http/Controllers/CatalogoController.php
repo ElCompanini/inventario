@@ -33,7 +33,8 @@ class CatalogoController extends Controller
                     ->when($ccId, fn($q3) => $q3->where('centro_costo_id', $ccId)),
             ]),
         ])->where('activo', true)
-            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+            ->when($ccId, fn($q) => $q->where(fn($i) => $i->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id')))
+            ->orderBy('nombre')
             ->get();
 
         $containers = Container::orderBy('nombre')
@@ -43,8 +44,29 @@ class CatalogoController extends Controller
         $unidades = UnidadMedida::orderBy('nombre')->get(['id', 'nombre', 'abreviacion']);
 
         $familiaActiva = (int) $request->get('familia', $familias->first()?->id ?? 0);
+        $familiaActual = $familias->firstWhere('id', $familiaActiva);
 
-        return view('admin.productos.catalogo', compact('familias', 'containers', 'unidades', 'familiaActiva'));
+        // When SIN FAMILIA is active, build virtual category list from all normal families (DB query)
+        $categoriasActivas = null;
+        if ($familiaActual && $familiaActual->esSinFamilia()) {
+            $categoriasActivas = Categoria::paraSinFamilia()
+                ->with([
+                    'marcas',
+                    'productos' => fn($q) => $q
+                        ->with('marca')
+                        ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId)),
+                ])
+                ->orderBy('nombre')
+                ->get();
+        }
+
+        $familiasBienes    = $familias->filter(fn($f) => $f->esBien())->values();
+        $familiasServicios = $familias->filter(fn($f) => $f->esServicioCatalogo())->values();
+
+        return view('admin.productos.catalogo', compact(
+            'familias', 'familiasBienes', 'familiasServicios',
+            'containers', 'unidades', 'familiaActiva', 'categoriasActivas'
+        ));
     }
 
     public function storeFamilia(Request $request)
@@ -198,29 +220,45 @@ class CatalogoController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
+        // Pre-check: is this category in the SERVICIOS family?
+        $categoriaObj      = Categoria::with('familia')->find($request->input('categoria_id'));
+        $esFamiliaServicios = $categoriaObj?->familia?->tipo === 'servicios';
+
         $data = $request->validate([
             'nombre'          => ['required', 'string', 'max:200'],
             'categoria_id'    => ['required', 'integer', 'exists:categorias,id'],
-            'marca_id'        => ['required', 'integer', 'exists:marcas,id'],
-            'stock_minimo'    => ['required', 'integer', 'min:0'],
-            'stock_critico'   => ['required', 'integer', 'min:0'],
-            'contenedor'      => ['required', 'integer', 'exists:containers,id'],
-            'unidad_medida_id'=> ['required', 'integer', 'exists:unidades_medida,id'],
+            'marca_id'        => ['nullable', 'integer', 'exists:marcas,id'],
+            'stock_minimo'    => $esFamiliaServicios ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
+            'stock_critico'   => $esFamiliaServicios ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
+            'contenedor'      => $esFamiliaServicios ? ['nullable', 'integer', 'exists:containers,id'] : ['required', 'integer', 'exists:containers,id'],
+            'unidad_medida_id'=> $esFamiliaServicios ? ['nullable', 'integer', 'exists:unidades_medida,id'] : ['required', 'integer', 'exists:unidades_medida,id'],
             'codigo_barras'   => ['nullable', 'string', 'max:100', 'unique:productos,codigo_barras'],
+            'es_servicio'     => ['nullable', 'boolean'],
         ], [
             'nombre.required'           => 'El nombre del producto es obligatorio.',
-            'marca_id.required'         => 'Debes seleccionar una marca.',
             'codigo_barras.unique'      => 'Ese código de barras ya está asignado a otro producto.',
             'unidad_medida_id.required' => 'Debes seleccionar una unidad de medida.',
         ]);
 
-        // Brand must belong to the selected category
-        $marca = Marca::find($data['marca_id']);
-        if (!$marca || (int) $marca->categoria_id !== (int) $data['categoria_id']) {
-            $err = 'La marca seleccionada no pertenece a esta categoría.';
-            return $request->ajax()
-                ? response()->json(['ok' => false, 'errors' => ['marca_id' => [$err]]], 422)
-                : back()->withErrors(['marca_id' => $err]);
+        $sinMarcaId = Marca::idSinMarca();
+
+        // SERVICIOS family: force es_servicio=true and use SIN MARCA — skip brand validation
+        if ($esFamiliaServicios) {
+            $marcaId    = $sinMarcaId;
+            $esServicio = true;
+        } else {
+            // Validate brand belongs to category (skip check for SIN MARCA)
+            $marcaId = $data['marca_id'] ?: $sinMarcaId;
+            if ($marcaId && $marcaId !== $sinMarcaId) {
+                $marca = Marca::find($marcaId);
+                if (!$marca || (int) $marca->categoria_id !== (int) $data['categoria_id']) {
+                    $err = 'La marca seleccionada no pertenece a esta categoría.';
+                    return $request->ajax()
+                        ? response()->json(['ok' => false, 'errors' => ['marca_id' => [$err]]], 422)
+                        : back()->withErrors(['marca_id' => $err]);
+                }
+            }
+            $esServicio = $request->boolean('es_servicio', false);
         }
 
         $ccId = $this->ccId();
@@ -229,13 +267,14 @@ class CatalogoController extends Controller
             'nombre'           => strtoupper(trim($data['nombre'])),
             'codigo_barras'    => $data['codigo_barras'] ?? null,
             'stock_actual'     => 0,
-            'stock_minimo'     => $data['stock_minimo'],
-            'stock_critico'    => $data['stock_critico'],
-            'contenedor'       => $data['contenedor'],
-            'unidad_medida_id' => $data['unidad_medida_id'],
+            'stock_minimo'     => $data['stock_minimo'] ?? 0,
+            'stock_critico'    => $data['stock_critico'] ?? 0,
+            'contenedor'       => $data['contenedor'] ?? null,
+            'unidad_medida_id' => $data['unidad_medida_id'] ?? null,
             'categoria_id'     => $data['categoria_id'],
-            'marca_id'         => $data['marca_id'],
+            'marca_id'         => $marcaId,
             'centro_costo_id'  => $ccId,
+            'es_servicio'      => $esServicio,
         ]);
 
         if ($request->ajax()) {
@@ -369,6 +408,13 @@ class CatalogoController extends Controller
         abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $marca = Marca::where('id', $marcaId)->where('categoria_id', $categoriaId)->firstOrFail();
+
+        if ($marca->protegido) {
+            return response()->json([
+                'ok'      => false,
+                'message' => "El registro \"{$marca->nombre}\" está protegido y no puede eliminarse.",
+            ], 403);
+        }
 
         if ($marca->productos()->count() > 0) {
             return response()->json([

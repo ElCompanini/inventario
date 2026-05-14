@@ -75,6 +75,13 @@ class MarcaController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
+        if ($marca->protegido) {
+            $msg = "El registro \"{$marca->nombre}\" está protegido y no puede eliminarse.";
+            return request()->ajax()
+                ? response()->json(['ok' => false, 'message' => $msg], 403)
+                : back()->withErrors(['error' => $msg]);
+        }
+
         $count = $marca->productos()->count();
         if ($count > 0) {
             if (request()->ajax()) {
@@ -98,6 +105,13 @@ class MarcaController extends Controller
         abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $marca = Marca::withTrashed()->findOrFail($id);
+
+        if ($marca->protegido) {
+            $msg = "El registro \"{$marca->nombre}\" está protegido y no puede deshabilitarse.";
+            return request()->ajax()
+                ? response()->json(['ok' => false, 'message' => $msg], 403)
+                : back()->withErrors(['error' => $msg]);
+        }
 
         if ($marca->trashed()) {
             $marca->restore();

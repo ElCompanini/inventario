@@ -99,8 +99,9 @@ class BincardService
             $costoUnit  = null;
 
             if ($mov->origen === 'sicd' && isset($sicds[$mov->origen_id])) {
-                $sicd    = $sicds[$mov->origen_id];
-                $tipoDoc = 'SICD';
+                $sicd      = $sicds[$mov->origen_id];
+                $tipoDoc   = 'SICD';
+                $sicdLabel = 'SICD ' . $sicd->codigo_sicd;
 
                 // ── Granularidad: cada movimiento tiene su propia OC ──────
                 // Prioridad 1: orden_compra_id directo en el movimiento (registros nuevos)
@@ -110,7 +111,7 @@ class BincardService
                     // ✅ Link directo — muestra SOLO la OC que causó este ingreso
                     $ocDirecta = $ocsDirectas[$mov->orden_compra_id];
                     $tipoDoc   = 'SICD / OC';
-                    $nDoc      = $sicd->codigo_sicd . ' | ' . $ocDirecta->numero_oc;
+                    $nDoc      = $sicdLabel . ' | ' . $ocDirecta->numero_oc;
                     $rutProv   = $ocDirecta->api_proveedor_rut   ?? '—';
                     $proveedor = $ocDirecta->api_proveedor_nombre ?? '—';
 
@@ -125,7 +126,7 @@ class BincardService
 
                     if ($ocFromMotivo) {
                         $tipoDoc   = 'SICD / OC';
-                        $nDoc      = $sicd->codigo_sicd . ' | ' . $ocFromMotivo->numero_oc;
+                        $nDoc      = $sicdLabel . ' | ' . $ocFromMotivo->numero_oc;
                         $rutProv   = $ocFromMotivo->api_proveedor_rut   ?? '—';
                         $proveedor = $ocFromMotivo->api_proveedor_nombre ?? '—';
                     } else {
@@ -133,8 +134,8 @@ class BincardService
                         $todasOcs = $ocsPorSicd[$sicd->id]?->ordenesCompra ?? collect();
                         $ocNums   = $todasOcs->pluck('numero_oc')->filter()->values();
                         $nDoc     = $ocNums->isNotEmpty()
-                            ? $sicd->codigo_sicd . ' | OC: ' . $ocNums->join(' / ')
-                            : $sicd->codigo_sicd;
+                            ? $sicdLabel . ' | OC: ' . $ocNums->join(' / ')
+                            : $sicdLabel;
                         $rutProv   = $todasOcs->pluck('api_proveedor_rut')->filter()->unique()->join(' / ') ?: '—';
                         $proveedor = $todasOcs->pluck('api_proveedor_nombre')->filter()->unique()->join(' / ') ?: ($sicd->proveedor_nombre ?? '—');
                         if ($todasOcs->isNotEmpty()) $tipoDoc = 'SICD / OC';
@@ -213,6 +214,7 @@ class BincardService
 
         return [
             'producto'        => $producto,
+            'es_servicio'     => (bool) $producto->es_servicio,
             'filas'           => $rows,
             'total_entradas'  => $totalEntradas,
             'total_salidas'   => $totalSalidas,

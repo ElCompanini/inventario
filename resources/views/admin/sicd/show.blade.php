@@ -165,11 +165,25 @@
                     </tr>
                     @endforeach
                 </tbody>
-                @php $totalNeto = $sicd->detalles->sum('total_neto'); @endphp
+                @php
+                    $totalNeto  = $sicd->detalles->sum('total_neto');
+                    $totalIva   = round($totalNeto * 0.19, 0);
+                    $totalConIva = round($totalNeto * 1.19, 0);
+                @endphp
                 <tfoot>
                     <tr class="bg-gray-50 border-t-2 border-gray-200">
-                        <td colspan="4" class="px-4 py-3 text-right text-sm font-semibold text-gray-600">Valor Neto Total</td>
-                        <td id="det-total-display" class="px-3 py-3 text-right text-base font-bold text-gray-900">${{ number_format($totalNeto, 0, ',', '.') }}</td>
+                        <td colspan="4" class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Monto Neto</td>
+                        <td id="det-total-display" class="px-3 py-2.5 text-right text-sm font-bold text-gray-700">${{ number_format($totalNeto, 0, ',', '.') }}</td>
+                        <td class="det-edit-col" style="display:none;"></td>
+                    </tr>
+                    <tr class="bg-gray-50">
+                        <td colspan="4" class="px-4 py-1.5 text-right text-xs text-gray-400">IVA 19%</td>
+                        <td id="det-iva-display" class="px-3 py-1.5 text-right text-xs text-gray-500">${{ number_format($totalIva, 0, ',', '.') }}</td>
+                        <td class="det-edit-col" style="display:none;"></td>
+                    </tr>
+                    <tr class="bg-indigo-50 border-t border-indigo-100">
+                        <td colspan="4" class="px-4 py-3 text-right text-sm font-bold text-indigo-700">Total (con IVA)</td>
+                        <td id="det-total-iva-display" class="px-3 py-3 text-right text-base font-bold text-indigo-900">${{ number_format($totalConIva, 0, ',', '.') }}</td>
                         <td class="det-edit-col" style="display:none;"></td>
                     </tr>
                     <tr id="det-row-agregar" style="display:none;">
@@ -448,8 +462,11 @@
 
         {{-- Variación Presupuestaria SICD vs OC --}}
         @php
-            $sicdTotalRef  = $sicd->detalles->sum(fn($d) => (float)($d->total_neto_original ?? $d->total_neto ?? 0));
+            $sicdNetoRef   = $sicd->detalles->sum(fn($d) => (float)($d->total_neto_original ?? $d->total_neto ?? 0));
+            $sicdIvaRef    = round($sicdNetoRef * 0.19, 2);
+            $sicdTotalRef  = round($sicdNetoRef * 1.19, 2);
             $ocTotalAdj    = (float) $sicd->ordenesCompra->sum('api_total');
+            // Comparación homogénea: SICD total (neto+IVA) vs OC api_total (total con IVA)
             $difSicdOc     = $ocTotalAdj - $sicdTotalRef;
             $hayOcConTotal = $sicd->ordenesCompra->whereNotNull('api_total')->isNotEmpty();
             $fmt           = fn($v) => '$' . number_format(abs((float)$v), 0, ',', '.');
@@ -461,22 +478,33 @@
                 </svg>
                 <p class="text-xs font-semibold text-gray-600">Variación Presupuestaria</p>
             </div>
-            <div class="px-4 py-3 space-y-2.5">
-                {{-- SICD referencial --}}
+            <div class="px-4 py-3 space-y-1.5">
+                {{-- SICD: desglose neto / IVA / total --}}
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-1.5">
-                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
-                        <span class="text-xs text-gray-500">Valor referencial SICD</span>
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-indigo-300 shrink-0"></span>
+                        <span class="text-xs text-gray-400">SICD Neto</span>
                     </div>
-                    <span class="text-xs font-bold text-gray-700 tabular-nums">{{ $fmt($sicdTotalRef) }}</span>
+                    <span class="text-xs text-gray-500 tabular-nums">{{ $fmt($sicdNetoRef) }}</span>
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs text-gray-300 pl-3">+ IVA 19%</span>
+                    <span class="text-xs text-gray-400 tabular-nums">{{ $fmt($sicdIvaRef) }}</span>
+                </div>
+                <div class="flex items-center justify-between gap-2 pb-1.5 border-b border-gray-100">
+                    <div class="flex items-center gap-1.5">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>
+                        <span class="text-xs font-semibold text-gray-600">SICD Total</span>
+                    </div>
+                    <span class="text-xs font-bold text-indigo-700 tabular-nums">{{ $fmt($sicdTotalRef) }}</span>
                 </div>
 
-                {{-- OC adjudicada --}}
-                <div class="flex items-center justify-between gap-2">
+                {{-- OC adjudicada (api_total = total con IVA) --}}
+                <div class="flex items-center justify-between gap-2 pt-0.5">
                     <div class="flex items-center gap-1.5">
                         <span class="inline-block w-1.5 h-1.5 rounded-full {{ $hayOcConTotal ? 'bg-emerald-400' : 'bg-gray-300' }} shrink-0"></span>
                         <span class="text-xs text-gray-500">
-                            {{ $hayOcConTotal ? 'Valor adjudicado OC' : 'OC aún sin validar' }}
+                            {{ $hayOcConTotal ? 'OC Total (con IVA)' : 'OC aún sin validar' }}
                         </span>
                     </div>
                     <span class="text-xs font-bold {{ $hayOcConTotal ? 'text-gray-900' : 'text-gray-400' }} tabular-nums">
@@ -484,12 +512,13 @@
                     </span>
                 </div>
 
-                {{-- Diferencia --}}
+                {{-- Diferencia (homogénea: SICD total vs OC total) --}}
                 @if($hayOcConTotal && $sicdTotalRef > 0)
                 <div class="pt-2 border-t border-gray-100">
                     <div class="flex items-center justify-between gap-2">
                         @if(abs($difSicdOc) < 1)
                             <span class="text-xs font-semibold text-gray-500">Sin variación</span>
+                            <span class="text-xs text-gray-400">$0</span>
                         @elseif($difSicdOc < 0)
                             <div class="flex items-center gap-1">
                                 <svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
@@ -504,6 +533,7 @@
                             <span class="text-xs font-bold text-red-500 tabular-nums">{{ $fmt($difSicdOc) }}</span>
                         @endif
                     </div>
+                    <p class="text-[10px] text-gray-300 mt-1">Comparación total vs total (ambos incluyen IVA)</p>
                 </div>
                 @endif
             </div>
@@ -746,8 +776,15 @@ function detRecalcTotal() {
     document.querySelectorAll('.det-row .det-ptotal').forEach(function(inp) {
         sum += parseFloat(inp.value) || 0;
     });
-    var display = document.getElementById('det-total-display');
-    if (display) display.textContent = '$' + sum.toLocaleString('es-CL');
+    var iva      = Math.round(sum * 0.19);
+    var conIva   = Math.round(sum * 1.19);
+    var fmt = function(n) { return '$' + n.toLocaleString('es-CL'); };
+    var d1 = document.getElementById('det-total-display');
+    var d2 = document.getElementById('det-iva-display');
+    var d3 = document.getElementById('det-total-iva-display');
+    if (d1) d1.textContent = fmt(Math.round(sum));
+    if (d2) d2.textContent = fmt(iva);
+    if (d3) d3.textContent = fmt(conIva);
 }
 
 function detMostrarMsg(msg, ok) {

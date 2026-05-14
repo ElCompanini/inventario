@@ -24,6 +24,7 @@ class Producto extends Model
         'stock_minimo_desde',
         'stock_critico_desde',
         'activo',
+        'es_servicio',
     ];
 
     protected static function booted(): void
@@ -34,6 +35,7 @@ class Producto extends Model
     protected $casts = [
         'stock_minimo_desde'  => 'datetime',
         'stock_critico_desde' => 'datetime',
+        'es_servicio'         => 'boolean',
     ];
 
     public function centroCosto()
@@ -93,8 +95,27 @@ class Producto extends Model
         return $this->precios()->latest()->first();
     }
 
+    public function esServicio(): bool
+    {
+        return (bool) $this->es_servicio;
+    }
+
+    public function scopeSoloFisicos($query)
+    {
+        return $query->where('es_servicio', false);
+    }
+
+    public function scopeSoloServicios($query)
+    {
+        return $query->where('es_servicio', true);
+    }
+
     public function estadoStock(): string
     {
+        // Servicios no tienen stock físico — siempre neutral
+        if ($this->es_servicio) {
+            return 'servicio';
+        }
         if ($this->stock_actual <= $this->stock_critico) {
             return 'critico';
         }

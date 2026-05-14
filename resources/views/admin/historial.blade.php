@@ -151,7 +151,7 @@
                                 $pos   = strpos($after, ' (');
                                 $sicdCodigo = $pos !== false ? rtrim(substr($after, 0, $pos)) : $after;
                             }
-                            $sicdCodigo = $sicdCodigo ?: ('SICD #' . $primero->origen_id);
+                            $sicdCodigo = $sicdCodigo ? 'SICD ' . $sicdCodigo : ('SICD #' . $primero->origen_id);
                         @endphp
                         <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                         @if(auth()->user()->tienePermiso('sicd'))
@@ -237,7 +237,7 @@
                             $pos   = strpos($after, ' (');
                             $sicdCodigo = $pos !== false ? rtrim(substr($after, 0, $pos)) : $after;
                         }
-                        $sicdCodigo = $sicdCodigo ?: ('SICD #' . $registro->origen_id);
+                        $sicdCodigo = $sicdCodigo ? 'SICD ' . $sicdCodigo : ('SICD #' . $registro->origen_id);
                     @endphp
                     <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                     @if(auth()->user()->tienePermiso('sicd'))

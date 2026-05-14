@@ -34,6 +34,11 @@ class DashboardController extends Controller
         // ── KPI 1: Stock (una sola query agregada) ─────────────────────────────
         $stockStats = DB::table('productos')
             ->where('activo', true)
+            ->where('es_servicio', false)
+            ->whereNotIn('categoria_id', fn($sub) => $sub->select('categorias.id')
+                ->from('categorias')
+                ->join('familias', 'familias.id', '=', 'categorias.familia_id')
+                ->where('familias.tipo', 'servicios'))
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->selectRaw('
                 COUNT(*) as total_productos,
@@ -70,8 +75,7 @@ class DashboardController extends Controller
         // ── KPI 5: Comparativa financiera SICD vs OC del mes ─────────────────
         $inicioMes = now()->startOfMonth();
 
-        // Valor referencial SICD: suma de total_neto_original (o total_neto como fallback) de
-        // los detalles de SICDs creados este mes.
+        // SICD neto del mes: suma de total_neto_original (o total_neto como fallback).
         $sicdRefMes = (float) DB::table('sicd_detalles')
             ->join('sicds', 'sicd_detalles.sicd_id', '=', 'sicds.id')
             ->whereNull('sicd_detalles.deleted_at')
@@ -79,7 +83,11 @@ class DashboardController extends Controller
             ->where('sicds.created_at', '>=', $inicioMes)
             ->sum(DB::raw('COALESCE(sicd_detalles.total_neto_original, sicd_detalles.total_neto, 0)'));
 
-        // Valor final adjudicado OC: suma de api_total de OCs validadas/recibidas este mes.
+        // SICD con IVA (19%): base de comparación homogénea con OC (que incluye IVA).
+        $sicdIvaMes    = round($sicdRefMes * 0.19, 2);
+        $sicdTotalMes  = round($sicdRefMes * 1.19, 2);
+
+        // Valor final adjudicado OC: suma de api_total (total con IVA desde Mercado Público).
         $ocFinalMes = (float) DB::table('ordenes_compra')
             ->whereNull('deleted_at')
             ->where('created_at', '>=', $inicioMes)
@@ -87,8 +95,18 @@ class DashboardController extends Controller
             ->whereNotNull('api_total')
             ->sum('api_total');
 
-        // Diferencia: positivo = sobrecosto, negativo = ahorro
-        $difFinanciera = $ocFinalMes - $sicdRefMes;
+        // IVA de OCs del mes (desde api_impuestos de Mercado Público).
+        $ocIvaMes  = (float) DB::table('ordenes_compra')
+            ->whereNull('deleted_at')
+            ->where('created_at', '>=', $inicioMes)
+            ->whereIn('estado', ['validado', 'recibido'])
+            ->whereNotNull('api_total')
+            ->sum('api_impuestos');
+        $ocNetoMes = max(0.0, $ocFinalMes - $ocIvaMes);
+
+        // Diferencia: comparar SICD total (neto+IVA) vs OC total — valores homogéneos.
+        // Positivo = sobrecosto, negativo = ahorro.
+        $difFinanciera = $ocFinalMes - $sicdTotalMes;
 
         // Mantener gastos menores para el resto del sistema (no se muestra en el card ya)
         $gastosBase  = fn() => GastoMenor::where('created_at', '>=', $inicioMes)
@@ -187,7 +205,12 @@ class DashboardController extends Controller
         ];
 
         // ── Actividad reciente ─────────────────────────────────────────────────
-        $actividadReciente = HistorialCambio::with('usuario:id,name')
+        $actividadReciente = HistorialCambio::with([
+                'usuario:id,name',
+                'producto' => fn($q) => $q->withoutGlobalScopes()->select('id', 'es_servicio', 'categoria_id'),
+                'producto.categoria:id,familia_id',
+                'producto.categoria.familia:id,tipo',
+            ])
             ->when($ccId, fn($q) => $q->whereHas('producto', fn($p) => $p->withoutGlobalScopes()->where('centro_costo_id', $ccId)))
             ->latest()->take(12)->get();
 
@@ -250,7 +273,11 @@ class DashboardController extends Controller
             'gastosStats',
             'gastosUltimos',
             'sicdRefMes',
+            'sicdIvaMes',
+            'sicdTotalMes',
             'ocFinalMes',
+            'ocIvaMes',
+            'ocNetoMes',
             'difFinanciera',
             'equiposStats',
             'valorInventario',
@@ -441,7 +468,12 @@ class DashboardController extends Controller
 
         $ccId = auth()->user()->ccFiltro();
 
-        $actividad = HistorialCambio::with('usuario:id,name')
+        $actividad = HistorialCambio::with([
+                'usuario:id,name',
+                'producto' => fn($q) => $q->withoutGlobalScopes()->select('id', 'es_servicio', 'categoria_id'),
+                'producto.categoria:id,familia_id',
+                'producto.categoria.familia:id,tipo',
+            ])
             ->whereBetween('created_at', [$desde, $hasta])
             ->when($ccId, fn($q) => $q->whereHas('producto', fn($p) => $p->withoutGlobalScopes()->where('centro_costo_id', $ccId)))
             ->latest()
@@ -459,12 +491,13 @@ class DashboardController extends Controller
 
         return response()->json([
             'actividad' => $actividad->map(fn($mov) => [
-                'tipo'    => $mov->tipo,
-                'nombre'  => $mov->nombre_producto,
-                'cantidad'=> (int) abs($mov->cantidad),
-                'origen'  => $origenLabel[$mov->origen] ?? 'Manual',
-                'usuario' => $mov->usuario?->name ?? '—',
-                'fecha'   => $mov->created_at->format('d/m H:i'),
+                'tipo'        => $mov->tipo,
+                'nombre'      => $mov->nombre_producto,
+                'cantidad'    => (int) abs($mov->cantidad),
+                'origen'      => $origenLabel[$mov->origen] ?? 'Manual',
+                'usuario'     => $mov->usuario?->name ?? '—',
+                'fecha'       => $mov->created_at->format('d/m H:i'),
+                'es_servicio' => $mov->producto?->es_servicio || $mov->producto?->categoria?->familia?->tipo === 'servicios',
             ])->values(),
         ]);
     }

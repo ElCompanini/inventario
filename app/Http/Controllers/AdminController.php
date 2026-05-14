@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Categoria;
 use App\Models\Familia;
+use App\Models\Marca;
 use App\Models\Solicitud;
 use App\Models\Producto;
 use App\Models\Container;
@@ -55,8 +56,13 @@ class AdminController extends Controller
 
         $producto = $solicitud->producto;
 
-        // Validar stock negativo para salidas
-        if ($solicitud->tipo === 'salida') {
+        // Servicios no tienen stock físico — bloquear salidas de stock
+        if ($producto->es_servicio && $solicitud->tipo === 'salida') {
+            return back()->with('error', "«{$producto->nombre}» es un servicio y no tiene stock físico que descontar.");
+        }
+
+        // Validar stock negativo para salidas de productos físicos
+        if (!$producto->es_servicio && $solicitud->tipo === 'salida') {
             if ($producto->stock_actual < $solicitud->cantidad) {
                 return back()->with('error',
                     "Stock insuficiente. Stock actual: {$producto->stock_actual}, solicitado: {$solicitud->cantidad}.");
@@ -64,14 +70,16 @@ class AdminController extends Controller
         }
 
         DB::transaction(function () use ($solicitud, $producto) {
-            // Actualizar stock
-            if ($solicitud->tipo === 'entrada') {
-                $producto->stock_actual += $solicitud->cantidad;
-            } else {
-                $producto->stock_actual -= $solicitud->cantidad;
+            // Solo actualizar stock para productos físicos
+            if (!$producto->es_servicio) {
+                if ($solicitud->tipo === 'entrada') {
+                    $producto->stock_actual += $solicitud->cantidad;
+                } else {
+                    $producto->stock_actual -= $solicitud->cantidad;
+                }
+                $producto->actualizarFechasStock();
+                $producto->save();
             }
-            $producto->actualizarFechasStock();
-            $producto->save();
 
             // Cambiar estado de la solicitud
             $solicitud->estado = 'aprobado';
@@ -231,6 +239,10 @@ class AdminController extends Controller
 
         $producto = Producto::findOrFail($id);
 
+        if ($producto->es_servicio) {
+            return back()->with('error', "«{$producto->nombre}» es un servicio y no tiene stock físico. Los servicios se registran únicamente a través de SICD, OC o Gastos Menores.");
+        }
+
         if ($data['tipo'] === 'salida' && $producto->stock_actual < $data['cantidad']) {
             return back()->withErrors([
                 'cantidad' => "Stock insuficiente. Stock actual: {$producto->stock_actual}.",
@@ -329,8 +341,115 @@ class AdminController extends Controller
             'ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o',
             'ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u',
             'ñ'=>'n',
+            // Superíndices matemáticos comunes en Excel (m², m³)
+            '²'=>'2', '³'=>'3',
         ]);
         return preg_replace('/[^a-z0-9]/u', '', $s);
+    }
+
+    /**
+     * Resuelve variantes y alias de unidades antes del lookup en el índice.
+     * Cubre plurales españoles, abreviaciones comunes y formatos de Excel.
+     */
+    private static function resolverVarianteUnidad(string $norm): string
+    {
+        static $mapa = [
+            // ── Metro lineal ──────────────────────────────────────────────
+            'ml'                => 'metrolineal',  // M.L. o ML (contexto construcción)
+            'mls'               => 'metrolineal',
+            'mlin'              => 'metrolineal',
+            'mlineal'           => 'metrolineal',
+            'metroslineales'    => 'metrolineal',
+            'metrolineales'     => 'metrolineal',
+            'metrolineale'      => 'metrolineal',  // typo frecuente
+            // ── Metro cuadrado ────────────────────────────────────────────
+            'metroscuadrados'   => 'metrocuadrado',
+            'metrocuadrados'    => 'metrocuadrado',
+            // ── Metro cúbico ──────────────────────────────────────────────
+            'metroscubicos'     => 'metrocubico',
+            'metrocubicos'      => 'metrocubico',
+            // ── Metro genérico (plural) ───────────────────────────────────
+            'metros'            => 'metro',
+            // ── Unidad ────────────────────────────────────────────────────
+            'unidades'          => 'unidad',
+            'und'               => 'unidad',
+            'un'                => 'unidad',
+            'u'                 => 'unidad',
+            'uds'               => 'unidad',
+            'unds'              => 'unidad',
+            'pza'               => 'unidad',
+            'pzas'              => 'unidad',
+            'pieza'             => 'unidad',
+            'piezas'            => 'unidad',
+            // ── Kilogramo ─────────────────────────────────────────────────
+            'kilogramos'        => 'kilogramo',
+            'kilo'              => 'kilogramo',
+            'kilos'             => 'kilogramo',
+            'kgs'               => 'kilogramo',
+            // ── Gramo ─────────────────────────────────────────────────────
+            'gramos'            => 'gramo',
+            'grs'               => 'gramo',
+            // ── Litro ─────────────────────────────────────────────────────
+            'litros'            => 'litro',
+            'lts'               => 'litro',
+            'ltr'               => 'litro',
+            // ── Mililitro ─────────────────────────────────────────────────
+            'mililitros'        => 'mililitro',
+            // ── Tonelada ──────────────────────────────────────────────────
+            'toneladas'         => 'tonelada',
+            'tns'               => 'tonelada',
+            // ── Caja ──────────────────────────────────────────────────────
+            'cajas'             => 'caja',
+            // Caja de 10
+            'cajax10'           => 'caja10',
+            'cajade10'          => 'caja10',
+            'cajasde10'         => 'caja10',
+            'cajadex10'         => 'caja10',
+            // Caja de 20
+            'cajax20'           => 'caja20',
+            'cajade20'          => 'caja20',
+            'cajasde20'         => 'caja20',
+            'cajadex20'         => 'caja20',
+            // Caja de 50
+            'cajax50'           => 'caja50',
+            'cajade50'          => 'caja50',
+            'cajasde50'         => 'caja50',
+            'cajadex50'         => 'caja50',
+            // ── Paquete ───────────────────────────────────────────────────
+            'paquetes'          => 'paquete',
+            'pack'              => 'paquete',
+            'packs'             => 'paquete',
+            // ── Rollo ─────────────────────────────────────────────────────
+            'rollos'            => 'rollo',
+            // ── Bolsa ─────────────────────────────────────────────────────
+            'bolsas'            => 'bolsa',
+            // ── Tubo ──────────────────────────────────────────────────────
+            'tubos'             => 'tubo',
+            // ── Saco ──────────────────────────────────────────────────────
+            'sacos'             => 'saco',
+            // ── Pallet ────────────────────────────────────────────────────
+            'pallets'           => 'pallet',
+            'paletes'           => 'pallet',
+            'palets'            => 'pallet',
+            // ── Juego / Set ───────────────────────────────────────────────
+            'juegos'            => 'juego',
+            'sets'              => 'set',
+            // ── Kit ───────────────────────────────────────────────────────
+            'kits'              => 'kit',
+            // ── Par ───────────────────────────────────────────────────────
+            'pares'             => 'par',
+            // ── Docena ────────────────────────────────────────────────────
+            'docenas'           => 'docena',
+            // ── Hora ──────────────────────────────────────────────────────
+            'horas'             => 'hora',
+            'hrs'               => 'hora',
+            // ── Servicio ──────────────────────────────────────────────────
+            'servicios'         => 'servicio',
+            // ── Bidón ─────────────────────────────────────────────────────
+            'bidones'           => 'bidon',
+            'bidons'            => 'bidon',
+        ];
+        return $mapa[$norm] ?? $norm;
     }
 
     private static function calcSimilitud(string $aNorm, string $bNorm): float
@@ -412,8 +531,8 @@ class AdminController extends Controller
 
         // ── Precarga en memoria — elimina N+1 y timeouts ──────────────────
         $productosDB    = Producto::when($ccIdMasiva, fn($q) => $q->where('centro_costo_id', $ccIdMasiva))
-                            ->get(['id', 'nombre', 'contenedor']);
-        $unidadesMedida = UnidadMedida::activas()->get(['id', 'nombre', 'abreviacion']);
+                            ->get(['id', 'nombre', 'contenedor', 'unidad_medida_id']);
+        $unidadesMedida = UnidadMedida::activas()->get(['id', 'nombre', 'abreviacion', 'descripcion']);
 
         // Índice normalizado → Producto (búsqueda O(1) sin query por fila)
         $prodIdx = [];
@@ -422,13 +541,18 @@ class AdminController extends Controller
             if ($k !== '') $prodIdx[$k] = $p;
         }
 
-        // Índice normalizado → UnidadMedida (abreviacion + nombre)
+        // Mapa id → UnidadMedida para lookup rápido de nombre
+        $unidMap = $unidadesMedida->keyBy('id');
+
+        // Índice normalizado → UnidadMedida (abreviacion + nombre + descripcion)
         $unidIdx = [];
         foreach ($unidadesMedida as $u) {
             $kAbr = self::normalizarTexto($u->abreviacion);
             $kNom = self::normalizarTexto($u->nombre);
+            $kDes = self::normalizarTexto($u->descripcion ?? '');
             if ($kAbr !== '') $unidIdx[$kAbr] = $u;
             if ($kNom !== '') $unidIdx[$kNom] = $u;
+            if ($kDes !== '') $unidIdx[$kDes] = $u;
         }
         // ──────────────────────────────────────────────────────────────────
 
@@ -441,18 +565,28 @@ class AdminController extends Controller
             $cantidad    = (int) ($row[2] ?? 0);
             $precioNeto  = is_numeric($row[3] ?? '') ? (float) $row[3] : null;
             $totalNeto   = is_numeric($row[4] ?? '') ? (float) $row[4] : null;
+            // Columna F (índice 5): TIPO — "SERVICIO" → servicio, cualquier otro → producto físico
+            $tipoExcel   = strtoupper(trim((string) ($row[5] ?? '')));
+            $esServicio  = $tipoExcel === 'SERVICIO';
 
             if ($desc === '' || $cantidad <= 0) continue;
 
+            // Auto-calculate total when Excel omits the column
+            if ($totalNeto === null && $precioNeto !== null && $cantidad > 0) {
+                $totalNeto = round($precioNeto * $cantidad);
+            }
+
             $item = [
-                'descripcion'      => $desc,
-                'unidad'           => $unidadExcel,
-                'cantidad'         => $cantidad,
-                'precioNeto'       => $precioNeto,
-                'totalNeto'        => $totalNeto,
-                'unidad_medida_id' => null,
-                'unidad_warning'   => null,
-                'monto_warning'    => null,
+                'descripcion'        => $desc,
+                'unidad'             => $unidadExcel,
+                'cantidad'           => $cantidad,
+                'precioNeto'         => $precioNeto,
+                'es_servicio'        => $esServicio,
+                'totalNeto'          => $totalNeto,
+                'unidad_medida_id'   => null,
+                'unidad_warning'     => null,
+                'unidad_discrepancia'=> null,
+                'monto_warning'      => null,
             ];
 
             // ── Validación monetaria ───────────────────────────────────────
@@ -468,7 +602,7 @@ class AdminController extends Controller
 
             // ── Detección de unidad (in-memory, soft-delete excluido) ──────
             if ($unidadExcel !== '') {
-                $unidNorm = self::normalizarTexto($unidadExcel);
+                $unidNorm = self::resolverVarianteUnidad(self::normalizarTexto($unidadExcel));
                 if (isset($unidIdx[$unidNorm])) {
                     $u = $unidIdx[$unidNorm];
                     $item['unidad_medida_id']     = $u->id;
@@ -479,7 +613,8 @@ class AdminController extends Controller
                     foreach ($unidadesMedida as $u) {
                         $pct = max(
                             self::calcSimilitud($unidNorm, self::normalizarTexto($u->abreviacion)),
-                            self::calcSimilitud($unidNorm, self::normalizarTexto($u->nombre))
+                            self::calcSimilitud($unidNorm, self::normalizarTexto($u->nombre)),
+                            self::calcSimilitud($unidNorm, self::normalizarTexto($u->descripcion ?? ''))
                         );
                         if ($pct > $mejorUPct) { $mejorUPct = $pct; $mejorUnid = $u; }
                     }
@@ -509,6 +644,20 @@ class AdminController extends Controller
                 $item['similitud']         = 100.0;
                 $item['sugerencia_id']     = $producto->id;
                 $item['sugerencia_nombre'] = $producto->nombre;
+
+                // Detectar discrepancia de unidad: Excel resolvió unidad X pero producto tiene unidad Y
+                if ($item['unidad_medida_id'] !== null
+                    && $producto->unidad_medida_id !== null
+                    && $item['unidad_medida_id'] !== (int) $producto->unidad_medida_id) {
+                    $item['unidad_discrepancia'] = [
+                        'excel_id'       => $item['unidad_medida_id'],
+                        'excel_nombre'   => $item['unidad_medida_nombre'] ?? $item['unidad'],
+                        'producto_um_id' => (int) $producto->unidad_medida_id,
+                        'producto_nombre'=> $unidMap->get($producto->unidad_medida_id)?->abreviacion ?? '—',
+                    ];
+                    $tieneWarnings = true;
+                }
+
                 $tieneWarnings ? ($conflictos[] = $item) : ($exactos[] = $item);
                 continue;
             }
@@ -525,12 +674,25 @@ class AdminController extends Controller
             $item['sugerencia_id']     = $mejorProd?->id;
             $item['sugerencia_nombre'] = $mejorProd?->nombre;
 
-            // ≥95% sin advertencias → auto-enlazar como exacto
+            // ≥95% sin advertencias → verificar discrepancia de unidad antes de clasificar
             if ($mejorPct >= 95 && !$tieneWarnings && $mejorProd) {
                 $item['producto_id']     = $mejorProd->id;
                 $item['producto_nombre'] = $mejorProd->nombre;
                 $item['contenedor_id']   = $mejorProd->contenedor;
-                $exactos[] = $item;
+
+                if ($item['unidad_medida_id'] !== null
+                    && $mejorProd->unidad_medida_id !== null
+                    && $item['unidad_medida_id'] !== (int) $mejorProd->unidad_medida_id) {
+                    $item['unidad_discrepancia'] = [
+                        'excel_id'       => $item['unidad_medida_id'],
+                        'excel_nombre'   => $item['unidad_medida_nombre'] ?? $item['unidad'],
+                        'producto_um_id' => (int) $mejorProd->unidad_medida_id,
+                        'producto_nombre'=> $unidMap->get($mejorProd->unidad_medida_id)?->abreviacion ?? '—',
+                    ];
+                    $conflictos[] = $item;
+                } else {
+                    $exactos[] = $item;
+                }
             } else {
                 $conflictos[] = $item;
             }
@@ -596,12 +758,22 @@ class AdminController extends Controller
         }
         $ccId       = auth()->user()->ccFiltro();
         $productos  = Producto::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre', 'categoria_id', 'marca_id']);
-        $familias   = Familia::with([
+
+        // Familias: incluye siempre las de CC nulo (SIN FAMILIA, PARTES Y PIEZAS, etc.)
+        $familias = Familia::with([
             'categorias' => fn($q) => $q->with(['marcas' => fn($q2) => $q2->activas()]),
-        ])->where('activo', true)->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->orderBy('nombre')->get();
+        ])->where('activo', true)
+          ->when($ccId, fn($q) => $q->where(function ($inner) use ($ccId) {
+              $inner->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id');
+          }))
+          ->orderBy('nombre')
+          ->get();
+
         $containers = Container::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
         $unidades   = UnidadMedida::activas()->orderBy('abreviacion')->get(['id', 'abreviacion', 'nombre']);
-        return view('admin.productos.resolver-carga-masiva', compact('pendiente', 'productos', 'familias', 'containers', 'unidades'));
+        // tipo column in familias drives SIN FAMILIA / PYP detection in JS (no hardcoded IDs)
+        return view('admin.productos.resolver-carga-masiva',
+            compact('pendiente', 'productos', 'familias', 'containers', 'unidades'));
     }
 
     public function confirmarCargaMasiva(Request $request)
@@ -862,13 +1034,14 @@ class AdminController extends Controller
                     $nuevo = Producto::create([
                         'nombre'           => $item['nuevo_nombre'],
                         'categoria_id'     => $item['nuevo_categoria_id']  ?? null,
-                        'marca_id'         => $item['nuevo_marca_id']      ?? null,
+                        'marca_id'         => $item['nuevo_marca_id']      ?? Marca::idSinMarca(),
                         'unidad_medida_id' => $item['unidad_medida_id']    ?? null,
                         'stock_actual'     => 0,
                         'stock_minimo'     => (int) ($item['nuevo_stock_minimo']  ?? 0),
                         'stock_critico'    => (int) ($item['nuevo_stock_critico'] ?? 0),
                         'contenedor'       => $item['contenedor_id'] ?? 1,
                         'centro_costo_id'  => $ccId,
+                        'es_servicio'      => $item['es_servicio'] ?? false,
                     ]);
                     $productoId = $nuevo->id;
                 }
@@ -917,9 +1090,12 @@ class AdminController extends Controller
                 $producto = Producto::find($productoId);
                 if (!$producto) continue;
 
-                $producto->stock_actual += $item['cantidad'];
-                $producto->actualizarFechasStock();
-                $producto->save();
+                // Servicios: registrar en historial para costos/BINCARD, pero NO tocar stock_actual
+                if (!$producto->es_servicio) {
+                    $producto->stock_actual += $item['cantidad'];
+                    $producto->actualizarFechasStock();
+                    $producto->save();
+                }
 
                 HistorialCambio::create([
                     'producto_id'     => $producto->id,
@@ -1143,9 +1319,11 @@ class AdminController extends Controller
             'stock_minimo'    => ['nullable', 'integer', 'min:0'],
             'stock_critico'   => ['nullable', 'integer', 'min:0'],
             'unidad_medida_id'=> ['nullable', 'integer', 'exists:unidades_medida,id'],
+            'es_servicio'     => ['nullable', 'boolean'],
         ]);
 
-        $categoria = Categoria::findOrFail($request->categoria_id);
+        $categoria          = Categoria::with('familia')->findOrFail($request->categoria_id);
+        $esFamiliaServicios = $categoria->familia?->tipo === 'servicios';
 
         $producto = \App\Models\Producto::create([
             'nombre'           => trim($request->nombre),
@@ -1154,9 +1332,10 @@ class AdminController extends Controller
             'stock_critico'    => (int) ($request->stock_critico ?? 0),
             'contenedor'       => null,
             'categoria_id'     => $categoria->id,
-            'marca_id'         => $request->marca_id ?: null,
+            'marca_id'         => $esFamiliaServicios ? Marca::idSinMarca() : ($request->marca_id ?: Marca::idSinMarca()),
             'centro_costo_id'  => auth()->user()->centro_costo_id,
             'unidad_medida_id' => $request->unidad_medida_id ?: null,
+            'es_servicio'      => $esFamiliaServicios || $request->boolean('es_servicio', false),
         ]);
 
         $producto->load('unidadMedida:id,abreviacion');

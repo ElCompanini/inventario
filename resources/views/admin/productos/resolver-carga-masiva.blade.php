@@ -44,7 +44,13 @@
     </p>
     <ul class="text-xs space-y-0.5 list-disc list-inside cm-exactos-list">
         @foreach($pendiente['exactos'] as $e)
-            <li>{{ $e['descripcion'] }} <span class="cm-exactos-qty">× {{ $e['cantidad'] }}</span></li>
+            <li>{{ $e['descripcion'] }}
+                <span class="cm-exactos-qty">× {{ $e['cantidad'] }}
+                    @if(!empty($e['unidad_medida_nombre'])) {{ $e['unidad_medida_nombre'] }}
+                    @elseif(!empty($e['unidad'])) {{ $e['unidad'] }}
+                    @endif
+                </span>
+            </li>
         @endforeach
     </ul>
 </div>
@@ -180,6 +186,30 @@
                 </div>
                 @endif
 
+                {{-- ── ADVERTENCIA DISCREPANCIA DE UNIDAD ──────────── --}}
+                {{-- Se muestra cuando el Excel trae una unidad reconocida pero distinta a la del producto --}}
+                @if(!empty($c['unidad_discrepancia']) && empty($c['unidad_warning']))
+                @php $ud = $c['unidad_discrepancia']; @endphp
+                <div class="cm-warning-disc" style="margin-bottom:0.75rem;">
+                    <div style="display:flex; align-items:flex-start; gap:0.5rem;">
+                        <svg style="width:1rem;height:1rem;flex-shrink:0;margin-top:0.1rem;color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        </svg>
+                        <div>
+                            <p style="font-size:0.78rem; font-weight:700; margin:0 0 0.25rem;">⚠ Diferencia de unidad detectada</p>
+                            <p style="font-size:0.75rem; margin:0 0 0.15rem;">
+                                Excel: <strong>{{ $ud['excel_nombre'] }}</strong>
+                                &nbsp;·&nbsp;
+                                Sistema: <strong>{{ $ud['producto_nombre'] }}</strong>
+                            </p>
+                            <p style="font-size:0.72rem; color:#92400e; margin:0;">
+                                Se registrará con la unidad del Excel. La unidad del producto en el sistema no se modifica aquí.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
                 {{-- ── OPCIONES DE PRODUCTO ─────────────────────────── --}}
 
                 {{-- Opción 1: Enlazar a sugerencia --}}
@@ -303,7 +333,7 @@
         </div>
         <div style="padding:1rem 1.25rem;">
 
-            <p class="cm-modal-label" style="font-size:0.75rem; font-weight:600; margin:0 0 0.5rem;">Familia <span style="color:#ef4444;">*</span></p>
+            <p class="cm-modal-label" style="font-size:0.75rem; font-weight:600; margin:0 0 0.5rem;">Familia <span style="color:#6b7280; font-weight:400;">(opcional)</span></p>
             <div id="resolver-modal-familias" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.5rem;"></div>
             <div id="resolver-nueva-fam-wrap" style="display:flex; gap:0.4rem; align-items:center; margin-bottom:1rem;">
                 <button type="button" onclick="resolverToggleNuevaFam()"
@@ -318,7 +348,7 @@
                 </span>
             </div>
 
-            <div id="resolver-modal-cat-wrap" style="display:none; margin-bottom:0.75rem;">
+            <div id="resolver-modal-cat-wrap" style="margin-bottom:0.75rem;">
                 <p class="cm-modal-label" style="font-size:0.75rem; font-weight:600; margin:0 0 0.5rem;">Categoría <span style="color:#ef4444;">*</span></p>
                 <div id="resolver-modal-categorias" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.5rem;"></div>
                 <div style="display:flex; gap:0.4rem; align-items:center;">
@@ -336,7 +366,7 @@
             </div>
 
             <div id="resolver-modal-marca-wrap" style="display:none; margin-bottom:0.75rem;">
-                <p class="cm-modal-label" style="font-size:0.75rem; font-weight:600; margin:0 0 0.5rem;">Marca <span style="color:#ef4444;">*</span></p>
+                <p class="cm-modal-label" style="font-size:0.75rem; font-weight:600; margin:0 0 0.5rem;">Marca <span style="color:#6b7280; font-weight:400;">(opcional — se usará "SIN MARCA" si no se elige)</span></p>
                 <div id="resolver-modal-marcas" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.5rem;"></div>
                 <div style="display:flex; gap:0.4rem; align-items:center;">
                     <button type="button" onclick="resolverToggleNuevaMarca()"
@@ -407,6 +437,10 @@
     background:#eff6ff; border:1px solid #bfdbfe; border-radius:0.5rem;
     padding:0.6rem 0.75rem; color:#1e40af;
 }
+.cm-warning-disc {
+    background:#fffbeb; border:1px solid #fcd34d; border-radius:0.5rem;
+    padding:0.6rem 0.75rem; color:#92400e;
+}
 
 /* Botones unidad */
 .cm-unid-btn {
@@ -458,6 +492,9 @@ html.dark .cm-warning-monto  {
 html.dark .cm-warning-unidad {
     background:#172554; border-color:#1e40af; color:#93c5fd;
 }
+html.dark .cm-warning-disc {
+    background:#422006; border-color:#92400e; color:#fcd34d;
+}
 
 html.dark .cm-unid-btn        { background:#334155; border-color:#475569; color:#cbd5e1; }
 html.dark .cm-unid-btn-active { background:#1e3a5f; border-color:#2563eb; color:#93c5fd; }
@@ -492,12 +529,18 @@ html.dark .cm-input        { background:#0f172a; color:#e2e8f0; border-color:#33
 var resolverFamilias = {!! json_encode($familias->map(fn($f) => [
     'id'         => $f->id,
     'nombre'     => $f->nombre,
+    'tipo'       => $f->tipo,
     'categorias' => $f->categorias->map(fn($c) => [
         'id'     => $c->id,
         'nombre' => $c->nombre,
         'marcas' => $c->marcas->map(fn($m) => ['id' => $m->id, 'nombre' => $m->nombre])->values(),
     ])->values(),
 ])->values(), JSON_HEX_TAG | JSON_HEX_AMP) !!};
+
+// Derived from familia.tipo — no hardcoded IDs
+var _sinFamFam  = resolverFamilias.find(function(f) { return f.tipo === 'sin_familia'; });
+var _pypFam     = resolverFamilias.find(function(f) { return f.tipo === 'partes_piezas'; });
+var SIN_FAMILIA_ID = _sinFamFam ? _sinFamFam.id : null;
 
 var _resolverModalIdx  = null;
 var _resolverFamiliaId = null;
@@ -525,6 +568,20 @@ function setUnidManual(idx, sel) {
 }
 
 /* ── Cascade familia→cat→marca para "Enlazar a otro" ─────────────── */
+function cmBuscarCatEnFamilias(catId) {
+    for (var fi = 0; fi < resolverFamilias.length; fi++) {
+        var cats = resolverFamilias[fi].categorias;
+        for (var ci = 0; ci < cats.length; ci++) {
+            if (cats[ci].id == catId) return cats[ci];
+        }
+    }
+    return null;
+}
+
+function cmEsCatPYP(catId) {
+    return _pypFam ? _pypFam.categorias.some(function(c) { return c.id == catId; }) : false;
+}
+
 function cmFiltrarCat(idx, famId) {
     var catSel   = document.getElementById('cm-sel-cat-'   + idx);
     var marcaSel = document.getElementById('cm-sel-marca-' + idx);
@@ -533,26 +590,35 @@ function cmFiltrarCat(idx, famId) {
     catSel.disabled    = true;
     marcaSel.disabled  = true;
     if (!famId) { cmMostrarTodosProductos(idx); return; }
-    var fam = resolverFamilias.find(function(f) { return f.id == famId; });
-    if (!fam) return;
-    fam.categorias.forEach(function(c) {
+    var iSinFam = SIN_FAMILIA_ID && (parseInt(famId) === SIN_FAMILIA_ID);
+    var cats = [];
+    if (iSinFam) {
+        resolverFamilias.forEach(function(f) {
+            if (f.tipo === 'servicios') return;
+            f.categorias.forEach(function(c) {
+                if (!cmEsCatPYP(c.id)) cats.push(c);
+            });
+        });
+        cats.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); });
+    } else {
+        var fam = resolverFamilias.find(function(f) { return f.id == famId; });
+        if (fam) cats = fam.categorias;
+    }
+    cats.forEach(function(c) {
         var o = document.createElement('option');
         o.value = c.id; o.textContent = c.nombre;
         catSel.appendChild(o);
     });
-    catSel.disabled = false;
+    if (cats.length) catSel.disabled = false;
     cmMostrarTodosProductos(idx);
 }
 
 function cmFiltrarMarca(idx, catId) {
-    var famSel   = document.getElementById('cm-sel-fam-'   + idx);
     var marcaSel = document.getElementById('cm-sel-marca-' + idx);
     marcaSel.innerHTML = '<option value="">— Marca —</option>';
     marcaSel.disabled  = true;
     if (!catId) { cmFiltrarPorCat(idx, null); return; }
-    var famId = famSel.value;
-    var fam   = resolverFamilias.find(function(f) { return f.id == famId; });
-    var cat   = fam ? fam.categorias.find(function(c) { return c.id == catId; }) : null;
+    var cat = cmBuscarCatEnFamilias(catId);
     if (cat && cat.marcas && cat.marcas.length) {
         cat.marcas.forEach(function(m) {
             var o = document.createElement('option');
@@ -627,11 +693,11 @@ function resolverAbrirModal(idx, nombre) {
     _resolverMarcaId   = null;
     document.getElementById('resolver-modal-nombre').textContent = nombre;
     document.getElementById('resolver-modal-error').style.display = 'none';
-    document.getElementById('resolver-modal-cat-wrap').style.display   = 'none';
     document.getElementById('resolver-modal-marca-wrap').style.display = 'none';
     document.getElementById('resolver-modal-minimo').value  = document.getElementById('resolver-min-hidden-'  + idx).value || '0';
     document.getElementById('resolver-modal-critico').value = document.getElementById('resolver-crit-hidden-' + idx).value || '0';
     resolverRenderFamilias();
+    resolverRenderCategorias();
     document.getElementById('resolver-modal-nuevo').style.display = 'flex';
 }
 
@@ -649,22 +715,49 @@ function resolverRenderFamilias() {
         btn.style.cssText = 'font-size:.8rem;font-weight:600;padding:.35rem .85rem;border-radius:.5rem;border:1px solid ' +
             (sel ? '#7c3aed;background:#7c3aed;color:#fff' : '#d1d5db;background:#fff;color:#374151') + ';cursor:pointer;transition:background .15s;';
         btn.onclick = function() {
-            _resolverFamiliaId = f.id; _resolverCatId = null; _resolverMarcaId = null;
+            var same = (_resolverFamiliaId === f.id);
+            _resolverFamiliaId = same ? null : f.id;
+            _resolverCatId = null; _resolverMarcaId = null;
             var nmf = document.getElementById('resolver-nueva-marca-form');
             if (nmf) nmf.style.display = 'none';
+            document.getElementById('resolver-modal-marca-wrap').style.display = 'none';
             resolverRenderFamilias(); resolverRenderCategorias();
         };
         cont.appendChild(btn);
     });
 }
 
+function resolverBuscarCat(catId) {
+    var found = null;
+    resolverFamilias.forEach(function(f) {
+        if (!found) { found = f.categorias.find(function(c) { return c.id === catId; }) || null; }
+    });
+    return found;
+}
+
+function esCatPYP(catId) {
+    return _pypFam ? _pypFam.categorias.some(function(c) { return c.id == catId; }) : false;
+}
+
 function resolverRenderCategorias() {
-    var wrap = document.getElementById('resolver-modal-cat-wrap');
     var cont = document.getElementById('resolver-modal-categorias');
-    var fam  = resolverFamilias.find(function(f) { return f.id === _resolverFamiliaId; });
-    if (!fam || !fam.categorias.length) { wrap.style.display = 'none'; return; }
     cont.innerHTML = '';
-    fam.categorias.forEach(function(c) {
+    var catsToShow = [];
+    var sinFamOrNone = (!_resolverFamiliaId || _resolverFamiliaId === SIN_FAMILIA_ID);
+    if (!sinFamOrNone) {
+        // Familia real seleccionada → mostrar solo sus categorías
+        var fam = resolverFamilias.find(function(f) { return f.id === _resolverFamiliaId; });
+        if (fam) catsToShow = fam.categorias;
+    } else {
+        // Sin familia o SIN FAMILIA → todas las categorías excepto PARTES Y PIEZAS y SERVICIOS
+        resolverFamilias.forEach(function(f) {
+            if (f.tipo === 'servicios') return;
+            f.categorias.forEach(function(c) {
+                if (!esCatPYP(c.id)) catsToShow.push(c);
+            });
+        });
+    }
+    catsToShow.forEach(function(c) {
         var btn = document.createElement('button');
         btn.type = 'button'; btn.textContent = c.nombre;
         var sel = c.id === _resolverCatId;
@@ -678,7 +771,6 @@ function resolverRenderCategorias() {
         };
         cont.appendChild(btn);
     });
-    wrap.style.display = 'block';
 }
 
 function resolverRenderMarcas(cat) {
@@ -703,9 +795,13 @@ function resolverRenderMarcas(cat) {
 function resolverConfirmarModal() {
     var errDiv = document.getElementById('resolver-modal-error');
     errDiv.style.display = 'none';
-    if (!_resolverFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.style.display = 'block'; return; }
-    if (!_resolverCatId)     { errDiv.textContent = 'Selecciona una categoría.'; errDiv.style.display = 'block'; return; }
-    if (!_resolverMarcaId)   { errDiv.textContent = 'Selecciona una marca.'; errDiv.style.display = 'block'; return; }
+    if (!_resolverCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.style.display = 'block'; return; }
+    // Bloquear categorías de PARTES Y PIEZAS cuando no hay familia real seleccionada
+    var sinFamOrNone = (!_resolverFamiliaId || _resolverFamiliaId === SIN_FAMILIA_ID);
+    if (sinFamOrNone && esCatPYP(_resolverCatId)) {
+        errDiv.textContent = 'Las categorías de PARTES Y PIEZAS requieren una familia real.';
+        errDiv.style.display = 'block'; return;
+    }
     var min  = parseInt(document.getElementById('resolver-modal-minimo').value)  || 0;
     var crit = parseInt(document.getElementById('resolver-modal-critico').value) || 0;
     var idx  = _resolverModalIdx;
@@ -713,13 +809,14 @@ function resolverConfirmarModal() {
     document.getElementById('resolver-marca-hidden-'+ idx).value = _resolverMarcaId || '';
     document.getElementById('resolver-min-hidden-'  + idx).value = min;
     document.getElementById('resolver-crit-hidden-' + idx).value = crit;
-    var fam  = resolverFamilias.find(function(f) { return f.id === _resolverFamiliaId; });
-    var cat  = fam ? fam.categorias.find(function(c) { return c.id === _resolverCatId; }) : null;
-    var marca = (cat && cat.marcas) ? cat.marcas.find(function(m) { return m.id === _resolverMarcaId; }) : null;
+    var fam  = _resolverFamiliaId ? resolverFamilias.find(function(f) { return f.id === _resolverFamiliaId; }) : null;
+    var cat  = resolverBuscarCat(_resolverCatId);
+    var marca = (cat && cat.marcas && _resolverMarcaId) ? cat.marcas.find(function(m) { return m.id === _resolverMarcaId; }) : null;
     var resumen = document.getElementById('resolver-resumen-' + idx);
     if (resumen) {
-        resumen.textContent = '✓ ' + (fam ? fam.nombre : '') + ' › ' + (cat ? cat.nombre : '') +
-            (marca ? ' · ' + marca.nombre : '') + ' · Mín:' + min + ' / Crít:' + crit;
+        var famNombre = fam ? fam.nombre + ' › ' : '';
+        var marcaTxt  = marca ? ' · ' + marca.nombre : ' · sin marca';
+        resumen.textContent = '✓ ' + famNombre + (cat ? cat.nombre : '') + marcaTxt + ' · Mín:' + min + ' / Crít:' + crit;
         resumen.classList.remove('hidden');
     }
     resolverCerrarModal();
@@ -750,7 +847,7 @@ function resolverCrearFamilia() {
     if (!nombre) return;
     fetch(RESOLVER_URL_FAM, {
         method: 'POST',
-        headers: { 'X-CSRF-TOKEN': RESOLVER_CSRF, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        headers: { 'X-CSRF-TOKEN': RESOLVER_CSRF, 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ nombre: nombre }),
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.ok || data.id) {
@@ -765,22 +862,26 @@ function resolverCrearFamilia() {
 
 function resolverCrearCategoria() {
     var nombre = document.getElementById('resolver-nueva-cat-input').value.trim();
-    if (!nombre || !_resolverFamiliaId) return;
+    if (!nombre) return;
+    if (!_resolverFamiliaId || _resolverFamiliaId === SIN_FAMILIA_ID) {
+        var errDiv = document.getElementById('resolver-modal-error');
+        errDiv.textContent = 'Para crear una categoría, primero selecciona una familia real.';
+        errDiv.style.display = 'block'; return;
+    }
     fetch(RESOLVER_URL_CAT, {
         method: 'POST',
-        headers: { 'X-CSRF-TOKEN': RESOLVER_CSRF, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        headers: { 'X-CSRF-TOKEN': RESOLVER_CSRF, 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ nombre: nombre, familia_id: _resolverFamiliaId }),
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.ok || data.id) {
             var fam = resolverFamilias.find(function(f) { return f.id === _resolverFamiliaId; });
             if (fam) fam.categorias.push({ id: data.id, nombre: data.nombre || nombre, marcas: [] });
             _resolverCatId = data.id; _resolverMarcaId = null;
-            resolverRenderCategorias();
-            // Mostrar sección marca vacía para que el usuario cree una
-            var cat = fam ? fam.categorias.find(function(c) { return c.id === data.id; }) : null;
-            resolverRenderMarcas(cat || { marcas: [] });
             document.getElementById('resolver-nueva-cat-input').value = '';
             document.getElementById('resolver-nueva-cat-form').style.display = 'none';
+            resolverRenderCategorias();
+            var cat = fam ? fam.categorias.find(function(c) { return c.id === data.id; }) : null;
+            resolverRenderMarcas(cat || { marcas: [] });
         }
     }).catch(function() {});
 }
@@ -797,12 +898,11 @@ function resolverCrearMarca() {
     if (!nombre || !_resolverCatId) return;
     fetch(RESOLVER_URL_MARCA, {
         method: 'POST',
-        headers: { 'X-CSRF-TOKEN': RESOLVER_CSRF, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        headers: { 'X-CSRF-TOKEN': RESOLVER_CSRF, 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ nombre: nombre, categoria_id: _resolverCatId }),
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.ok || data.id) {
-            var fam = resolverFamilias.find(function(f) { return f.id === _resolverFamiliaId; });
-            var cat = fam ? fam.categorias.find(function(c) { return c.id === _resolverCatId; }) : null;
+            var cat = resolverBuscarCat(_resolverCatId);
             if (cat) {
                 if (!cat.marcas) cat.marcas = [];
                 cat.marcas.push({ id: data.id, nombre: data.nombre || nombre.toUpperCase() });

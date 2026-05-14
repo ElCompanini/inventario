@@ -53,6 +53,34 @@ class OrdenCompra extends Model
         return $this->estado === 'validado' || $this->estado === 'recibido';
     }
 
+    // ── Helpers financieros unificados ────────────────────────────────────────
+    // Para OCs validadas en MP: api_total = total con IVA, api_impuestos = IVA.
+    // Para OCs internas sin validación: calculado desde oc_detalles + 19%.
+
+    public function montoTotal(): float
+    {
+        if ($this->api_total !== null) {
+            return (float) $this->api_total;
+        }
+        return round($this->montoNeto() * 1.19, 2);
+    }
+
+    public function montoIva(): float
+    {
+        if ($this->api_impuestos !== null && $this->api_impuestos > 0) {
+            return (float) $this->api_impuestos;
+        }
+        return round($this->montoNeto() * 0.19, 2);
+    }
+
+    public function montoNeto(): float
+    {
+        if ($this->api_total !== null) {
+            return (float) max(0, $this->api_total - ($this->api_impuestos ?? 0));
+        }
+        return (float) ($this->detalles?->sum('total_neto') ?? 0);
+    }
+
     public function totalFormateado(): string
     {
         if ($this->api_total === null) return '—';

@@ -585,7 +585,7 @@ class SicdController extends Controller
     public function show(int $id)
     {
         abort_unless(auth()->user()->tienePermiso('sicd'), 403);
-        $sicd  = Sicd::with(['usuario', 'boleta', 'detalles.producto', 'ordenesCompra'])->findOrFail($id);
+        $sicd  = Sicd::withoutGlobalScope('sin_temporales')->with(['usuario', 'boleta', 'detalles.producto', 'ordenesCompra'])->findOrFail($id);
         $ccId  = auth()->user()->ccFiltro();
         $familias = Familia::with([
             'categorias' => fn($q) => $q->with([
@@ -801,15 +801,37 @@ class SicdController extends Controller
 
     public function verDocumento(int $id)
     {
-        $sicd = Sicd::findOrFail($id);
-        abort_unless($sicd->documento_blob, 404);
+        $sicd = Sicd::withoutGlobalScope('sin_temporales')->find($id);
 
-        $contenido = base64_decode($sicd->documento_blob);
-        $nombre    = $sicd->codigo_sicd . '.pdf';
-        return response($contenido, 200)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'inline; filename="' . $nombre . '"')
-            ->header('Content-Length', strlen($contenido));
+        // Prioridad 1: blob guardado internamente (temporal o permanente)
+        if ($sicd && $sicd->documento_blob) {
+            $contenido = base64_decode($sicd->documento_blob);
+            $nombre    = $sicd->codigo_sicd . '.pdf';
+            return response($contenido, 200)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'inline; filename="' . $nombre . '"')
+                ->header('Content-Length', strlen($contenido));
+        }
+
+        // Fallback: SICD aún no tiene blob interno — leer directo desde BD externa
+        $codigo = $sicd?->codigo_sicd ?? '';
+        if ($codigo !== '') {
+            $row = DB::connection('sicd_externa')
+                ->table('solicitud_full')
+                ->where('num_int_sol', $codigo)
+                ->select('pdf')
+                ->first();
+
+            if ($row && !empty($row->pdf) && strlen($row->pdf) > 100) {
+                $nombre = preg_replace('/[^A-Z0-9_\-]/i', '_', $codigo) . '.pdf';
+                return response($row->pdf, 200)
+                    ->header('Content-Type', 'application/pdf')
+                    ->header('Content-Disposition', 'inline; filename="' . $nombre . '"')
+                    ->header('Content-Length', strlen($row->pdf));
+            }
+        }
+
+        abort(404, 'PDF no disponible para esta SICD.');
     }
 
     public function descargarExterno(int $id)

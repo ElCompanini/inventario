@@ -150,7 +150,13 @@
                     <h2 class="text-sm font-semibold text-gray-700">Productos asociados a esta OC</h2>
                     <p class="text-xs text-gray-400 mt-0.5">Selecciona qué productos y cantidades pertenecen a esta Orden de Compra específica.</p>
                 </div>
-                <span id="badge-prods-asignados" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700"></span>
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <button type="button" id="btn-sel-todos-oc" onclick="seleccionarTodosOc()"
+                            style="font-size:0.72rem;font-weight:600;color:#4f46e5;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;">
+                        Seleccionar todos
+                    </button>
+                    <span id="badge-prods-asignados" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700"></span>
+                </div>
             </div>
 
             @error('oc_detalles')
@@ -406,7 +412,9 @@ function renderProductosOc(sicdIds) {
 
             html += '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 1.25rem;'
                   + 'border-bottom:1px solid ' + oc.rowBorder + ';'
-                  + 'background:' + (adjudicado ? rowBgAdjud : oc.rowBgNormal) + ';">'
+                  + 'background:' + (adjudicado ? rowBgAdjud : oc.rowBgNormal) + ';'
+                  + (adjudicado ? '' : 'cursor:pointer;') + '"'
+                  + (adjudicado ? '' : ' onclick="ocFilaClick(event,\'' + det.id + '\')"') + '>'
 
                   // ── Checkbox (solo si tiene disponibles) ──────────────
                   + '<div style="flex-shrink:0;display:flex;align-items:center;justify-content:center;width:20px;">';
@@ -483,6 +491,27 @@ function toggleProdOc(checkbox) {
     }
     actualizarBadgeProductos();
     actualizarSubmit();
+}
+
+function ocFilaClick(event, detId) {
+    var cantWrap = document.getElementById('cant-wrap-' + detId);
+    if (cantWrap && cantWrap.contains(event.target)) return;
+    if (event.target.classList.contains('oc-det-check')) return;
+    var chk = document.querySelector('.oc-det-check[data-det-id="' + detId + '"]');
+    if (chk) { chk.checked = !chk.checked; toggleProdOc(chk); }
+}
+
+function seleccionarTodosOc() {
+    var sinMarcar = document.querySelectorAll('.oc-det-check:not(:checked)');
+    if (sinMarcar.length > 0) {
+        sinMarcar.forEach(function(chk) { chk.checked = true; toggleProdOc(chk); });
+        var btn = document.getElementById('btn-sel-todos-oc');
+        if (btn) btn.textContent = 'Deseleccionar todos';
+    } else {
+        document.querySelectorAll('.oc-det-check:checked').forEach(function(chk) { chk.checked = false; toggleProdOc(chk); });
+        var btn = document.getElementById('btn-sel-todos-oc');
+        if (btn) btn.textContent = 'Seleccionar todos';
+    }
 }
 
 function validarCantOc(input) {
@@ -798,7 +827,7 @@ function _buildCard(e) {
         + headerBadge
         + headerExtra
         + '</div>'
-        + '<div data-oc-body="' + codeEsc + '" style="padding:0.75rem 1rem;display:' + (isExp ? 'block' : 'none') + ';">'
+        + '<div data-oc-body="' + codeEsc + '" style="padding:0.75rem 1rem;display:' + (isExp || e.estado === 'cargando' ? 'block' : 'none') + ';">'
         + body
         + '</div>'
         + '</div>';
@@ -852,7 +881,6 @@ function _buildOCBody(e) {
         html += '<div class="mp-cmp-box" style="margin-top:0.5rem;border-radius:0.5rem;padding:0.45rem 0.7rem;font-size:0.7rem;">'
               + '<div style="display:flex;justify-content:space-between;padding:2px 0;"><span class="mp-lbl">Total SICDs</span><span class="mp-val-bold">' + formatCLP(totalSC) + '</span></div>'
               + '<div style="display:flex;justify-content:space-between;padding:2px 0;border-top:1px solid #f3f4f6;"><span class="mp-lbl">Total MP</span><span class="mp-val-bold">' + formatCLP(comp.total_mp) + '</span></div>'
-              + '<div style="display:flex;justify-content:space-between;padding:2px 0;border-top:1px solid #f3f4f6;"><span class="mp-lbl">Diferencia</span><span style="font-weight:700;color:' + (ok ? '#16a34a' : '#d97706') + ';">' + pct + '%&nbsp;' + (ok ? '✓ Aceptable' : '⚠ Revisar') + '</span></div>'
               + '</div>';
     }
 

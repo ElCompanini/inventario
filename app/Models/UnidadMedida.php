@@ -10,7 +10,7 @@ class UnidadMedida extends Model
     use SoftDeletes;
     protected $table = 'unidades_medida';
 
-    protected $fillable = ['nombre', 'abreviacion', 'descripcion', 'activo'];
+    protected $fillable = ['nombre', 'abreviacion', 'descripcion', 'factor_conversion', 'activo'];
 
     protected $casts = ['activo' => 'boolean'];
 

@@ -109,6 +109,7 @@ class ComputadorController extends Controller
         $productos = Producto::where('categoria_id', $catId)
             ->where('activo', true)
             ->where('stock_actual', '>', 0)
+            ->where('es_servicio', false)
             ->with(['unidadMedida:id,abreviacion'])
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'stock_actual', 'unidad', 'categoria_id', 'unidad_medida_id']);
@@ -182,6 +183,13 @@ class ComputadorController extends Controller
 
         $producto  = Producto::with('categoria.familia')->findOrFail($data['producto_id']);
         $categoria = \App\Models\Categoria::with('familia')->findOrFail($data['categoria_id']);
+
+        // Bloquear servicios — no son componentes físicos
+        if ($producto->es_servicio) {
+            return back()->withErrors([
+                'producto_id' => "«{$producto->nombre}» es un servicio y no puede usarse como componente físico de un equipo.",
+            ])->withInput();
+        }
 
         // Validar que el producto pertenece a la categoría enviada
         if ($producto->categoria_id !== $categoria->id) {

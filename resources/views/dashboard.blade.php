@@ -7,8 +7,15 @@
 <div class="mb-6 flex items-center justify-between gap-4 flex-wrap">
     <div>
         <h1 class="text-2xl font-bold text-gray-800">Inventario de Productos</h1>
+        @php
+            $cntFisicos   = $productos->where('es_servicio', false)->count();
+            $cntServicios = $productos->where('es_servicio', true)->count();
+        @endphp
         <p class="text-sm text-gray-500 mt-1">
-            {{ $productos->count() }} producto(s) registrado(s)
+            {{ $cntFisicos }} producto(s) físico(s)
+            @if($cntServicios > 0)
+            · <span class="text-violet-600 font-medium">{{ $cntServicios }} servicio(s)</span>
+            @endif
         </p>
     </div>
 
@@ -141,6 +148,20 @@
             </button>
         </div>
 
+        {{-- Tipo: Todos / Productos / Servicios --}}
+        <div class="px-4 py-2 border-b border-gray-100 flex items-center gap-3 flex-wrap">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Tipo:</span>
+            <label class="flex items-center gap-1.5 cursor-pointer text-xs px-2 py-0.5 rounded-full border border-gray-200 hover:border-indigo-300 transition">
+                <input type="radio" name="fil-tipo-prod" value="todos" class="fil-prod-tipo accent-indigo-600" checked> Todos
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer text-xs px-2 py-0.5 rounded-full border border-gray-200 hover:border-indigo-300 transition">
+                <input type="radio" name="fil-tipo-prod" value="producto" class="fil-prod-tipo accent-indigo-600"> Productos físicos
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer text-xs px-2 py-0.5 rounded-full border border-violet-200 hover:border-violet-400 transition text-violet-700 font-semibold">
+                <input type="radio" name="fil-tipo-prod" value="servicio" class="fil-prod-tipo accent-violet-600"> Servicios
+            </label>
+        </div>
+
         <div class="grid grid-cols-1 gap-0 divide-y divide-gray-100 md:grid-cols-3 md:divide-x md:divide-y-0">
 
             {{-- Contenedor --}}
@@ -257,20 +278,20 @@
     <table id="tabla-inventario" class="w-full text-sm">
         <thead class="bg-gray-50 text-left">
             <tr>
-                <th class="px-4 py-3 font-semibold text-gray-600">Producto</th>
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Unidad</th>
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Familia</th>
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Categoría</th>
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs whitespace-nowrap">Marca</th>
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Cont.</th>
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Stock</th>
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Mín.</th>
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Crít.</th>
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Estado</th>
+                <th class="px-3 py-2 font-semibold text-gray-600 text-xs">Producto</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs whitespace-nowrap">Unidad</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs whitespace-nowrap">Familia</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs whitespace-nowrap">Categoría</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs whitespace-nowrap">Marca</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Cont.</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Stock</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Mín.</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Crít.</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Estado</th>
                 @if(auth()->user()->esDev())
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs text-center">CC</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs text-center">CC</th>
                 @endif
-                <th class="px-2 py-3 font-semibold text-gray-600 text-xs">Acciones</th>
+                <th class="px-1.5 py-2 font-semibold text-gray-600 text-xs text-center">Acciones</th>
             </tr>
         </thead>
         <tbody>
@@ -285,13 +306,15 @@
             @endphp
             @php
                 $pendienteSalida = $producto->solicitudes->sum('cantidad');
+                $esServicio = $producto->es_servicio;
             @endphp
             <tr class="{{ $rowClass }} transition"
                 data-contenedor="{{ $producto->contenedor }}"
                 data-estado="{{ $estado }}"
+                data-tipo="{{ $esServicio ? 'servicio' : 'producto' }}"
                 data-cc-id="{{ $producto->centro_costo_id }}"
                 data-producto-id="{{ $producto->id }}">
-                <td class="px-4 py-3 font-medium text-gray-900">
+                <td class="px-3 py-2 font-medium text-gray-900">
                     <div class="flex items-center gap-2">
                         @if($pendienteSalida > 0)
                             @if(auth()->user()->esAdmin())
@@ -312,9 +335,10 @@
                                 <span style="display:none; position:absolute; left:14px; top:50%; transform:translateY(-50%); z-index:9999;
                                              white-space:nowrap; background:#1f2937; color:#fff; font-size:11px; font-weight:500;
                                              padding:5px 10px; border-radius:6px; box-shadow:0 4px 8px rgba(0,0,0,.35);">
-                                    ⏳ {{ $pendienteSalida }} unidad(es) de salida pendiente(s)<br>
+                                    @php $umDisplay = $producto->unidadMedida?->abreviacion ?? $producto->unidad ?? 'u.' @endphp
+                                    ⏳ {{ $pendienteSalida }} {{ $umDisplay }} de salida pendiente(s)<br>
                                     @foreach($producto->solicitudes as $sol)
-                                        · {{ $sol->usuario->name ?? '—' }}: {{ $sol->cantidad }} u.<br>
+                                        · {{ $sol->usuario->name ?? '—' }}: {{ $sol->cantidad }} {{ $umDisplay }}<br>
                                     @endforeach
                                 </span>
                             @if(auth()->user()->esAdmin())
@@ -324,60 +348,70 @@
                             @endif
                         @endif
 
+                        @if($esServicio)
+                        <span class="inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
+                            SERVICIO
+                        </span>
+                        @endif
                         <span>{{ $producto->nombre }}</span>
                     </div>
                 </td>
-                <td class="px-2 py-3 text-gray-500 text-xs whitespace-nowrap">{{ $producto->unidadMedida?->nombre ?? $producto->unidad ?? '—' }}</td>
-                <td class="px-2 py-3 text-gray-500 text-xs">{{ $producto->categoria->familia->nombre ?? '—' }}</td>
-                <td class="px-2 py-3 text-gray-500 text-xs">{{ $producto->categoria->nombre ?? '—' }}</td>
-                <td class="px-2 py-3 text-xs whitespace-nowrap">
+                <td class="px-1.5 py-2 text-gray-500 text-xs whitespace-nowrap">{{ $producto->unidadMedida?->nombre ?? $producto->unidad ?? '—' }}</td>
+                <td class="px-1.5 py-2 text-gray-500 text-xs">{{ $producto->categoria->familia->nombre ?? '—' }}</td>
+                <td class="px-1.5 py-2 text-gray-500 text-xs">{{ $producto->categoria->nombre ?? '—' }}</td>
+                <td class="px-1.5 py-2 text-xs whitespace-nowrap">
                     @if($producto->marca)
                         <span class="inline-block bg-indigo-50 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $producto->marca->nombre }}</span>
                     @else
                         <span class="text-gray-300">—</span>
                     @endif
                 </td>
-                <td class="px-2 py-3" style="text-align:center; vertical-align:middle;">
+                <td class="px-1.5 py-2" style="text-align:center; vertical-align:middle;">
                     @if($producto->container)
                         @if(auth()->user()->esAdmin())
                             <a href="{{ route('admin.containers.index') }}#container-{{ $producto->container->id }}"
-                               style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.875rem; font-weight:700; padding:2px 12px; border-radius:9999px; text-decoration:none;">
+                               style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:9999px; text-decoration:none;">
                                 {{ strtoupper(substr($producto->container->nombre, 0, 1)) . preg_replace('/\D/', '', $producto->container->nombre) }}
                             </a>
                         @else
-                            <span style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.875rem; font-weight:700; padding:2px 12px; border-radius:9999px;">
+                            <span style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:9999px;">
                                 {{ strtoupper(substr($producto->container->nombre, 0, 1)) . preg_replace('/\D/', '', $producto->container->nombre) }}
                             </span>
                         @endif
                     @else
-                        <span style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.875rem; font-weight:700; padding:2px 12px; border-radius:9999px;">—</span>
+                        <span style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:9999px;">—</span>
                     @endif
                 </td>
-                <td class="px-2 py-3 text-center font-bold whitespace-nowrap
-                        {{ $estado === 'critico' ? 'text-red-700' : ($estado === 'minimo' ? 'text-yellow-700' : 'text-gray-800') }}">
-                    {{ $producto->stock_actual }}
+                <td class="px-1.5 py-2 text-center font-bold text-xs whitespace-nowrap
+                        {{ $estado === 'critico' ? 'text-red-700' : ($estado === 'minimo' ? 'text-yellow-700' : 'text-gray-400') }}">
+                    @if($esServicio) — @else {{ $producto->stock_actual }} @endif
                 </td>
-                <td class="px-2 py-3 text-center text-gray-600 whitespace-nowrap">
-                    @if($estado === 'minimo')
-                        <span class="inline-block px-2 py-0.5 rounded-full estado-pulso-minimo">{{ $producto->stock_minimo }}</span>
+                <td class="px-1.5 py-2 text-center text-gray-400 text-xs whitespace-nowrap">
+                    @if($esServicio)
+                        —
+                    @elseif($estado === 'minimo')
+                        <span class="inline-block px-1.5 py-0.5 rounded-full estado-pulso-minimo">{{ $producto->stock_minimo }}</span>
                     @else
                         {{ $producto->stock_minimo }}
                     @endif
                 </td>
-                <td class="px-2 py-3 text-center text-gray-600 whitespace-nowrap">
-                    @if($estado === 'critico')
-                        <span class="inline-block px-2 py-0.5 rounded-full estado-pulso-critico">{{ $producto->stock_critico }}</span>
+                <td class="px-1.5 py-2 text-center text-gray-400 text-xs whitespace-nowrap">
+                    @if($esServicio)
+                        —
+                    @elseif($estado === 'critico')
+                        <span class="inline-block px-1.5 py-0.5 rounded-full estado-pulso-critico">{{ $producto->stock_critico }}</span>
                     @else
                         {{ $producto->stock_critico }}
                     @endif
                 </td>
-                <td class="px-2 py-3 text-center">
+                <td class="px-1.5 py-2 text-center">
                     @if($estado === 'critico')
                     <span style="position:relative; display:inline-flex; cursor:default;"
                           onmouseenter="this.querySelector('.tt').style.display='block'"
                           onmouseleave="this.querySelector('.tt').style.display='none'">
-                        <span class="inline-flex items-center gap-1 bg-red-100 text-red-700 text-sm font-semibold px-3 py-1.5 rounded-full estado-pulso-critico">
-                            <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5" fill="#ef4444"><animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/></circle></svg>
+                        <span class="inline-flex items-center gap-1 bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full estado-pulso-critico">
+                            <svg width="7" height="7" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5" fill="#ef4444"><animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/></circle></svg>
                             Crítico
                         </span>
                         @if($producto->stock_critico_desde)
@@ -392,8 +426,8 @@
                     <span style="position:relative; display:inline-flex; cursor:default;"
                           onmouseenter="this.querySelector('.tt').style.display='block'"
                           onmouseleave="this.querySelector('.tt').style.display='none'">
-                        <span class="inline-flex items-center gap-1 bg-yellow-100 text-yellow-700 text-sm font-semibold px-3 py-1.5 rounded-full estado-pulso-minimo">
-                            <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5" fill="#eab308"><animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/></circle></svg>
+                        <span class="inline-flex items-center gap-1 bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full estado-pulso-minimo">
+                            <svg width="7" height="7" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5" fill="#eab308"><animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/></circle></svg>
                             Mínimo
                         </span>
                         @if($producto->stock_minimo_desde)
@@ -404,57 +438,58 @@
                         </span>
                         @endif
                     </span>
+                    @elseif($estado === 'servicio')
+                    <span class="inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
+                        Servicio
+                    </span>
                     @else
-                    <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-sm font-semibold px-3 py-1.5 rounded-full">
+                    <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
                         <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Normal
                     </span>
                     @endif
                 </td>
                 @if(auth()->user()->esDev())
-                <td class="px-2 py-3 text-center">
+                <td class="px-1.5 py-2 text-center">
                     <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
                         {{ $producto->centroCosto?->acronimo ?? '—' }}
                     </span>
                 </td>
                 @endif
-                <td class="px-2 py-3 text-center">
-                    <div class="flex flex-col items-center gap-1.5">
+                <td class="px-1.5 py-2 text-center">
+                    <div class="flex items-center justify-center gap-1">
                         @if(auth()->user()->esAdmin())
-                        {{-- Admin: ver detalle del producto --}}
                         <a href="{{ route('admin.productos.show', $producto->id) }}"
-                            class="btn-accion-indigo inline-flex items-center gap-1 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg whitespace-nowrap">
-                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                           title="Ver detalle"
+                           class="btn-accion-indigo inline-flex items-center justify-center text-white rounded-lg p-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                             </svg>
-                            Ver
                         </a>
-                        {{-- Admin: modificar stock directamente --}}
                         <a href="{{ route('admin.productos.editar', $producto->id) }}"
-                            class="btn-accion-indigo inline-flex items-center gap-1 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg whitespace-nowrap">
-                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                           title="Modificar stock"
+                           class="btn-accion-indigo inline-flex items-center justify-center text-white rounded-lg p-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
-                            Modificar
                         </a>
-                        {{-- Admin: trasladar container --}}
                         <button type="button"
+                            title="Trasladar"
                             onclick="abrirModalTrasladar({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', {{ $producto->contenedor }})"
-                            class="btn-accion-blue inline-flex items-center gap-1 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg whitespace-nowrap">
-                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            class="btn-accion-blue inline-flex items-center justify-center text-white rounded-lg p-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                             </svg>
-                            Trasladar
                         </button>
                         @else
-                        {{-- Usuario: solicitar salida --}}
                         <button type="button"
-                            onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'salida', {{ $producto->stock_actual }}, {{ $producto->solicitudes->sum('cantidad') }})"
-                            class="btn-accion-orange inline-flex items-center gap-1 text-white text-xs font-medium px-3 py-1.5 rounded-lg"
-                            {{ $producto->stock_actual <= 0 ? 'disabled' : '' }}>
+                            title="{{ $esServicio ? 'Servicio — sin stock físico' : 'Solicitar salida' }}"
+                            @if(!$esServicio) onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'salida', {{ $producto->stock_actual }}, {{ $producto->solicitudes->sum('cantidad') }}, '{{ addslashes($producto->unidadMedida?->abreviacion ?? $producto->unidad ?? 'u.') }}')" @endif
+                            class="btn-accion-orange inline-flex items-center justify-center text-white rounded-lg p-1.5"
+                            {{ ($esServicio || $producto->stock_actual <= 0) ? 'disabled' : '' }}>
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
                             </svg>
-                            Salida
                         </button>
                         @endif
                     </div>
@@ -621,6 +656,7 @@
 
     var _pendienteActual = 0;
     var _submitForzado   = false;
+    var _unidad          = 'u.';
 
     function cancelarConfirmarPendiente() {
         document.getElementById('modal-confirmar-pendiente').style.display = 'none';
@@ -632,9 +668,10 @@
         document.getElementById('form-solicitud').requestSubmit();
     }
 
-    function abrirModal(productoId, nombre, tipo, stockActual, pendiente) {
+    function abrirModal(productoId, nombre, tipo, stockActual, pendiente, unidad) {
         _pendienteActual = pendiente || 0;
         _submitForzado   = false;
+        _unidad          = unidad || 'u.';
         document.getElementById('modal-producto-id').value = productoId;
         document.getElementById('modal-tipo').value = tipo;
         document.getElementById('modal-cantidad').value = '';
@@ -655,7 +692,7 @@
                 + '<svg style="width:14px;height:14px;flex-shrink:0;margin-top:1px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">'
                 + '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'
                 + '</svg>'
-                + '<span>Hay <strong>' + pendiente + '</strong> unidad' + (pendiente !== 1 ? 'es' : '') + ' con solicitudes pendientes de aprobación'
+                + '<span>Hay <strong>' + pendiente + '</strong> ' + _unidad + ' con solicitudes pendientes de aprobación'
                 + (critico ? ' — superan el stock disponible.' : '.') + '</span>'
                 + '</div>';
         } else {
@@ -663,7 +700,7 @@
         }
 
         document.getElementById('modal-titulo').textContent = 'Solicitar Salida — ' + nombre;
-        document.getElementById('modal-subtitulo').textContent = 'Retirar unidades del inventario';
+        document.getElementById('modal-subtitulo').textContent = 'Retirar ' + _unidad + ' del inventario';
         document.getElementById('modal-btn-submit').className =
             'btn-primary px-4 py-2 text-sm font-medium text-white rounded-lg transition bg-orange-500 hover:bg-orange-600';
 
@@ -707,7 +744,7 @@
         // Si hay pendientes y no se ha confirmado, mostrar aviso
         if (_pendienteActual > 0 && !_submitForzado) {
             e.preventDefault();
-            var texto = 'Existen <strong>' + _pendienteActual + '</strong> unidad' + (_pendienteActual !== 1 ? 'es' : '')
+            var texto = 'Existen <strong>' + _pendienteActual + '</strong> ' + _unidad
                 + ' con solicitudes pendientes para este producto. Sin un administrador disponible para verificar el stock real, la solicitud podría no ser atendida. ¿Desea continuar de todas formas?';
             document.getElementById('modal-confirmar-texto').innerHTML = texto;
             document.getElementById('modal-confirmar-pendiente').style.display = 'flex';
@@ -1223,6 +1260,7 @@ function escHtmlGm(str) {
                                 <input type="text" id="ai-buscador"
                                     placeholder="🔍 Buscar producto por nombre o descripción..."
                                     autocomplete="off"
+                                    oninput="this.value=this.value.toUpperCase()"
                                     style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
                                 <div id="ai-resultados"
                                     style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #e5e7eb; border-radius:0.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.1); max-height:200px; overflow-y:auto; margin-top:2px;"></div>
@@ -1277,14 +1315,9 @@ function escHtmlGm(str) {
                             <div id="ai-sicd-info" style="display:none; margin-top:0.4rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.4rem; padding:0.35rem 0.6rem; font-size:0.72rem; color:#166534;"></div>
                         </div>
 
-                        <div>
-                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                Descripción <span style="font-weight:400; color:#9ca3af;">(opcional)</span>
-                            </label>
-                            <textarea name="descripcion" id="ai-descripcion" rows="2" maxlength="500"
-                                placeholder="Notas o descripción del documento SICD..."
-                                style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; resize:vertical;"></textarea>
-                        </div>
+
+                        {{-- Sección de carga — oculta hasta que el código SICD sea válido --}}
+                        <div id="ai-ext-carga-wrap" style="display:none; flex-direction:column; gap:0.75rem;">
 
                         {{-- Datos de boleta (ocultos para Licitación) --}}
                         <div id="ai-ext-boleta-datos">
@@ -1357,7 +1390,14 @@ function escHtmlGm(str) {
                                     </a>
                                 </div>
                                 <input type="file" name="excel_masivo" id="ai-excel-masivo" accept=".xlsx,.xls,.csv"
-                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
+                                    style="display:none;"
+                                    onchange="aiFileUpdate('ai-excel-masivo','ai-excel-masivo-txt',this)">
+                                <label for="ai-excel-masivo" class="ai-file-lbl ai-file-lbl-xl">
+                                    <svg class="ai-file-ico" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <span class="ai-file-lbl-txt" id="ai-excel-masivo-txt">Seleccionar Excel (.xlsx, .xls, .csv)</span>
+                                </label>
                             </div>
                             <div id="ai-boleta-masiva" style="display:flex; flex-direction:column; gap:0.25rem;">
                                 <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151;">
@@ -1365,7 +1405,14 @@ function escHtmlGm(str) {
                                     <span style="font-weight:400; color:#9ca3af;">(PDF)</span>
                                 </label>
                                 <input type="file" name="boleta_sicd" id="ai-boleta-masiva-input" accept=".pdf,.jpg,.jpeg,.png"
-                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
+                                    style="display:none;"
+                                    onchange="aiFileUpdate('ai-boleta-masiva-input','ai-boleta-masiva-txt',this)">
+                                <label for="ai-boleta-masiva-input" class="ai-file-lbl">
+                                    <svg class="ai-file-ico" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <span class="ai-file-lbl-txt" id="ai-boleta-masiva-txt">Seleccionar PDF, JPG o PNG</span>
+                                </label>
                             </div>
                             <input type="checkbox" name="vincular_oc" id="ai-vincular-oc" value="1" style="display:none;">
                         </div>
@@ -1374,8 +1421,9 @@ function escHtmlGm(str) {
                         <div id="ai-ext-panel-manual" style="display:none; flex-direction:column; gap:0.75rem;">
                             <div style="position:relative;">
                                 <input type="text" id="ai-buscador-manual"
-                                    placeholder="🔍 Buscar producto por nombre o descripción..."
+                                    placeholder="🔍 Descripción del bien o servicio..."
                                     autocomplete="off"
+                                    oninput="this.value=this.value.toUpperCase()"
                                     style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
                                 <div id="ai-resultados-manual"
                                     style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#fff; border:1px solid #e5e7eb; border-radius:0.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.1); max-height:200px; overflow-y:auto; margin-top:2px;"></div>
@@ -1386,7 +1434,14 @@ function escHtmlGm(str) {
                                     <span style="font-weight:400; color:#9ca3af;">(PDF)</span>
                                 </label>
                                 <input type="file" name="boleta_sicd" id="ai-boleta-manual-input" accept=".pdf,.jpg,.jpeg,.png"
-                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.35rem 0.65rem; font-size:0.75rem; box-sizing:border-box; color:#374151;">
+                                    style="display:none;"
+                                    onchange="aiFileUpdate('ai-boleta-manual-input','ai-boleta-manual-txt',this)">
+                                <label for="ai-boleta-manual-input" class="ai-file-lbl">
+                                    <svg class="ai-file-ico" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <span class="ai-file-lbl-txt" id="ai-boleta-manual-txt">Seleccionar PDF, JPG o PNG</span>
+                                </label>
                             </div>
                             <div id="ai-tabla-manual-wrap" style="display:none;">
                                 <table style="width:100%; font-size:0.78rem; border-collapse:collapse;">
@@ -1409,6 +1464,8 @@ function escHtmlGm(str) {
                             </p>
                             <input type="checkbox" name="vincular_oc_manual" id="ai-vincular-oc-manual" value="1" style="display:none;">
                         </div>
+
+                        </div>{{-- /ai-ext-carga-wrap --}}
 
                     </div>
 
@@ -1514,6 +1571,38 @@ function escHtmlGm(str) {
 
     .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s, transform .15s; }
     .dt-btn-pdf:hover { background:#b91c1c; transform:translateY(-1px); animation:btn-breathe-red 1.6s ease-in-out infinite; }
+
+    /* ── Buscador manual (carga manual) dark mode ── */
+    html.dark #ai-buscador-manual {
+        background: #1e293b; border-color: #475569; color: #e2e8f0;
+    }
+    html.dark #ai-buscador-manual::placeholder { color: #64748b; }
+    html.dark #ai-resultados-manual {
+        background: #1e293b !important; border-color: #334155 !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,.45) !important;
+    }
+    /* ── File inputs estilizados (carga masiva/manual) ── */
+    .ai-file-lbl {
+        display:flex; align-items:center; gap:0.5rem;
+        width:100%; padding:0.55rem 0.85rem; border-radius:0.5rem;
+        border:2px dashed #d1d5db; background:#f9fafb; color:#6b7280;
+        font-size:0.78rem; font-weight:500; cursor:pointer;
+        transition:background .18s, border-color .18s, color .18s;
+        box-sizing:border-box; overflow:hidden;
+    }
+    .ai-file-ico { width:15px; height:15px; flex-shrink:0; }
+    .ai-file-lbl-txt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ai-file-lbl:hover { background:#f3f4f6; border-color:#9ca3af; color:#374151; }
+    .ai-file-lbl.has-file { border-style:solid; color:#374151; }
+    .ai-file-lbl-xl { border-color:#3b82f6; background:#eff6ff; color:#1d4ed8; }
+    .ai-file-lbl-xl:hover { background:#dbeafe; border-color:#2563eb; color:#1e3a8a; }
+    .ai-file-lbl-xl.has-file { color:#1e3a8a; }
+    html.dark .ai-file-lbl { background:#1e293b; border-color:#475569; color:#94a3b8; }
+    html.dark .ai-file-lbl:hover { background:#334155; border-color:#64748b; color:#cbd5e1; }
+    html.dark .ai-file-lbl.has-file { color:#e2e8f0; }
+    html.dark .ai-file-lbl-xl { background:#1e3a5f; border-color:#3b82f6; color:#93c5fd; }
+    html.dark .ai-file-lbl-xl:hover { background:#172554; border-color:#60a5fa; color:#bfdbfe; }
+    html.dark .ai-file-lbl-xl.has-file { color:#bfdbfe; }
 
     /* ── Paginación DataTables estilo Tailwind ── */
     .dt-paging { margin-top:1rem !important; display:flex !important; justify-content:flex-end !important; gap:4px !important; align-items:center !important; }
@@ -1662,10 +1751,11 @@ function escHtmlGm(str) {
         var filContenedores  = new Set();
         var filEstados       = new Set();
         var filProductoIds   = new Set();  // IDs seleccionados (familia completa o desc individual)
+        var filTipo          = 'todos';    // 'todos' | 'producto' | 'servicio'
 
         function redibujarProd() {
             table.draw();
-            var hay = filContenedores.size || filEstados.size || filProductoIds.size;
+            var hay = filContenedores.size || filEstados.size || filProductoIds.size || filTipo !== 'todos';
             $('#badge-prod').toggleClass('hidden', !hay);
             $('[data-target="acc-prod-contenedor"]').toggleClass('has-active', filContenedores.size > 0);
             $('[data-target="acc-prod-estado"]').toggleClass('has-active', filEstados.size > 0);
@@ -1694,6 +1784,12 @@ function escHtmlGm(str) {
             if (q) {
                 var celdas = tr ? Array.from(tr.querySelectorAll('td')).map(function(td){ return td.innerText.toLowerCase(); }) : [];
                 if (![0,1,2,3,6].some(function(i){ return (celdas[i]||'').includes(q); })) return false;
+            }
+
+            // Tipo (producto físico / servicio)
+            if (filTipo !== 'todos') {
+                var tipo = tr ? tr.getAttribute('data-tipo') : null;
+                if (tipo !== filTipo) return false;
             }
 
             // Contenedor
@@ -1733,6 +1829,10 @@ function escHtmlGm(str) {
         });
         $(document).on('change', '.fil-prod-estado', function() {
             this.checked ? filEstados.add(this.value) : filEstados.delete(this.value);
+            redibujarProd();
+        });
+        $(document).on('change', '.fil-prod-tipo', function() {
+            filTipo = this.value;
             redibujarProd();
         });
 
@@ -1783,8 +1883,9 @@ function escHtmlGm(str) {
 
         // ── Limpiar todo ───────────────────────────────────────────────
         $('#btn-limpiar-prod').on('click', function() {
-            filContenedores.clear(); filEstados.clear(); filProductoIds.clear();
+            filContenedores.clear(); filEstados.clear(); filProductoIds.clear(); filTipo = 'todos';
             $('.fil-prod-contenedor, .fil-prod-estado, .fil-prod-familia-padre, .fil-prod-desc').prop('checked', false);
+            $('.fil-prod-tipo[value="todos"]').prop('checked', true);
             $('.fil-prod-familia-padre').each(function() { this.indeterminate = false; });
             $('#buscador-productos').val('');
             redibujarProd();
@@ -1998,7 +2099,7 @@ function escHtmlGm(str) {
             </select>
         </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.85rem;">
+        <div id="ai-crear-stock-wrap" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.85rem;">
             <div>
                 <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
                     Stock mínimo <span style="color:#ef4444;">*</span>
@@ -2052,6 +2153,7 @@ $aiFamiliasJson = json_encode(
     ($familias ?? collect())->map(fn($f) => [
         'id'         => $f->id,
         'nombre'     => $f->nombre,
+        'tipo'       => $f->tipo,
         'categorias' => $f->categorias->map(fn($c) => [
             'id'     => $c->id,
             'nombre' => $c->nombre,
@@ -2066,6 +2168,12 @@ $aiFamiliasJson = json_encode(
 <script type="application/json" id="ai-familias-data">{!! $aiFamiliasJson !!}</script>
 <script>
 var aiFamilias = JSON.parse(document.getElementById('ai-familias-data').textContent);
+// Derived from familia.tipo — no hardcoded IDs needed
+var _aiSinFamFam      = aiFamilias.find(function(f) { return f.tipo === 'sin_familia'; });
+var _aiPypFam         = aiFamilias.find(function(f) { return f.tipo === 'partes_piezas'; });
+var _aiServiciosFam   = aiFamilias.find(function(f) { return f.tipo === 'servicios'; });
+var AI_SIN_FAMILIA_ID     = _aiSinFamFam    ? _aiSinFamFam.id    : null;
+var AI_SERVICIOS_FAMILIA_ID = _aiServiciosFam ? _aiServiciosFam.id : null;
 if (document.getElementById('btn-agregar-inventario')) {
 var aiProductos  = JSON.parse(document.getElementById('ai-data').textContent);
 var aiContainers = JSON.parse(document.getElementById('ai-containers-data').textContent);
@@ -2211,8 +2319,33 @@ function cerrarModalAgregarInv() {
     document.getElementById('modal-agregar-inv').style.display = 'none';
     document.body.style.overflow = '';
     aiForm.reset();
+    [['ai-excel-masivo','ai-excel-masivo-txt','Seleccionar Excel (.xlsx, .xls, .csv)'],
+     ['ai-boleta-masiva-input','ai-boleta-masiva-txt','Seleccionar PDF, JPG o PNG'],
+     ['ai-boleta-manual-input','ai-boleta-manual-txt','Seleccionar PDF, JPG o PNG']
+    ].forEach(function(p){
+        var el=document.getElementById(p[1]); var lb=document.querySelector('label[for="'+p[0]+'"]');
+        if(el) el.textContent=p[2]; if(lb) lb.classList.remove('has-file');
+    });
     document.getElementById('ai-seccion-local').style.display = 'none';
     document.getElementById('ai-seccion-externa').style.display = 'none';
+
+    // Reset SICD validation state
+    aiSicdValido = false;
+    clearTimeout(aiSicdValidTimer);
+    var sicdInput = document.getElementById('ai-codigo-sicd');
+    if (sicdInput) { sicdInput.style.borderColor = '#d1d5db'; }
+    var hintEl = document.getElementById('ai-codigo-hint');
+    if (hintEl) hintEl.innerHTML = '';
+    var infoEl = document.getElementById('ai-sicd-info');
+    if (infoEl) { infoEl.style.display = 'none'; infoEl.innerHTML = ''; }
+    var warnEl = document.getElementById('ai-sicd-ya-ingresada');
+    if (warnEl) warnEl.style.display = 'none';
+    var cargaWrap = document.getElementById('ai-ext-carga-wrap');
+    if (cargaWrap) cargaWrap.style.display = 'none';
+    var pdfBanner = document.getElementById('ai-pdf-banner');
+    if (pdfBanner) pdfBanner.remove();
+    _aiSicdDupUrl = null; _aiSicdDupEstado = null; _aiSicdDupCodigo = null;
+
     aiItems = [];
     aiCounter = 0;
     aiItemsManual = [];
@@ -2236,20 +2369,49 @@ document.getElementById('modal-agregar-inv').addEventListener('click', function(
     if (e.target === this) cerrarConConfirmacion();
 });
 
+function aiFileUpdate(inputId, txtId, input) {
+    var lbl = document.querySelector('label[for="' + inputId + '"]');
+    var txt = document.getElementById(txtId);
+    var defaults = {
+        'ai-excel-masivo':       'Seleccionar Excel (.xlsx, .xls, .csv)',
+        'ai-boleta-masiva-input':'Seleccionar PDF, JPG o PNG',
+        'ai-boleta-manual-input':'Seleccionar PDF, JPG o PNG'
+    };
+    if (input.files.length > 0) {
+        if (txt) txt.textContent = '✓ ' + input.files[0].name;
+        if (lbl) lbl.classList.add('has-file');
+    } else {
+        if (txt) txt.textContent = defaults[inputId] || 'Seleccionar archivo';
+        if (lbl) lbl.classList.remove('has-file');
+    }
+}
+
 function aiMetodoCarga(metodo) {
     aiMetodoCargaActual = metodo;
-    var btnM = document.getElementById('ai-ext-btn-masiva');
-    var btnMa = document.getElementById('ai-ext-btn-manual');
+    var btnM   = document.getElementById('ai-ext-btn-masiva');
+    var btnMa  = document.getElementById('ai-ext-btn-manual');
     var panelM  = document.getElementById('ai-ext-panel-masiva');
     var panelMa = document.getElementById('ai-ext-panel-manual');
+    var _dm = document.documentElement.classList.contains('dark');
+
+    var offBg = _dm ? '#1e293b' : '#fff';
+    var offBd = _dm ? '#334155' : '#e5e7eb';
+    var offTx = _dm ? '#94a3b8' : '#6b7280';
+
     if (metodo === 'masiva') {
-        btnM.style.borderColor  = '#2563eb'; btnM.style.background  = '#eff6ff'; btnM.style.color  = '#1e40af';
-        btnMa.style.borderColor = '#e5e7eb'; btnMa.style.background = '#fff';    btnMa.style.color = '#6b7280';
+        var onBg = _dm ? '#1e3a5f' : '#eff6ff';
+        var onBd = _dm ? '#3b82f6' : '#2563eb';
+        var onTx = _dm ? '#93c5fd' : '#1e40af';
+        btnM.style.borderColor  = onBd;  btnM.style.background  = onBg;  btnM.style.color  = onTx;
+        btnMa.style.borderColor = offBd; btnMa.style.background = offBg; btnMa.style.color = offTx;
         panelM.style.display  = 'flex';
         panelMa.style.display = 'none';
     } else {
-        btnMa.style.borderColor = '#7c3aed'; btnMa.style.background = '#faf5ff'; btnMa.style.color = '#6b21a8';
-        btnM.style.borderColor  = '#e5e7eb'; btnM.style.background  = '#fff';    btnM.style.color  = '#6b7280';
+        var onBg = _dm ? '#2e1065' : '#faf5ff';
+        var onBd = _dm ? '#7c3aed' : '#7c3aed';
+        var onTx = _dm ? '#c4b5fd' : '#6b21a8';
+        btnMa.style.borderColor = onBd;  btnMa.style.background = onBg;  btnMa.style.color = onTx;
+        btnM.style.borderColor  = offBd; btnM.style.background  = offBg; btnM.style.color  = offTx;
         panelMa.style.display = 'flex';
         panelM.style.display  = 'none';
     }
@@ -2275,6 +2437,10 @@ function aiCambiarTipo(tipo) {
     var externa = document.getElementById('ai-seccion-externa');
     local.style.display = (tipo === 'local') ? 'flex' : 'none';
     externa.style.display = (tipo === 'externa' || tipo === 'licitacion') ? 'flex' : 'none';
+
+    // Ocultar sección de carga al cambiar tipo — se muestra solo tras validar SICD
+    var cargaWrap = document.getElementById('ai-ext-carga-wrap');
+    if (cargaWrap) cargaWrap.style.display = 'none';
 
     var boletaDatos  = document.getElementById('ai-ext-boleta-datos');
     var chkMasiva    = document.getElementById('ai-vincular-oc');
@@ -2421,6 +2587,7 @@ function aiEnviar() {
     sessionStorage.removeItem('ai_sicd_pending');
     sessionStorage.removeItem('ai_prods_creados');
     _aiProductosCreados = [];
+    aiLimpiarPreciosManual();
     aiForm.submit();
 }
 
@@ -2437,6 +2604,7 @@ document.getElementById('form-agregar-inv').addEventListener('submit-confirmed',
     sessionStorage.removeItem('ai_sicd_pending');
     sessionStorage.removeItem('ai_prods_creados');
     _aiProductosCreados = [];
+    aiLimpiarPreciosManual();
     aiForm.submit();
 });
 
@@ -2607,6 +2775,8 @@ function aiValidarCodigo(codigo) {
 
             if (data.valido) {
                 aiSicdValido = true;
+                var cargaWrap = document.getElementById('ai-ext-carga-wrap');
+                if (cargaWrap) cargaWrap.style.display = 'flex';
                 // Si se buscó por ID numérico, reemplazar el campo con el código real
                 var codigoFinal = data.codigo_resuelto || codigo;
                 if (codigoFinal !== codigo) {
@@ -2769,12 +2939,16 @@ function aiValidarCodigo(codigo) {
                     });
             } else {
                 aiSicdValido = false;
+                var cargaWrapErr = document.getElementById('ai-ext-carga-wrap');
+                if (cargaWrapErr) cargaWrapErr.style.display = 'none';
                 hint.innerHTML = '<svg style="width:13px;height:13px;flex-shrink:0" fill="none" stroke="#dc2626" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg><span style="color:#dc2626;font-weight:600;">' + data.mensaje + '</span>';
                 document.getElementById('ai-codigo-sicd').style.borderColor = '#dc2626';
             }
         })
         .catch(function() {
             aiSicdValido = false;
+            var cargaWrapCatch = document.getElementById('ai-ext-carga-wrap');
+            if (cargaWrapCatch) cargaWrapCatch.style.display = 'none';
             hint.innerHTML = '<span style="color:#d97706;">⚠️ Sin conexión al sistema externo.</span>';
             document.getElementById('ai-codigo-sicd').style.borderColor = '#d1d5db';
         });
@@ -2815,6 +2989,8 @@ document.getElementById('ai-codigo-sicd').addEventListener('input', function() {
     var warnEl = document.getElementById('ai-sicd-ya-ingresada');
     if (warnEl) warnEl.style.display = 'none';
     aiSicdValido = false;
+    var cargaWrapInput = document.getElementById('ai-ext-carga-wrap');
+    if (cargaWrapInput) cargaWrapInput.style.display = 'none';
     clearTimeout(aiSicdValidTimer);
     if (codigo.length >= 3) {
         aiSicdValidTimer = setTimeout(function() { aiValidarCodigo(codigo); }, 600);
@@ -2874,24 +3050,34 @@ document.getElementById('ai-buscador-manual').addEventListener('input', function
         return p.nombre.toLowerCase().indexOf(q) >= 0;
     }).slice(0, 10);
 
+    var _dm        = document.documentElement.classList.contains('dark');
+    var rowBorder  = _dm ? '#334155'  : '#f3f4f6';
+    var rowHover   = _dm ? '#312e81'  : '#f3e8ff';
+    var rowText    = _dm ? '#e2e8f0'  : '#1f2937';
+    var rowSub     = _dm ? '#94a3b8'  : '#6b7280';
+    var crearBg    = _dm ? '#052e16'  : '#f0fdf4';
+    var crearBd    = _dm ? '#166534'  : '#e5e7eb';
+    var crearHover = _dm ? '#14532d'  : '#dcfce7';
+    var crearTx    = _dm ? '#86efac'  : '#16a34a';
+
     var html = matches.map(function(p) {
         return '<div data-pid="' + p.id + '" data-pnombre="' + escHtmlAi(p.nombre) + '" data-pcid="' + (p.contenedor_id || '') + '"'
             + ' onclick="aiAgregarManualDesdeDato(this)"'
-            + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;"'
-            + ' onmouseover="this.style.background=\'#f3e8ff\'" onmouseout="this.style.background=\'\'">'
-            + '<p style="font-size:0.8rem;font-weight:600;color:#1f2937;">' + escHtmlAi(p.nombre) + '</p>'
-            + '<p style="font-size:0.72rem;color:#6b7280;">' + escHtmlAi(p.contenedor_nombre || '') + ' &middot; Stock: ' + p.stock + '</p>'
+            + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid ' + rowBorder + ';"'
+            + ' onmouseover="this.style.background=\'' + rowHover + '\'" onmouseout="this.style.background=\'\'">'
+            + '<p style="font-size:0.8rem;font-weight:600;color:' + rowText + ';">' + escHtmlAi(p.nombre) + '</p>'
+            + '<p style="font-size:0.72rem;color:' + rowSub + ';">' + escHtmlAi(p.contenedor_nombre || '') + ' &middot; Stock: ' + p.stock + '</p>'
             + '</div>';
     }).join('');
 
     if (AI_IS_ADMIN) {
         var qEsc = qOrig.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         html += '<div data-crear-nombre="' + qEsc + '" onclick="aiAbrirModalCrear(this.dataset.crearNombre)"'
-            + ' style="padding:0.5rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;border-top:1px solid #e5e7eb;background:#f0fdf4;"'
-            + ' onmouseover="this.style.background=\'#dcfce7\'" onmouseout="this.style.background=\'#f0fdf4\'">'
+            + ' style="padding:0.5rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;border-top:1px solid ' + crearBd + ';background:' + crearBg + ';"'
+            + ' onmouseover="this.style.background=\'' + crearHover + '\'" onmouseout="this.style.background=\'' + crearBg + '\'">'
             + '<span style="font-size:1rem;line-height:1;">➕</span>'
             + '<div>'
-            + '<p style="font-size:0.8rem;font-weight:700;color:#16a34a;">Crear producto «' + qEsc + '»</p>'
+            + '<p style="font-size:0.8rem;font-weight:700;color:' + crearTx + ';">Crear producto «' + qEsc + '»</p>'
             + '</div>'
             + '</div>';
     }
@@ -2961,12 +3147,12 @@ function aiRenderFilaManual(idx, id, nombre, contenedorId) {
         + unidadHtml
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" id="ai-pneto-' + idx + '" name="items_manual[' + idx + '][precio_neto]" placeholder="0" min="0" step="any"'
-        + ' style="width:88px;text-align:right;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '<input type="text" inputmode="numeric" id="ai-pneto-' + idx + '" name="items_manual[' + idx + '][precio_neto]" placeholder="$0"'
+        + ' style="width:110px;text-align:right;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" id="ai-ptotal-' + idx + '" name="items_manual[' + idx + '][precio_total]" placeholder="0" min="0" step="1"'
-        + ' style="width:88px;text-align:right;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
+        + '<input type="text" inputmode="numeric" id="ai-ptotal-' + idx + '" name="items_manual[' + idx + '][precio_total]" placeholder="$0"'
+        + ' style="width:110px;text-align:right;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;">'
         + '<select name="items_manual[' + idx + '][contenedor_id]"'
@@ -2986,18 +3172,26 @@ function aiRenderFilaManual(idx, id, nombre, contenedorId) {
 
     inpNeto.addEventListener('input', function() {
         var cant  = parseFloat(inpCant.value) || 1;
-        var neto  = parseFloat(this.value);
-        inpTotal.value = isNaN(neto) ? '' : Math.round(neto * cant);
+        var neto  = aiParseClp(this.value);
+        inpTotal.value = neto > 0 ? aiFormatClp(Math.round(neto * cant)) : '';
+    });
+    inpNeto.addEventListener('blur', function() {
+        var neto = aiParseClp(this.value);
+        this.value = neto > 0 ? aiFormatClp(neto) : '';
     });
     inpTotal.addEventListener('input', function() {
         var cant  = parseFloat(inpCant.value) || 1;
-        var total = parseFloat(this.value);
-        inpNeto.value = (!isNaN(total) && cant > 0) ? parseFloat((total / cant).toFixed(2)) : '';
+        var total = aiParseClp(this.value);
+        inpNeto.value = (total > 0 && cant > 0) ? aiFormatClp(total / cant) : '';
+    });
+    inpTotal.addEventListener('blur', function() {
+        var total = aiParseClp(this.value);
+        this.value = total > 0 ? aiFormatClp(total) : '';
     });
     inpCant.addEventListener('input', function() {
         var cant = parseFloat(this.value) || 1;
-        var neto = parseFloat(inpNeto.value);
-        if (!isNaN(neto)) inpTotal.value = Math.round(neto * cant);
+        var neto = aiParseClp(inpNeto.value);
+        if (neto > 0) inpTotal.value = aiFormatClp(Math.round(neto * cant));
     });
 }
 
@@ -3112,6 +3306,20 @@ function escHtmlAi(str) {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function aiFormatClp(n) {
+    if (n === '' || n === null || isNaN(n)) return '';
+    return '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+function aiParseClp(s) {
+    return parseFloat(String(s).replace(/\$|\./g, '').replace(',', '.')) || 0;
+}
+function aiLimpiarPreciosManual() {
+    document.querySelectorAll('[id^="ai-pneto-"],[id^="ai-ptotal-"]').forEach(function(inp) {
+        var raw = aiParseClp(inp.value);
+        inp.value = raw > 0 ? String(raw) : '';
+    });
+}
+
 function aiGetUnidad(productoId) {
     var p = (typeof aiProductos !== 'undefined' ? aiProductos : []).find(function(x) { return x.id === productoId; });
     return p ? (p.unidad || '—') : '—';
@@ -3163,8 +3371,11 @@ function aiAbrirModalCrear(nombre, editIdx) {
     var res = document.getElementById('ai-resultados-manual');
     if (res) res.style.display = 'none';
     aiRenderCrearFamilias();
+    aiRenderCrearCategorias();
+    aiToggleStockPorFamilia();
     document.getElementById('ai-modal-crear-producto').style.display = 'flex';
 }
+
 
 function aiCerrarModalCrear() {
     if (aiEditandoIdx !== null) {
@@ -3175,40 +3386,82 @@ function aiCerrarModalCrear() {
     document.getElementById('ai-modal-crear-producto').style.display = 'none';
 }
 
+function aiToggleStockPorFamilia() {
+    var esServicios = (aiCrearFamiliaId !== null && aiCrearFamiliaId === AI_SERVICIOS_FAMILIA_ID);
+    var wrap = document.getElementById('ai-crear-stock-wrap');
+    if (wrap) wrap.style.display = esServicios ? 'none' : 'grid';
+}
+
 function aiRenderCrearFamilias() {
     var cont = document.getElementById('ai-crear-familias');
     if (!cont) return;
     cont.innerHTML = '';
+    var _dm = document.documentElement.classList.contains('dark');
     var lista = (typeof aiFamilias !== 'undefined') ? aiFamilias : [];
     lista.forEach(function(f) {
         var sel = f.id === aiCrearFamiliaId;
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = f.nombre;
+        var inactiveCss = _dm
+            ? 'background:rgba(255,255,255,.06);color:#cbd5e1;border-color:#475569;'
+            : 'background:#fff;color:#374151;border-color:#d1d5db;';
         btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;margin:0;'
-            + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : 'background:#fff;color:#374151;border-color:#d1d5db;');
+            + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : inactiveCss);
         btn.onclick = function() {
-            aiCrearFamiliaId = f.id;
+            var same = (aiCrearFamiliaId === f.id);
+            aiCrearFamiliaId = same ? null : f.id;
             aiCrearCatId     = null;
+            aiCrearMarcaId   = null;
             aiRenderCrearFamilias();
             aiRenderCrearCategorias();
+            aiToggleStockPorFamilia();
         };
         cont.appendChild(btn);
     });
+}
+
+function aiBuscarCatEnFamilias(catId) {
+    var found = null;
+    (aiFamilias || []).forEach(function(f) {
+        if (!found) { found = (f.categorias || []).find(function(c) { return c.id === catId; }) || null; }
+    });
+    return found;
+}
+
+function aiEsCatPYP(catId) {
+    return _aiPypFam ? _aiPypFam.categorias.some(function(c) { return c.id == catId; }) : false;
 }
 
 function aiRenderCrearCategorias() {
     var wrapper = document.getElementById('ai-crear-cat-wrapper');
     var cont    = document.getElementById('ai-crear-categorias-btns');
     if (!wrapper || !cont) return;
-    if (!aiCrearFamiliaId) { wrapper.style.display = 'none'; return; }
-    var lista   = aiFamilias || [];
-    var familia = lista.find(function(f) { return f.id === aiCrearFamiliaId; });
-    var cats    = (familia ? familia.categorias : []) || [];
+
+    var sinFamOrNone = (!aiCrearFamiliaId || aiCrearFamiliaId === AI_SIN_FAMILIA_ID);
+    var cats = [];
+
+    if (!sinFamOrNone) {
+        // Familia real seleccionada → solo sus categorías
+        var familia = (aiFamilias || []).find(function(f) { return f.id === aiCrearFamiliaId; });
+        cats = (familia ? familia.categorias : []) || [];
+    } else {
+        // Sin familia o SIN FAMILIA → todas las categorías excepto PARTES Y PIEZAS y SERVICIOS
+        (aiFamilias || []).forEach(function(f) {
+            if (f.tipo === 'servicios') return;
+            (f.categorias || []).forEach(function(c) {
+                if (!aiEsCatPYP(c.id)) cats.push(c);
+            });
+        });
+    }
+
+    var _dmCat = document.documentElement.classList.contains('dark');
     cont.innerHTML = '';
     if (cats.length === 0) {
         var empty = document.createElement('p');
-        empty.textContent = 'Esta familia no tiene categorías aún. Crea una nueva usando el botón de abajo.';
+        empty.textContent = sinFamOrNone
+            ? 'No hay categorías generales disponibles aún.'
+            : 'Esta familia no tiene categorías aún. Crea una nueva usando el botón de abajo.';
         empty.style.cssText = 'font-size:0.75rem;color:#9ca3af;margin:0;';
         cont.appendChild(empty);
         aiCrearCatId = null;
@@ -3218,9 +3471,12 @@ function aiRenderCrearCategorias() {
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.textContent = c.nombre;
+            var inactiveCssCat = _dmCat
+                ? 'background:rgba(255,255,255,.06);color:#cbd5e1;border-color:#475569;'
+                : 'background:#fff;color:#374151;border-color:#d1d5db;';
             btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;'
-                + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : 'background:#fff;color:#374151;border-color:#d1d5db;');
-            btn.onclick = function() { aiCrearCatId = c.id; aiCrearMarcaId = null; aiRenderCrearCategorias(); };
+                + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : inactiveCssCat);
+            btn.onclick = function() { aiCrearCatId = c.id; aiCrearMarcaId = null; aiRenderCrearCategorias(); aiRenderCrearMarcas(); };
             cont.appendChild(btn);
         });
     }
@@ -3233,11 +3489,9 @@ function aiRenderCrearMarcas() {
     var cont    = document.getElementById('ai-crear-marcas-btns');
     if (!wrapper || !cont) return;
     if (!aiCrearCatId) { wrapper.style.display = 'none'; return; }
-    var lista   = aiFamilias || [];
-    var familia = lista.find(function(f) { return f.id === aiCrearFamiliaId; });
-    var cats    = (familia ? familia.categorias : []) || [];
-    var cat     = cats.find(function(c) { return c.id === aiCrearCatId; });
-    var marcas  = (cat && cat.marcas ? cat.marcas : []);
+    // Busca la categoría en cualquier familia (soporta SIN FAMILIA)
+    var cat    = aiBuscarCatEnFamilias(aiCrearCatId);
+    var marcas = (cat && cat.marcas ? cat.marcas : []);
     if (marcas.length === 0) { wrapper.style.display = 'none'; return; }
     cont.innerHTML = '';
     marcas.forEach(function(m) {
@@ -3269,13 +3523,18 @@ function aiConfirmarCrearProducto() {
         if (!aiCrearNombre) { errDiv.textContent = 'Escribe el nombre del producto.'; errDiv.style.display = 'block'; return; }
     }
 
-    if (!aiCrearFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.style.display = 'block'; return; }
     if (!aiCrearCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.style.display = 'block'; return; }
 
-    // Verificar si la categoría tiene marcas y exigir selección
+    // Bloquear categorías de PARTES Y PIEZAS cuando no hay familia real
+    var _sinFamOrNone = (!aiCrearFamiliaId || aiCrearFamiliaId === AI_SIN_FAMILIA_ID);
+    if (_sinFamOrNone && aiEsCatPYP(aiCrearCatId)) {
+        errDiv.textContent = 'Las categorías de PARTES Y PIEZAS requieren una familia real.';
+        errDiv.style.display = 'block'; return;
+    }
+
+    // Verificar si la categoría tiene marcas y exigir selección (busca en cualquier familia)
     var _marcasRequeridas = (function() {
-        var f = (aiFamilias || []).find(function(f) { return f.id === aiCrearFamiliaId; });
-        var c = f ? (f.categorias || []).find(function(c) { return c.id === aiCrearCatId; }) : null;
+        var c = aiBuscarCatEnFamilias(aiCrearCatId);
         return c && c.marcas && c.marcas.length > 0;
     })();
     if (_marcasRequeridas && !aiCrearMarcaId) { errDiv.textContent = 'Selecciona una marca.'; errDiv.style.display = 'block'; return; }
@@ -3412,8 +3671,9 @@ function aiGuardarNuevaCategoria() {
             return;
         }
         var familia = aiFamilias.find(function(f) { return f.id === aiCrearFamiliaId; });
-        if (familia) familia.categorias.push({ id: res.d.id, nombre: res.d.nombre });
+        if (familia) familia.categorias.push({ id: res.d.id, nombre: res.d.nombre, marcas: [] });
         aiCrearCatId = res.d.id;
+        document.getElementById('ai-nueva-categoria-input').value = '';
         aiOcultarNuevaCategoria();
         aiRenderCrearCategorias();
     })

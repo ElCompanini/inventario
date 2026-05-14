@@ -125,6 +125,16 @@
     @media (min-width: 1024px) {
         #row-actividad { grid-template-columns: 3fr 2fr !important; }
     }
+
+    .act-servicio-badge {
+        display:inline-flex; align-items:center; border-radius:0.3rem;
+        background:#f5f3ff; border:1px solid #ddd6fe; color:#7c3aed;
+        font-weight:700; letter-spacing:0.03em;
+        font-size:0.65rem; padding:0.1rem 0.4rem; margin-left:0.3rem; vertical-align:middle;
+    }
+    html.dark .act-servicio-badge {
+        background:rgba(109,40,217,0.2); border:1px solid rgba(139,92,246,0.4); color:#c4b5fd;
+    }
 </style>
 @endpush
 
@@ -234,23 +244,31 @@
                 <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
             </div>
         </div>
-        {{-- SICD referencial --}}
+        {{-- SICD: neto → IVA → total --}}
         <div class="flex items-baseline justify-between gap-1">
-            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0">SICD</span>
-            <span class="text-xs font-semibold text-gray-600 dark:text-gray-400 truncate text-right">{{ $moneda($sicdRefMes) }}</span>
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0">SICD Neto</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400 truncate text-right tabular-nums">{{ $moneda($sicdRefMes) }}</span>
         </div>
-        {{-- OC adjudicada --}}
         <div class="flex items-baseline justify-between gap-1 mt-0.5">
-            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0">OC</span>
-            <span class="text-lg font-bold text-gray-900 dark:text-gray-100 truncate text-right">{{ $moneda($ocFinalMes) }}</span>
+            <span class="text-[10px] text-gray-300 dark:text-slate-600 shrink-0">+IVA 19%</span>
+            <span class="text-[10px] text-gray-400 truncate text-right tabular-nums">{{ $moneda($sicdIvaMes) }}</span>
         </div>
-        {{-- Diferencia --}}
+        <div class="flex items-baseline justify-between gap-1 mt-0.5">
+            <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wide shrink-0">SICD Total</span>
+            <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 truncate text-right tabular-nums">{{ $moneda($sicdTotalMes) }}</span>
+        </div>
+        {{-- OC adjudicada (total con IVA) --}}
+        <div class="flex items-baseline justify-between gap-1 mt-1.5 pt-1.5 border-t border-gray-100 dark:border-slate-700">
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0">OC Total</span>
+            <span class="text-base font-bold text-gray-900 dark:text-gray-100 truncate text-right tabular-nums">{{ $moneda($ocFinalMes) }}</span>
+        </div>
+        {{-- Diferencia (total vs total — homogéneo) --}}
         <div class="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700">
-            @if($sicdRefMes > 0 || $ocFinalMes > 0)
+            @if($sicdTotalMes > 0 || $ocFinalMes > 0)
                 @if($difFinanciera < 0)
-                    <span class="text-xs font-bold text-green-600 dark:text-green-400">↓ Dif. Favorable {{ $moneda(abs($difFinanciera)) }}</span>
+                    <span class="text-xs font-bold text-green-600 dark:text-green-400">↓ Favorable {{ $moneda(abs($difFinanciera)) }}</span>
                 @elseif($difFinanciera > 0)
-                    <span class="text-xs font-bold text-red-500">↑ Dif. Desfavorable {{ $moneda($difFinanciera) }}</span>
+                    <span class="text-xs font-bold text-red-500">↑ Desfavorable {{ $moneda($difFinanciera) }}</span>
                 @else
                     <span class="text-xs text-gray-400">Sin variación</span>
                 @endif
@@ -361,7 +379,12 @@
                 <span class="tipo-badge-{{ $mov->tipo }} text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 text-center shrink-0">
                     {{ $mov->tipo === 'entrada' ? '↑ Ent.' : '↓ Sal.' }}
                 </span>
-                <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">{{ $mov->nombre_producto }}</span>
+                <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">
+                    {{ $mov->nombre_producto }}
+                    @if($mov->producto?->es_servicio || $mov->producto?->categoria?->familia?->tipo === 'servicios')
+                    <span class="act-servicio-badge">SERVICIO</span>
+                    @endif
+                </span>
                 <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 shrink-0">{{ $num(abs($mov->cantidad)) }} u.</span>
                 <span class="hidden sm:inline text-xs text-indigo-500 dark:text-indigo-400 w-20 shrink-0">{{ $modulo }}</span>
                 <span class="hidden sm:inline text-xs text-gray-400 w-20 shrink-0">{{ $mov->usuario?->name ?? '—' }}</span>
@@ -1329,9 +1352,12 @@
             ? '<span class="tipo-badge-entrada text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 text-center shrink-0">↑ Ent.</span>'
             : '<span class="tipo-badge-salida text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 text-center shrink-0">↓ Sal.</span>';
         const oCls = origenColor[mov.origen] ?? 'text-gray-400';
+        const servBadge = mov.es_servicio
+            ? '<span class="act-servicio-badge">SERVICIO</span>'
+            : '';
         return `<div class="flex items-center gap-3 px-3 py-2 rounded-lg alert-row">
             ${badge}
-            <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">${mov.nombre}</span>
+            <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">${mov.nombre}${servBadge}</span>
             <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 shrink-0">${mov.cantidad} u.</span>
             <span class="hidden sm:inline text-xs ${oCls} w-20 shrink-0">${mov.origen}</span>
             <span class="hidden sm:inline text-xs text-gray-400 w-20 shrink-0">${mov.usuario}</span>

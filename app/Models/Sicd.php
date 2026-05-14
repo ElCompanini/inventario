@@ -49,6 +49,23 @@ class Sicd extends Model
         return $this->hasMany(SicdDetalle::class);
     }
 
+    // ── Helpers financieros (neto viene de sicd_detalles, IVA = 19%) ─────────
+
+    public function montoNeto(): float
+    {
+        return (float) ($this->detalles->sum('total_neto') ?? 0);
+    }
+
+    public function montoIva(): float
+    {
+        return round($this->montoNeto() * 0.19, 2);
+    }
+
+    public function montoTotal(): float
+    {
+        return round($this->montoNeto() * 1.19, 2);
+    }
+
     public function ordenesCompra()
     {
         return $this->belongsToMany(OrdenCompra::class, 'oc_sicds');

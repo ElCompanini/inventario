@@ -1,12 +1,12 @@
 @extends('layouts.app')
-@section('title', 'Catálogo de Productos')
+@section('title', 'Catálogo de Productos y Servicios')
 
 @section('content')
 
 {{-- Header --}}
 <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800">Catálogo de Productos</h1>
+        <h1 class="text-2xl font-bold text-gray-800">Catálogo de Productos y Servicios</h1>
         <p class="text-sm text-gray-500 mt-1">Gestión de familias, categorías, marcas y productos</p>
     </div>
     <div class="flex items-center gap-2">
@@ -65,10 +65,11 @@
 </div>
 @endif
 
-{{-- Family tabs --}}
-<p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Familias</p>
-<div class="flex flex-wrap items-center gap-2 mb-6">
-    @foreach($familias as $familia)
+{{-- Family tabs — BIENES --}}
+<p class="text-sm font-bold text-white uppercase tracking-widest mb-0.5">Familias</p>
+<p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Bienes</p>
+<div class="flex flex-wrap items-center gap-2 mb-4">
+    @foreach($familiasBienes as $familia)
     <a href="{{ route('admin.productos.catalogo', ['familia' => $familia->id]) }}"
        class="{{ $familiaActiva === $familia->id ? 'btn-primary' : 'btn-ghost' }}
               px-5 py-2 rounded-full text-sm font-semibold transition
@@ -80,24 +81,53 @@
     @endforeach
 </div>
 
+@if($familiasServicios->isNotEmpty())
+{{-- Separator --}}
+<div style="border-top:1px solid #e5e7eb; margin:0.5rem 0 1rem;"></div>
+
+{{-- Family tabs — SERVICIOS --}}
+<p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Servicios</p>
+<div class="flex flex-wrap items-center gap-2 mb-6">
+    @foreach($familiasServicios as $familia)
+    <a href="{{ route('admin.productos.catalogo', ['familia' => $familia->id]) }}"
+       class="{{ $familiaActiva === $familia->id ? 'btn-primary' : 'btn-ghost' }}
+              px-5 py-2 rounded-full text-sm font-semibold transition
+              {{ $familiaActiva === $familia->id
+                 ? 'bg-indigo-600 text-white shadow'
+                 : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200' }}">
+        {{ $familia->nombre }}
+    </a>
+    @endforeach
+</div>
+@else
+<div class="mb-6"></div>
+@endif
+
 @php
-    $familiaActual = $familias->firstWhere('id', $familiaActiva);
-    $familiaProtegida = $familiaActual &&
-        str_contains(strtolower(str_replace([' ','-','_'], '', $familiaActual->nombre)), 'partes') &&
-        str_contains(strtolower(str_replace([' ','-','_'], '', $familiaActual->nombre)), 'piezas');
+    $familiaActual      = $familias->firstWhere('id', $familiaActiva);
+    $esSinFamilia       = $familiaActual && $familiaActual->esSinFamilia();
+    $familiaProtegida   = $familiaActual && $familiaActual->esPartesYPiezas();
+    $esFamiliaServicios = $familiaActual && $familiaActual->esServicios();
+    $catsToShow         = $esSinFamilia
+        ? ($categoriasActivas ?? collect())
+        : ($familiaActual?->categorias ?? collect());
 @endphp
 
 @if($familiaActual)
 
 
-<div class="grid grid-cols-1 lg:grid-cols-4 gap-5">
+<div class="grid grid-cols-1 gap-5" style="grid-template-columns: repeat({{ $esFamiliaServicios ? 3 : 4 }}, minmax(0, 1fr));">
 
     {{-- LEFT: Categorías --}}
-    <div class="lg:col-span-1">
-        <div class="bg-white rounded-xl shadow p-5">
+    <div>
+        <div class="bg-white rounded-xl shadow p-5 overflow-hidden">
             <div class="flex items-center justify-between mb-4 pb-3" style="border-bottom:1px solid #f3f4f6;">
                 <h2 class="text-sm font-bold text-gray-700">Categorías</h2>
-                @if(!$familiaProtegida)
+                @if($esSinFamilia)
+                <span class="text-xs text-gray-400 italic">Vista global</span>
+                @elseif($familiaProtegida)
+                <span class="text-xs text-gray-400 italic">Familia protegida</span>
+                @else
                 <button onclick="abrirModalCategoria({{ $familiaActual->id }})"
                         class="btn-primary inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg shrink-0">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -105,28 +135,26 @@
                     </svg>
                     Nueva
                 </button>
-                @else
-                <span class="text-xs text-gray-400 italic">Familia protegida</span>
                 @endif
             </div>
 
-            @if($familiaActual->categorias->isEmpty())
+            @if($catsToShow->isEmpty())
             <p class="text-xs text-gray-400 italic text-center py-4">Sin categorías aún</p>
             @else
             <ul class="space-y-1" id="lista-categorias">
-                @foreach($familiaActual->categorias as $cat)
+                @foreach($catsToShow as $cat)
                 <li class="flex items-center gap-1 group">
                     <button onclick="seleccionarCategoria({{ $cat->id }}, '{{ addslashes($cat->nombre) }}')"
                             id="cat-btn-{{ $cat->id }}"
                             class="btn-ghost cat-item flex-1 text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between
-                                   {{ request('categoria', $familiaActual->categorias->first()?->id) == $cat->id
+                                   {{ request('categoria', $catsToShow->first()?->id) == $cat->id
                                       ? 'bg-indigo-50 text-indigo-700 font-semibold'
                                       : 'text-gray-700 hover:bg-gray-50' }}"
                             data-cat-id="{{ $cat->id }}">
-                        <span class="cat-nombre min-w-0 flex-1 truncate">{{ $cat->nombre }}</span>
+                        <span class="cat-nombre min-w-0 flex-1 truncate text-xs">{{ $cat->nombre }}</span>
                         <span class="text-xs text-gray-400 ml-2 shrink-0">{{ $cat->productos->count() }}</span>
                     </button>
-                    @if(auth()->user()->esDev() && !$familiaProtegida)
+                    @if(auth()->user()->esDev() && !$familiaProtegida && !$esSinFamilia)
                     <button onclick="editarCategoria({{ $cat->id }}, '{{ addslashes($cat->nombre) }}')"
                             title="Editar categoría"
                             class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50 transition shrink-0">
@@ -149,8 +177,8 @@
         </div>
     </div>
 
-    {{-- MIDDLE: Marcas --}}
-    <div class="lg:col-span-1" id="panel-marcas-col">
+    {{-- MIDDLE: Marcas — hidden for SERVICIOS family --}}
+    <div id="panel-marcas-col" @if($esFamiliaServicios) style="display:none;" @endif>
         <div class="bg-white rounded-xl shadow p-5">
             <div class="flex items-center justify-between mb-4 pb-3" style="border-bottom:1px solid #f3f4f6;">
                 <h2 class="text-sm font-bold text-gray-700">Marcas</h2>
@@ -167,9 +195,18 @@
         </div>
     </div>
 
-    {{-- RIGHT: Productos --}}
-    <div class="lg:col-span-1">
+    {{-- RIGHT: Productos (spans 2 cols when SERVICIOS to fill gap left by hidden Marcas panel) --}}
+    <div @if($esFamiliaServicios) style="grid-column: span 2;" @endif>
         <div class="bg-white rounded-xl shadow p-5" id="panel-productos">
+
+            @if($esFamiliaServicios)
+            <div id="servicios-familia-badge" class="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg">
+                <svg id="servicios-familia-icon" class="w-4 h-4 shrink-0" fill="none" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <p id="servicios-familia-texto" class="text-xs font-semibold">Familia de Servicios — sin stock físico · sin marcas · los productos son descripciones de servicios</p>
+            </div>
+            @endif
 
             <div class="flex items-center justify-between mb-4 pb-3" style="border-bottom:1px solid #f3f4f6;">
                 <div>
@@ -187,7 +224,7 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
                     </svg>
-                    Nuevo producto
+                    <span id="btn-nuevo-texto">{{ $esFamiliaServicios ? 'Nuevo servicio' : 'Nuevo producto' }}</span>
                 </button>
             </div>
 
@@ -209,6 +246,7 @@
 {!! json_encode($familias->map(fn($f) => [
     'id'         => $f->id,
     'nombre'     => $f->nombre,
+    'tipo'       => $f->tipo,
     'categorias' => $f->categorias->map(fn($c) => [
         'id'        => $c->id,
         'nombre'    => $c->nombre,
@@ -223,6 +261,7 @@
             'contenedor_id'=> $p->contenedor,
             'marca_id'     => $p->marca_id,
             'marca_nombre' => $p->marca?->nombre,
+            'es_servicio'  => (bool) $p->es_servicio,
         ])->values(),
     ])->values(),
 ])->values()) !!}
@@ -312,12 +351,12 @@
 
             {{-- Nombre: solo al crear --}}
             <div id="prod-nombre-wrapper">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del producto <span class="text-red-500">*</span></label>
+                <label id="prod-nombre-label" class="block text-sm font-medium text-gray-700 mb-1">Nombre del producto <span class="text-red-500">*</span></label>
                 <input type="text" id="prod-nombre" maxlength="200" placeholder="Ej: Cable HDMI 1.8m"
                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase">
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
+            <div id="prod-stock-wrap" class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Stock mínimo <span class="text-red-500">*</span></label>
                     <input type="number" id="prod-stock-minimo" min="0" value="0"
@@ -551,13 +590,42 @@
         from { opacity:0; transform:scale(.94); }
         to   { opacity:1; transform:scale(1); }
     }
+
+    /* SERVICIOS family badge — light mode */
+    #servicios-familia-badge {
+        background: #f5f3ff;
+        border: 1px solid #ddd6fe;
+    }
+    #servicios-familia-icon { stroke: #7c3aed; }
+    #servicios-familia-texto { color: #7c3aed; }
+
+    /* SERVICIOS family badge — dark mode */
+    html.dark #servicios-familia-badge {
+        background: rgba(109, 40, 217, 0.15);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+    html.dark #servicios-familia-icon { stroke: #c4b5fd; }
+    html.dark #servicios-familia-texto { color: #c4b5fd; }
+
+    /* [SERVICIO] inline badge en lista de productos */
+    .cat-servicio-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: #f5f3ff; border: 1px solid #ddd6fe; color: #7c3aed;
+        font-size: 0.7rem; font-weight: 600; padding: 2px 7px; border-radius: 5px;
+    }
+    html.dark .cat-servicio-badge {
+        background: rgba(109, 40, 217, 0.2);
+        border: 1px solid rgba(139, 92, 246, 0.4);
+        color: #c4b5fd;
+    }
 </style>
 @endpush
 
 @push('scripts')
 <script>
-const CSRF             = '{{ csrf_token() }}';
-const IS_DEV           = {{ auth()->user()->esDev() ? 'true' : 'false' }};
+const CSRF                = '{{ csrf_token() }}';
+const IS_DEV              = {{ auth()->user()->esDev() ? 'true' : 'false' }};
+const IS_FAMILIA_SERVICIOS = {{ $esFamiliaServicios ? 'true' : 'false' }};
 const ROUTE_FAM_STORE  = '{{ route('admin.catalogo.familias.store') }}';
 const ROUTE_CAT_STORE  = '{{ route('admin.catalogo.categorias.store') }}';
 const ROUTE_CAT_UPDATE  = (id) => `{{ url('admin/catalogo/categorias') }}/${id}`;
@@ -944,44 +1012,55 @@ function seleccionarCategoria(catId, catNombre) {
     if (btn) { btn.classList.add('bg-indigo-50', 'text-indigo-700', 'font-semibold'); btn.classList.remove('text-gray-700'); }
 
     document.getElementById('titulo-categoria').textContent = catNombre;
-    const cat   = catalogoData.flatMap(f => f.categorias).find(c => c.id === catId);
-    const count = cat?.productos?.length ?? 0;
-    document.getElementById('subtitulo-categoria').textContent = count === 0 ? 'Sin productos' : (count === 1 ? '1 producto' : count + ' productos');
+    const cat    = catalogoData.flatMap(f => f.categorias).find(c => c.id === catId);
+    const count  = cat?.productos?.length ?? 0;
+    const label  = IS_FAMILIA_SERVICIOS ? 'servicio' : 'producto';
+    document.getElementById('subtitulo-categoria').textContent = count === 0
+        ? ('Sin ' + label + 's')
+        : (count === 1 ? ('1 ' + label) : (count + ' ' + label + 's'));
 
     const btnNuevo = document.getElementById('btn-nuevo-producto');
     btnNuevo.classList.remove('hidden');
     btnNuevo.style.display = 'inline-flex';
 
-    renderMarcas(cat);
+    if (!IS_FAMILIA_SERVICIOS) renderMarcas(cat);
     renderProductos(cat?.productos ?? []);
 }
 
 function renderProductos(productos) {
     const area = document.getElementById('area-productos');
+    const emptyMsg = IS_FAMILIA_SERVICIOS
+        ? 'Sin servicios en esta categoría. Agrega el primero.'
+        : 'Sin productos en esta categoría. Agrega el primero.';
     if (!productos.length) {
-        area.innerHTML = '<p class="text-sm text-gray-400 text-center py-8 italic">Sin productos en esta categoría. Agrega el primero.</p>';
+        area.innerHTML = '<p class="text-sm text-gray-400 text-center py-8 italic">' + emptyMsg + '</p>';
         return;
     }
     let html = '<div class="space-y-2">';
     productos.forEach(p => {
-        const estado     = p.stock_actual <= p.stock_critico ? 'critico' : p.stock_actual <= p.stock_minimo ? 'minimo' : 'normal';
-        const colorStock = estado === 'critico' ? 'text-red-600' : estado === 'minimo' ? 'text-yellow-600' : 'text-green-600';
+        const esServicio = p.es_servicio || IS_FAMILIA_SERVICIOS;
+        const estado     = esServicio ? 'servicio' : (p.stock_actual <= p.stock_critico ? 'critico' : p.stock_actual <= p.stock_minimo ? 'minimo' : 'normal');
+        const colorStock = estado === 'critico' ? 'text-red-600' : estado === 'minimo' ? 'text-yellow-600' : estado === 'servicio' ? 'text-gray-400' : 'text-green-600';
+        const stockDisplay = esServicio
+            ? '<span class="text-xs text-gray-400 italic">—</span>'
+            : `<span class="text-lg font-bold ${colorStock}">${p.stock_actual}</span>`;
+        const stockBadges = esServicio
+            ? '<span class="cat-servicio-badge">[SERVICIO]</span>'
+            : `<span class="inline-flex items-center gap-1 bg-yellow-50 border border-yellow-200 text-yellow-700 font-medium px-2 py-0.5 rounded-md">Mín: <strong>${p.stock_minimo}</strong></span>
+               <span class="inline-flex items-center gap-1 bg-red-50 border border-red-200 text-red-600 font-medium px-2 py-0.5 rounded-md">Crít: <strong>${p.stock_critico}</strong></span>`;
         html += `
         <div class="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition">
             <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-800 leading-snug">${escHtml(p.nombre)}</p>
-                ${p.marca_nombre ? `<p class="text-xs text-indigo-600 font-semibold">${escHtml(p.marca_nombre)}</p>` : ''}
-                <p class="text-xs mt-1 flex items-center gap-1.5">
-                    <span class="inline-flex items-center gap-1 bg-yellow-50 border border-yellow-200 text-yellow-700 font-medium px-2 py-0.5 rounded-md">Mín: <strong>${p.stock_minimo}</strong></span>
-                    <span class="inline-flex items-center gap-1 bg-red-50 border border-red-200 text-red-600 font-medium px-2 py-0.5 rounded-md">Crít: <strong>${p.stock_critico}</strong></span>
-                </p>
+                ${(!esServicio && p.marca_nombre) ? `<p class="text-xs text-indigo-600 font-semibold">${escHtml(p.marca_nombre)}</p>` : ''}
+                <p class="text-xs mt-1 flex items-center gap-1.5">${stockBadges}</p>
             </div>
             <div class="flex items-center gap-3 shrink-0">
-                <span class="text-lg font-bold ${colorStock}">${p.stock_actual}</span>
-                <button onclick="editarProducto(${p.id})"
+                ${stockDisplay}
+                ${!IS_FAMILIA_SERVICIOS ? `<button onclick="editarProducto(${p.id})"
                         class="btn-ghost text-xs font-semibold text-gray-600 hover:text-gray-800 border border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 px-3 py-1.5 rounded-lg">
                     Editar
-                </button>
+                </button>` : ''}
                 ${IS_DEV ? `<button onclick="eliminarProducto(${p.id}, '${escHtml(p.nombre).replace(/'/g,"\\'")}')"
                         class="btn-ghost text-xs font-semibold text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 bg-white hover:bg-red-50 px-3 py-1.5 rounded-lg">
                     Eliminar
@@ -1395,20 +1474,20 @@ function prodRenderCategorias() {
 }
 
 function abrirModalProducto() {
-    // Bloquear si no hay contenedores
-    if (containersData.length === 0) {
-        showAviso('No hay contenedores disponibles. Crea al menos un contenedor antes de agregar productos.', 'warn');
-        return;
-    }
-    // Bloquear si no hay unidades de medida
-    if (unidadesData.length === 0) {
-        showAviso('No hay unidades de medida disponibles. Crea al menos una unidad de medida antes de agregar productos.', 'warn');
-        return;
-    }
-    // Bloquear si no hay marca seleccionada en el panel
-    if (!marcaActualId) {
-        showAviso('Selecciona una marca en el panel antes de agregar un producto.', 'warn');
-        return;
+    // For physical products: require containers, units, and marca selection
+    if (!IS_FAMILIA_SERVICIOS) {
+        if (containersData.length === 0) {
+            showAviso('No hay contenedores disponibles. Crea al menos un contenedor antes de agregar productos.', 'warn');
+            return;
+        }
+        if (unidadesData.length === 0) {
+            showAviso('No hay unidades de medida disponibles. Crea al menos una unidad de medida antes de agregar productos.', 'warn');
+            return;
+        }
+        if (!marcaActualId) {
+            showAviso('Selecciona una marca en el panel antes de agregar un producto.', 'warn');
+            return;
+        }
     }
 
     editandoProdId = null;
@@ -1418,46 +1497,68 @@ function abrirModalProducto() {
 
     // Populate breadcrumb
     var catObj = familia ? familia.categorias.find(function(c) { return c.id === catActualId; }) : null;
-    document.getElementById('prod-breadcrumb-fam').textContent   = familia ? familia.nombre : '—';
-    document.getElementById('prod-breadcrumb-cat').textContent   = catObj  ? catObj.nombre  : '—';
-    var hasMarca = !!marcaActualNombre;
-    document.getElementById('prod-breadcrumb-sep-marca').style.display = hasMarca ? '' : 'none';
-    document.getElementById('prod-breadcrumb-marca').textContent = hasMarca ? marcaActualNombre : '';
+    document.getElementById('prod-breadcrumb-fam').textContent = familia ? familia.nombre : '—';
+    document.getElementById('prod-breadcrumb-cat').textContent = catObj  ? catObj.nombre  : '—';
+    // For SERVICIOS: no marca in breadcrumb
+    if (IS_FAMILIA_SERVICIOS) {
+        document.getElementById('prod-breadcrumb-sep-marca').style.display = 'none';
+        document.getElementById('prod-breadcrumb-marca').textContent = '';
+    } else {
+        var hasMarca = !!marcaActualNombre;
+        document.getElementById('prod-breadcrumb-sep-marca').style.display = hasMarca ? '' : 'none';
+        document.getElementById('prod-breadcrumb-marca').textContent = hasMarca ? marcaActualNombre : '';
+    }
 
     document.getElementById('prod-selector-wrapper').style.display  = 'block';
-    document.getElementById('modal-prod-titulo').textContent         = 'Nuevo producto';
-    document.getElementById('modal-prod-subtitulo').textContent      = '';
-    document.getElementById('prod-stock-minimo').value               = '0';
-    document.getElementById('prod-stock-critico').value              = '0';
-    document.getElementById('prod-nombre').value                     = '';
-    document.getElementById('prod-nombre-wrapper').style.display     = 'block';
     document.getElementById('modal-prod-errors').classList.add('hidden');
     document.getElementById('modal-prod-success').classList.add('hidden');
+    document.getElementById('prod-nombre').value = '';
+    document.getElementById('prod-nombre-wrapper').style.display = 'block';
 
-    // Poblar y mostrar select de contenedor
-    var sel = document.getElementById('prod-contenedor');
-    sel.innerHTML = '<option value="">— Selecciona un contenedor —</option>';
-    containersData.forEach(function(c) {
-        var opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = c.nombre;
-        sel.appendChild(opt);
-    });
-    document.getElementById('prod-contenedor-wrapper').style.display = 'block';
+    if (IS_FAMILIA_SERVICIOS) {
+        // Service mode: simplified form
+        document.getElementById('modal-prod-titulo').textContent   = 'Nuevo servicio';
+        document.getElementById('modal-prod-subtitulo').textContent = '';
+        document.getElementById('prod-nombre-label').innerHTML = 'Descripción del servicio <span style="color:#ef4444">*</span>';
+        document.getElementById('prod-nombre').placeholder = 'Ej: Mantención preventiva impresora HP';
+        document.getElementById('prod-stock-wrap').style.display     = 'none';
+        document.getElementById('prod-contenedor-wrapper').style.display = 'none';
+        document.getElementById('prod-unidad-wrapper').style.display    = 'none';
+    } else {
+        // Physical product mode: full form
+        document.getElementById('modal-prod-titulo').textContent   = 'Nuevo producto';
+        document.getElementById('modal-prod-subtitulo').textContent = '';
+        document.getElementById('prod-nombre-label').innerHTML = 'Nombre del producto <span style="color:#ef4444">*</span>';
+        document.getElementById('prod-nombre').placeholder = 'Ej: Cable HDMI 1.8m';
+        document.getElementById('prod-stock-minimo').value  = '0';
+        document.getElementById('prod-stock-critico').value = '0';
+        document.getElementById('prod-stock-wrap').style.display = '';
 
-    // Poblar y mostrar select de unidad de medida
-    var selU = document.getElementById('prod-unidad');
-    selU.innerHTML = '<option value="">— Selecciona una unidad —</option>';
-    unidadesData.forEach(function(u) {
-        var opt = document.createElement('option');
-        opt.value = u.id;
-        opt.textContent = u.nombre + (u.abreviacion ? ' (' + u.abreviacion + ')' : '');
-        selU.appendChild(opt);
-    });
-    document.getElementById('prod-unidad-wrapper').style.display = 'block';
+        // Poblar y mostrar select de contenedor
+        var sel = document.getElementById('prod-contenedor');
+        sel.innerHTML = '<option value="">— Selecciona un contenedor —</option>';
+        containersData.forEach(function(c) {
+            var opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.nombre;
+            sel.appendChild(opt);
+        });
+        document.getElementById('prod-contenedor-wrapper').style.display = 'block';
+
+        // Poblar y mostrar select de unidad de medida
+        var selU = document.getElementById('prod-unidad');
+        selU.innerHTML = '<option value="">— Selecciona una unidad —</option>';
+        unidadesData.forEach(function(u) {
+            var opt = document.createElement('option');
+            opt.value = u.id;
+            opt.textContent = u.nombre + (u.abreviacion ? ' (' + u.abreviacion + ')' : '');
+            selU.appendChild(opt);
+        });
+        document.getElementById('prod-unidad-wrapper').style.display = 'block';
+    }
 
     abrirModal('modal-producto');
-    setTimeout(function() { document.getElementById('prod-stock-minimo').focus(); }, 50);
+    setTimeout(function() { document.getElementById('prod-nombre').focus(); }, 50);
 }
 
 function editarProducto(prodId) {
@@ -1509,10 +1610,8 @@ async function eliminarProducto(prodId, nombre) {
 }
 
 async function guardarProducto() {
-    var stock_minimo  = document.getElementById('prod-stock-minimo').value;
-    var stock_critico = document.getElementById('prod-stock-critico').value;
-    var errDiv        = document.getElementById('modal-prod-errors');
-    var sucDiv        = document.getElementById('modal-prod-success');
+    var errDiv = document.getElementById('modal-prod-errors');
+    var sucDiv = document.getElementById('modal-prod-success');
     errDiv.classList.add('hidden');
     sucDiv.classList.add('hidden');
 
@@ -1520,30 +1619,37 @@ async function guardarProducto() {
 
     var nombreProd = document.getElementById('prod-nombre')?.value.trim() ?? '';
     if (!editandoProdId && !nombreProd) {
-        errDiv.textContent = 'El nombre del producto es obligatorio.';
+        errDiv.textContent = IS_FAMILIA_SERVICIOS ? 'La descripción del servicio es obligatoria.' : 'El nombre del producto es obligatorio.';
         errDiv.classList.remove('hidden');
         return;
     }
 
-    // Marca: viene del panel (marcaActualId) al crear; en edición no se toca
-    if (!editandoProdId && !marcaActualId) {
-        errDiv.textContent = 'Selecciona una marca en el panel antes de crear un producto.';
-        errDiv.classList.remove('hidden');
-        return;
-    }
+    var stock_minimo  = '0';
+    var stock_critico = '0';
+    var contenedorId  = '';
+    var unidadId      = '';
 
-    var contenedorId = document.getElementById('prod-contenedor')?.value ?? '';
-    if (!editandoProdId && !contenedorId) {
-        errDiv.textContent = 'Debes seleccionar un contenedor.';
-        errDiv.classList.remove('hidden');
-        return;
-    }
-
-    var unidadId = document.getElementById('prod-unidad')?.value ?? '';
-    if (!editandoProdId && !unidadId) {
-        errDiv.textContent = 'Debes seleccionar una unidad de medida.';
-        errDiv.classList.remove('hidden');
-        return;
+    if (!IS_FAMILIA_SERVICIOS) {
+        // Physical product validations
+        if (!editandoProdId && !marcaActualId) {
+            errDiv.textContent = 'Selecciona una marca en el panel antes de crear un producto.';
+            errDiv.classList.remove('hidden');
+            return;
+        }
+        stock_minimo  = document.getElementById('prod-stock-minimo').value;
+        stock_critico = document.getElementById('prod-stock-critico').value;
+        contenedorId  = document.getElementById('prod-contenedor')?.value ?? '';
+        unidadId      = document.getElementById('prod-unidad')?.value ?? '';
+        if (!editandoProdId && !contenedorId) {
+            errDiv.textContent = 'Debes seleccionar un contenedor.';
+            errDiv.classList.remove('hidden');
+            return;
+        }
+        if (!editandoProdId && !unidadId) {
+            errDiv.textContent = 'Debes seleccionar una unidad de medida.';
+            errDiv.classList.remove('hidden');
+            return;
+        }
     }
 
     var btn = document.getElementById('btn-guardar-prod');
@@ -1553,11 +1659,15 @@ async function guardarProducto() {
         var method = editandoProdId ? 'PUT' : 'POST';
         var body   = new URLSearchParams({ _token: CSRF, stock_minimo, stock_critico });
         if (!editandoProdId) {
-            body.append('marca_id', marcaActualId);
             body.append('categoria_id', prodCatId);
-            body.append('contenedor', contenedorId);
-            body.append('unidad_medida_id', unidadId);
             body.append('nombre', nombreProd.toUpperCase());
+            if (IS_FAMILIA_SERVICIOS) {
+                body.append('es_servicio', '1');
+            } else {
+                body.append('marca_id', marcaActualId);
+                body.append('contenedor', contenedorId);
+                body.append('unidad_medida_id', unidadId);
+            }
         }
         var res  = await fetch(url, { method, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
         var json = await res.json();
@@ -1565,27 +1675,35 @@ async function guardarProducto() {
             errDiv.textContent = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message ?? 'Error al guardar.');
             errDiv.classList.remove('hidden');
         } else if (editandoProdId) {
-            var cat = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
+            var cat  = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
             var prod = cat ? cat.productos.find(function(p) { return p.id === editandoProdId; }) : null;
             if (prod) {
                 prod.stock_minimo  = parseInt(stock_minimo);
                 prod.stock_critico = parseInt(stock_critico);
             }
             var prods = cat ? cat.productos : [];
-            if (marcaActualId) prods = prods.filter(function(p) { return p.marca_id === marcaActualId; });
+            if (!IS_FAMILIA_SERVICIOS && marcaActualId) prods = prods.filter(function(p) { return p.marca_id === marcaActualId; });
             renderProductos(prods);
             cerrarModalProducto();
         } else {
             var familia = catalogoData.find(function(f) { return f.categorias.some(function(c) { return c.id === prodCatId; }); });
             var cat     = familia ? familia.categorias.find(function(c) { return c.id === prodCatId; }) : null;
             if (cat) {
-                var marcaSel = marcasData.find(function(m) { return m.id === marcaActualId; });
-                cat.productos.push({ id: json.id, nombre: json.nombre, stock_actual: 0, stock_minimo: parseInt(stock_minimo), stock_critico: parseInt(stock_critico), contenedor_id: null, marca_id: marcaActualId, marca_nombre: marcaSel ? marcaSel.nombre : null });
+                var marcaSel = IS_FAMILIA_SERVICIOS ? null : marcasData.find(function(m) { return m.id === marcaActualId; });
+                cat.productos.push({
+                    id: json.id, nombre: json.nombre,
+                    stock_actual: 0, stock_minimo: parseInt(stock_minimo), stock_critico: parseInt(stock_critico),
+                    contenedor_id: null,
+                    marca_id: IS_FAMILIA_SERVICIOS ? null : marcaActualId,
+                    marca_nombre: marcaSel ? marcaSel.nombre : null,
+                    es_servicio: IS_FAMILIA_SERVICIOS,
+                });
                 if (catActualId === prodCatId) {
-                    document.getElementById('subtitulo-categoria').textContent = cat.productos.length + ' producto' + (cat.productos.length !== 1 ? 's' : '');
-                    var prodsVis = marcaActualId ? cat.productos.filter(function(p) { return p.marca_id === marcaActualId; }) : cat.productos;
+                    const label = IS_FAMILIA_SERVICIOS ? 'servicio' : 'producto';
+                    document.getElementById('subtitulo-categoria').textContent = cat.productos.length + ' ' + label + (cat.productos.length !== 1 ? 's' : '');
+                    var prodsVis = (!IS_FAMILIA_SERVICIOS && marcaActualId) ? cat.productos.filter(function(p) { return p.marca_id === marcaActualId; }) : cat.productos;
                     renderProductos(prodsVis);
-                    renderMarcas(cat);
+                    if (!IS_FAMILIA_SERVICIOS) renderMarcas(cat);
                 }
                 var spanCont = document.querySelector('#cat-btn-' + prodCatId + ' span.text-xs');
                 if (spanCont) spanCont.textContent = cat.productos.length;
@@ -1593,7 +1711,10 @@ async function guardarProducto() {
             cerrarModalProducto();
         }
     } catch (e) { errDiv.textContent = 'Error de conexión.'; errDiv.classList.remove('hidden'); }
-    finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+    finally {
+        btn.disabled = false;
+        btn.textContent = IS_FAMILIA_SERVICIOS ? 'Guardar' : 'Guardar';
+    }
 }
 
 document.getElementById('modal-producto').addEventListener('click', function(e) { if (e.target === e.currentTarget) cerrarModalProducto(); });

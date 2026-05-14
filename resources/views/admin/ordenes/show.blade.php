@@ -135,7 +135,12 @@
                                     {{ $det->precio_neto ? '$' . number_format($det->precio_neto, 0, ',', '.') : '—' }}
                                 </td>
                                 <td class="px-4 py-2 text-right font-semibold text-gray-800">
-                                    {{ $det->total_neto ? '$' . number_format($det->total_neto, 0, ',', '.') : '—' }}
+                                    @php
+                                        $cant = $det->cantidad_recibida ?: $det->cantidad_solicitada;
+                                        $totalNeto = $det->total_neto
+                                            ?: ($det->precio_neto && $cant ? round($det->precio_neto * $cant) : null);
+                                    @endphp
+                                    {{ $totalNeto ? '$' . number_format($totalNeto, 0, ',', '.') : '—' }}
                                 </td>
                             </tr>
                         @endforeach
@@ -337,7 +342,9 @@
             <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
                     <h2 class="text-base font-semibold text-gray-700">Factura</h2>
+                    @if(!$oc->factura)
                     <p class="text-xs text-red-500">Obligatoria para recepción</p>
+                    @endif
                 </div>
                 <span class="w-2.5 h-2.5 rounded-full {{ $oc->factura ? 'bg-green-500' : 'bg-gray-300' }}"></span>
             </div>

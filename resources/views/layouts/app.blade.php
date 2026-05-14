@@ -26,12 +26,28 @@
     /* ── Sidebar ── */
     #sidebar {
         width: var(--sb-w);
-        transition: width .28s cubic-bezier(.4,0,.2,1);
+        /* Compound: layout transition + theme transitions merged here
+           so the later theme-only rule cannot override them */
+        transition: width .28s cubic-bezier(.4,0,.2,1),
+                    background-color .18s ease,
+                    border-color .18s ease;
     }
 
     #main-wrapper {
         margin-left: var(--sb-w);
-        transition: margin-left .28s cubic-bezier(.4,0,.2,1);
+        /* Explicit width prevents auto-width rounding artifacts and
+           keeps the content box correctly sized at all sidebar states */
+        width: calc(100vw - var(--sb-w));
+        min-width: 0;
+        /* Compound: layout + theme transitions merged */
+        transition: margin-left .28s cubic-bezier(.4,0,.2,1),
+                    width .28s cubic-bezier(.4,0,.2,1),
+                    background-color .18s ease;
+    }
+
+    /* Collapsed overrides — must set width explicitly to match margin-left */
+    body.sb-collapsed #main-wrapper {
+        width: calc(100vw - var(--sb-cw));
     }
 
     /* Breathing pulse on notification badge */
@@ -63,16 +79,17 @@
     body.sb-collapsed .sb-logout-btn    { display: none; }
     body.sb-collapsed #sb-toggle svg    { transform: rotate(180deg); }
 
-    /* Nav: uniform icon spacing when collapsed — kill section gaps */
-    body.sb-collapsed nav              { padding-top: 6px !important; padding-bottom: 6px !important; display: flex; flex-direction: column; gap: 0; }
+    /* Nav: uniform icon spacing when collapsed — kill section gaps, center pills */
+    body.sb-collapsed nav              { padding-top: 6px !important; padding-bottom: 6px !important; display: flex; flex-direction: column; align-items: center; gap: 0; }
     body.sb-collapsed nav > div       { padding: 0 !important; margin: 0 !important; display: contents; }
 
-    /* Each link: 44×44 icon pill — left-aligned so margin:0 is stable during transition */
+    /* Each link: 44×44 icon pill centered in 68px sidebar */
     body.sb-collapsed .sb-link {
         width: 44px;
         height: 44px;
         padding: 0;
-        margin: 2px 0;   /* NOT auto — auto can't interpolate and causes negative-margin leftward jump */
+        gap: 0;          /* eliminate gap-3 so label/badge remnants don't push icon off-center */
+        margin: 2px 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -99,12 +116,17 @@
 
     /* Toggle button — size set inline, no override needed */
 
-    /* No stray shadows — dark mode keeps these overrides */
+    /* Dark mode sidebar — no stray shadows or borders */
     html.dark #sidebar { box-shadow: none !important; border-right: none !important; }
+    /* Dark mode compact: border colors from CSS vars, not Tailwind utility */
+    html.dark body.sb-collapsed .sb-header-row { border-bottom: 1px solid rgba(255,255,255,.08) !important; }
+    html.dark body.sb-collapsed .sb-user-block  { border-bottom: 1px solid rgba(255,255,255,.08) !important; }
 
-    /* Transición suave al cambiar tema — solo propiedades visuales */
-    body, #main-wrapper, .bg-white, .bg-gray-50, .bg-gray-100,
-    input, select, textarea, th, td, table, #sidebar {
+    /* Transición suave al cambiar tema — solo propiedades visuales.
+       NOTA: #sidebar y #main-wrapper se excluyen de aquí porque ya tienen
+       sus propias transiciones compuestas (layout + tema) declaradas arriba. */
+    body, .bg-white, .bg-gray-50, .bg-gray-100,
+    input, select, textarea, th, td, table {
         transition: background-color .18s ease, border-color .18s ease, color .18s ease;
     }
 
@@ -226,13 +248,16 @@
         pointer-events: none;
     }
 
-    /* Notification badges: opacity fade only (no layout impact) */
+    /* Notification badges: opacity fade only */
     .sb-badge {
-        transition: opacity .16s ease;
+        transition: opacity .16s ease, width .16s ease;
     }
     body.sb-collapsed .sb-badge {
         display: inline-flex !important; /* allow transition — override display:none */
         opacity: 0;
+        width: 0 !important;
+        min-width: 0 !important;
+        overflow: hidden;
         pointer-events: none;
     }
 
@@ -318,7 +343,7 @@
     }
 </style>
 </head>
-<body class="bg-gray-100 font-sans">
+<body class="bg-gray-100 font-sans" style="overflow-x:hidden;">
 
 @php $u = auth()->user(); @endphp
 
@@ -604,13 +629,13 @@
                 <span class="sb-label">Unidades de Medida</span>
             </a>
 
-            <a href="{{ route('admin.productos.catalogo') }}" data-tip="Catálogo de Productos"
+            <a href="{{ route('admin.productos.catalogo') }}" data-tip="Catálogo de Productos y Servicios"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                       {{ request()->routeIs('admin.productos.catalogo*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                 </svg>
-                <span class="sb-label">Catálogo de Productos</span>
+                <span class="sb-label">Catálogo Prod. y Serv.</span>
             </a>
             @endif
         </div>
