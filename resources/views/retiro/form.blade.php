@@ -132,7 +132,7 @@
 @push('scripts')
 <script>
     // ── Estado del carrito ────────────────────────────────────────────────────
-    let carrito = {}; // { id: { id, nombre, stock_actual, cantidad } }
+    let carrito = {}; // { id: { id, nombre, stock_actual, cantidad, stock_visual, pkg_qty, pkg_tipo, pkg_base } }
     let timerBusqueda;
 
     // ── Modales personalizados ────────────────────────────────────────────────
@@ -148,10 +148,18 @@
         const totalPiezas = items.reduce((acc, i) => acc + i.cantidad, 0);
         const lista = items.map(i => {
             const meta = [i.familia, i.categoria].filter(Boolean).join(' › ');
+            let pkgStr = '';
+            if (i.pkgQty && i.cantidad) {
+                const cajas = Math.floor(i.cantidad / i.pkgQty);
+                const resto = i.cantidad % i.pkgQty;
+                if (cajas > 0 && resto > 0) pkgStr = `${cajas} ${i.pkgTipo} + ${resto} ${i.pkgBase}`;
+                else if (cajas > 0) pkgStr = `${cajas} ${i.pkgTipo}`;
+                else pkgStr = `${resto} ${i.pkgBase}`;
+            }
             return `<div style="padding:0.4rem 0; border-bottom:1px solid #f1f5f9;">
                 <span style="font-size:0.8125rem;font-weight:600;color:#1e293b;">${escHtml(i.nombre)}</span>
                 ${meta ? `<span style="font-size:0.75rem;color:#94a3b8;margin-left:0.4rem;">${escHtml(meta)}</span>` : ''}
-                <span style="float:right;font-size:0.8125rem;font-weight:600;color:#4f46e5;">${i.cantidad} u.</span>
+                <span style="float:right;font-size:0.8125rem;font-weight:600;color:#4f46e5;">${i.cantidad} u.${pkgStr ? ` <span style="font-size:0.75rem;font-weight:400;color:#7c3aed;">(${escHtml(pkgStr)})</span>` : ''}</span>
             </div>`;
         }).join('');
         document.getElementById('retiro-confirm-resumen').innerHTML =
@@ -214,24 +222,29 @@
         }
 
         sinRes.classList.add('hidden');
-        cont.innerHTML = productos.map(p => `
+        cont.innerHTML = productos.map(p => {
+            const stockBadgeClass = p.stock_actual <= 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700';
+            const pkgData = `data-pkg-qty="${p.pkg_qty || ''}" data-pkg-tipo="${escHtml(p.pkg_tipo || '')}" data-pkg-base="${escHtml(p.pkg_base || '')}" data-stock-visual="${escHtml(p.stock_visual || '')}"`;
+            return `
             <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-gray-200
                         hover:bg-indigo-50 hover:border-indigo-300 cursor-pointer transition"
-                 onclick="agregarAlCarrito(${p.id}, '${escHtml(p.nombre)}', ${p.stock_actual}, '${escHtml(p.categoria)}', '${escHtml(p.familia)}')">
+                 onclick="agregarAlCarrito(${p.id}, '${escHtml(p.nombre)}', ${p.stock_actual}, '${escHtml(p.categoria)}', '${escHtml(p.familia)}', ${p.pkg_qty || 'null'}, '${escHtml(p.pkg_tipo || '')}', '${escHtml(p.pkg_base || '')}', '${escHtml(p.stock_visual || '')}')">
                 <div class="min-w-0">
                     <p class="text-xs font-semibold text-indigo-700 truncate">${escHtml(p.nombre)}</p>
                     ${p.familia || p.categoria ? `<p class="text-[10px] text-gray-400 truncate">${escHtml(p.familia)}${p.familia && p.categoria ? ' › ' : ''}${escHtml(p.categoria)}</p>` : ''}
                 </div>
-                <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full
-                    ${p.stock_actual <= 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}">
-                    Stock: ${p.stock_actual}
-                </span>
-            </div>
-        `).join('');
+                <div class="shrink-0 text-right">
+                    <span class="text-xs font-bold px-2 py-0.5 rounded-full ${stockBadgeClass}">
+                        ${p.stock_actual} u.
+                    </span>
+                    ${p.stock_visual ? `<p class="text-[10px] text-blue-500 font-medium mt-0.5">${escHtml(p.stock_visual)}</p>` : ''}
+                </div>
+            </div>`;
+        }).join('');
     }
 
     // ── Carrito ───────────────────────────────────────────────────────────────
-    function agregarAlCarrito(id, nombre, stockActual, categoria, familia) {
+    function agregarAlCarrito(id, nombre, stockActual, categoria, familia, pkgQty, pkgTipo, pkgBase, stockVisual) {
         if (carrito[id]) {
             carrito[id].cantidad = Math.min(carrito[id].cantidad + 1, stockActual);
         } else {
@@ -246,6 +259,10 @@
                 cantidad: 1,
                 categoria: categoria || '',
                 familia: familia || '',
+                pkgQty: pkgQty || null,
+                pkgTipo: pkgTipo || '',
+                pkgBase: pkgBase || 'unidad',
+                stockVisual: stockVisual || '',
             };
         }
         renderCarrito();
@@ -290,11 +307,24 @@
 
         vacio.classList.add('hidden');
 
-        lista.innerHTML = items.map((item, idx) => `
+        lista.innerHTML = items.map((item, idx) => {
+            const meta = [item.familia, item.categoria].filter(Boolean).join(' › ');
+            const pkgInfo = item.pkgQty && item.cantidad
+                ? (() => {
+                    const cajas = Math.floor(item.cantidad / item.pkgQty);
+                    const resto = item.cantidad % item.pkgQty;
+                    if (cajas > 0 && resto > 0) return `${cajas} ${item.pkgTipo} + ${resto} ${item.pkgBase}`;
+                    if (cajas > 0) return `${cajas} ${item.pkgTipo}`;
+                    return `${resto} ${item.pkgBase}`;
+                })()
+                : null;
+            return `
             <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
                 <div class="flex-1 min-w-0">
                     <p class="text-xs font-semibold text-gray-700 truncate">${escHtml(item.nombre)}</p>
-                    ${(item.familia || item.categoria) ? `<p class="text-[10px] text-gray-400 truncate">${escHtml([item.familia, item.categoria].filter(Boolean).join(' › '))}</p>` : ''}
+                    ${meta ? `<p class="text-[10px] text-gray-400 truncate">${escHtml(meta)}</p>` : ''}
+                    ${item.stockVisual ? `<p class="text-[10px]" style="color:#2563eb;">Disponible: ${escHtml(item.stockVisual)}</p>` : ''}
+                    ${pkgInfo ? `<p class="text-[10px]" style="color:#7c3aed;">= ${escHtml(pkgInfo)}</p>` : ''}
                 </div>
                 <input type="number" min="1" max="${item.stockActual}" value="${item.cantidad}"
                        onchange="cambiarCantidad(${item.id}, this.value)"
@@ -305,8 +335,8 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
 
         // Inputs ocultos para el form
         inputs.innerHTML = items.map((item, idx) => `

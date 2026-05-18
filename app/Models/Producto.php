@@ -25,6 +25,10 @@ class Producto extends Model
         'stock_critico_desde',
         'activo',
         'es_servicio',
+        'maneja_presentacion',
+        'tipo_presentacion',
+        'cantidad_presentacion',
+        'unidad_base',
     ];
 
     protected static function booted(): void
@@ -33,9 +37,11 @@ class Producto extends Model
     }
 
     protected $casts = [
-        'stock_minimo_desde'  => 'datetime',
-        'stock_critico_desde' => 'datetime',
-        'es_servicio'         => 'boolean',
+        'stock_minimo_desde'    => 'datetime',
+        'stock_critico_desde'   => 'datetime',
+        'es_servicio'           => 'boolean',
+        'maneja_presentacion'   => 'boolean',
+        'cantidad_presentacion' => 'integer',
     ];
 
     public function centroCosto()
@@ -98,6 +104,63 @@ class Producto extends Model
     public function esServicio(): bool
     {
         return (bool) $this->es_servicio;
+    }
+
+    /** True if the product tracks a multi-unit presentation (box, bag, etc.) */
+    public function tienePresentacion(): bool
+    {
+        return (bool) $this->maneja_presentacion
+            && $this->cantidad_presentacion > 0
+            && $this->tipo_presentacion !== null;
+    }
+
+    /**
+     * Returns visual breakdown of stock_actual into presentations + remainder.
+     * e.g. 138 units with 50/box → ['tipo'=>'Caja','cajas'=>2,'resto'=>38,'por_pres'=>50,'unidad_base'=>'Unidad']
+     */
+    public function stockVisual(?int $stockOverride = null): ?array
+    {
+        if (!$this->tienePresentacion()) return null;
+
+        $q = (int) $this->cantidad_presentacion;
+        $s = $stockOverride ?? (int) $this->stock_actual;
+
+        return [
+            'tipo'        => $this->tipo_presentacion,
+            'cajas'       => intdiv($s, $q),
+            'resto'       => $s % $q,
+            'por_pres'    => $q,
+            'unidad_base' => $this->unidad_base ?: 'unidad',
+        ];
+    }
+
+    /**
+     * Human-readable visual of an arbitrary real-unit quantity.
+     * e.g. 138 with Caja/50/Unidad → "2 Caja(s) + 38 Unidad(s)"
+     */
+    public function cantidadVisual(int $cantidadReal): string
+    {
+        if (!$this->tienePresentacion()) return (string) $cantidadReal;
+
+        $q     = (int) $this->cantidad_presentacion;
+        $cajas = intdiv($cantidadReal, $q);
+        $resto = $cantidadReal % $q;
+        $tipo  = $this->tipo_presentacion;
+        $base  = $this->unidad_base ?: 'unidad';
+
+        if ($cajas > 0 && $resto > 0) return "{$cajas} {$tipo} + {$resto} {$base}";
+        if ($cajas > 0)               return "{$cajas} {$tipo}";
+        return "{$resto} {$base}";
+    }
+
+    /**
+     * Convert a "number of presentations" into real units.
+     * e.g. 3 boxes × 50 = 150 real units
+     */
+    public function presentacionesToReal(int $cantPresentaciones): int
+    {
+        if (!$this->tienePresentacion()) return $cantPresentaciones;
+        return $cantPresentaciones * (int) $this->cantidad_presentacion;
     }
 
     public function scopeSoloFisicos($query)

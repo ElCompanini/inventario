@@ -383,9 +383,24 @@
                         <span style="display:inline-block; background:#e0e7ff; color:#4338ca; font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:9999px;">—</span>
                     @endif
                 </td>
-                <td class="px-1.5 py-2 text-center font-bold text-xs whitespace-nowrap
+                <td class="px-1.5 py-2 text-center font-bold text-xs
                         {{ $estado === 'critico' ? 'text-red-700' : ($estado === 'minimo' ? 'text-yellow-700' : 'text-gray-400') }}">
-                    @if($esServicio) — @else {{ $producto->stock_actual }} @endif
+                    @if($esServicio)
+                        —
+                    @elseif($producto->tienePresentacion())
+                        @php $sv = $producto->stockVisual(); @endphp
+                        <span title="{{ $producto->stock_actual }} {{ strtolower($sv['unidad_base']) }}(s) en total"
+                              style="cursor:default; display:inline-flex; flex-direction:column; align-items:center; gap:1px;">
+                            @if($sv['cajas'] > 0)
+                            <span>{{ $sv['cajas'] }} {{ $sv['tipo'] }}</span>
+                            @endif
+                            @if($sv['resto'] > 0 || $sv['cajas'] === 0)
+                            <span style="font-weight:400; color:inherit; opacity:0.8;">{{ $sv['resto'] }} {{ $sv['unidad_base'] }}</span>
+                            @endif
+                        </span>
+                    @else
+                        {{ $producto->stock_actual }}
+                    @endif
                 </td>
                 <td class="px-1.5 py-2 text-center text-gray-400 text-xs whitespace-nowrap">
                     @if($esServicio)
@@ -484,7 +499,7 @@
                         @else
                         <button type="button"
                             title="{{ $esServicio ? 'Servicio — sin stock físico' : 'Solicitar salida' }}"
-                            @if(!$esServicio) onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'salida', {{ $producto->stock_actual }}, {{ $producto->solicitudes->sum('cantidad') }}, '{{ addslashes($producto->unidadMedida?->abreviacion ?? $producto->unidad ?? 'u.') }}')" @endif
+                            @if(!$esServicio) onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'salida', {{ $producto->stock_actual }}, {{ $producto->solicitudes->sum('cantidad') }}, '{{ addslashes($producto->unidadMedida?->abreviacion ?? $producto->unidad ?? 'u.') }}', '{{ $producto->tienePresentacion() ? addslashes($producto->cantidadVisual($producto->stock_actual)) : '' }}')" @endif
                             class="btn-accion-orange inline-flex items-center justify-center text-white rounded-lg p-1.5"
                             {{ ($esServicio || $producto->stock_actual <= 0) ? 'disabled' : '' }}>
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -668,7 +683,7 @@
         document.getElementById('form-solicitud').requestSubmit();
     }
 
-    function abrirModal(productoId, nombre, tipo, stockActual, pendiente, unidad) {
+    function abrirModal(productoId, nombre, tipo, stockActual, pendiente, unidad, visualStock) {
         _pendienteActual = pendiente || 0;
         _submitForzado   = false;
         _unidad          = unidad || 'u.';
@@ -676,7 +691,8 @@
         document.getElementById('modal-tipo').value = tipo;
         document.getElementById('modal-cantidad').value = '';
         document.getElementById('modal-motivo').value = '';
-        document.getElementById('modal-stock').textContent = stockActual;
+        // Show visual stock if product has presentation; fallback to raw number
+        document.getElementById('modal-stock').textContent = visualStock || stockActual;
         ocultarErrorModal();
 
         var aviso = document.getElementById('modal-aviso-pendiente');
@@ -1306,11 +1322,11 @@ function escHtmlGm(str) {
                                 style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
                             <span id="ai-codigo-hint" style="font-size:0.7rem; margin-top:0.35rem; display:flex; align-items:center; gap:0.3rem;"></span>
                             {{-- Advertencia leve: SICD ya ingresada --}}
-                            <div id="ai-sicd-ya-ingresada" style="display:none; margin-top:0.4rem; background:#fffbeb; border:1px solid #fcd34d; border-radius:0.4rem; padding:0.4rem 0.65rem; align-items:center; gap:0.5rem;">
+                            <div id="ai-sicd-ya-ingresada" class="ai-warn-ya-ingresada" style="display:none; margin-top:0.4rem;">
                                 <svg style="width:14px;height:14px;flex-shrink:0;color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                                 </svg>
-                                <span style="font-size:0.72rem; color:#92400e; font-weight:500;">Esta SICD ya fue ingresada · Estado: <strong id="ai-sicd-ya-estado-leve"></strong></span>
+                                <span style="font-size:0.72rem; font-weight:500;">Esta SICD ya fue ingresada · Estado: <strong id="ai-sicd-ya-estado-leve"></strong></span>
                             </div>
                             <div id="ai-sicd-info" style="display:none; margin-top:0.4rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.4rem; padding:0.35rem 0.6rem; font-size:0.72rem; color:#166534;"></div>
                         </div>
@@ -2005,6 +2021,11 @@ function escHtmlGm(str) {
         background:#312e81 !important; border-color:#312e81 !important;
     }
     html.dark .dt-info { color:#64748b !important; }
+    .ai-warn-ya-ingresada { background:#fffbeb; border:1px solid #fcd34d; border-radius:0.4rem; padding:0.4rem 0.65rem; align-items:center; gap:0.5rem; }
+    .ai-warn-ya-ingresada span { color:#92400e; }
+    html.dark .ai-warn-ya-ingresada { background:rgba(120,53,15,0.25); border-color:#92400e; }
+    html.dark .ai-warn-ya-ingresada span { color:#fde68a; }
+    html.dark .ai-warn-ya-ingresada svg { color:#fbbf24; }
 </style>
 @endpush
 
@@ -3006,22 +3027,32 @@ document.getElementById('ai-buscador').addEventListener('input', function() {
         return p.nombre.toLowerCase().indexOf(q) >= 0;
     }).slice(0, 10);
 
+    var _dm        = document.documentElement.classList.contains('dark');
+    var rowBorder  = _dm ? '#334155'  : '#f3f4f6';
+    var rowHover   = _dm ? '#312e81'  : '#fef3c7';
+    var rowText    = _dm ? '#e2e8f0'  : '#1f2937';
+    var rowSub     = _dm ? '#94a3b8'  : '#6b7280';
+    var crearBg    = _dm ? '#052e16'  : '#f0fdf4';
+    var crearBd    = _dm ? '#166534'  : '#e5e7eb';
+    var crearHover = _dm ? '#14532d'  : '#dcfce7';
+    var crearTx    = _dm ? '#86efac'  : '#16a34a';
+
     var html = matches.map(function(p) {
         return '<div onclick="aiAgregar(' + p.id + ',\'' + p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')"'
-            + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;"'
-            + ' onmouseover="this.style.background=\'#fef3c7\'" onmouseout="this.style.background=\'\'">'
-            + '<p style="font-size:0.8rem;font-weight:600;color:#1f2937;">' + escHtmlAi(p.nombre) + '</p>'
-            + '<p style="font-size:0.72rem;color:#6b7280;">Stock: ' + p.stock + '</p>'
+            + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid ' + rowBorder + ';"'
+            + ' onmouseover="this.style.background=\'' + rowHover + '\'" onmouseout="this.style.background=\'\'">'
+            + '<p style="font-size:0.8rem;font-weight:600;color:' + rowText + ';">' + escHtmlAi(p.nombre) + '</p>'
+            + '<p style="font-size:0.72rem;color:' + rowSub + ';">Stock: ' + p.stock + '</p>'
             + '</div>';
     }).join('');
 
     if (AI_IS_ADMIN) {
         var qEsc = qOrig.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         html += '<div data-crear-nombre="' + qEsc + '" onclick="aiCrearContexto=\'local\'; aiAbrirModalCrear(this.dataset.crearNombre)"'
-            + ' style="padding:0.5rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;border-top:1px solid #e5e7eb;background:#f0fdf4;"'
-            + ' onmouseover="this.style.background=\'#dcfce7\'" onmouseout="this.style.background=\'#f0fdf4\'">'
+            + ' style="padding:0.5rem 0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;border-top:1px solid ' + crearBd + ';background:' + crearBg + ';"'
+            + ' onmouseover="this.style.background=\'' + crearHover + '\'" onmouseout="this.style.background=\'' + crearBg + '\'">'
             + '<span style="font-size:1rem;line-height:1;">➕</span>'
-            + '<p style="font-size:0.8rem;font-weight:700;color:#16a34a;">Crear producto «' + qEsc + '»</p>'
+            + '<p style="font-size:0.8rem;font-weight:700;color:' + crearTx + ';">Crear producto «' + qEsc + '»</p>'
             + '</div>';
     }
 
@@ -3446,12 +3477,10 @@ function aiRenderCrearCategorias() {
         var familia = (aiFamilias || []).find(function(f) { return f.id === aiCrearFamiliaId; });
         cats = (familia ? familia.categorias : []) || [];
     } else {
-        // Sin familia o SIN FAMILIA → todas las categorías excepto PARTES Y PIEZAS y SERVICIOS
+        // Sin familia o SIN FAMILIA → todas las categorías excepto SERVICIOS y PARTES Y PIEZAS
         (aiFamilias || []).forEach(function(f) {
-            if (f.tipo === 'servicios') return;
-            (f.categorias || []).forEach(function(c) {
-                if (!aiEsCatPYP(c.id)) cats.push(c);
-            });
+            if (f.tipo === 'servicios' || f.tipo === 'partes_piezas') return;
+            (f.categorias || []).forEach(function(c) { cats.push(c); });
         });
     }
 
@@ -3524,13 +3553,6 @@ function aiConfirmarCrearProducto() {
     }
 
     if (!aiCrearCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.style.display = 'block'; return; }
-
-    // Bloquear categorías de PARTES Y PIEZAS cuando no hay familia real
-    var _sinFamOrNone = (!aiCrearFamiliaId || aiCrearFamiliaId === AI_SIN_FAMILIA_ID);
-    if (_sinFamOrNone && aiEsCatPYP(aiCrearCatId)) {
-        errDiv.textContent = 'Las categorías de PARTES Y PIEZAS requieren una familia real.';
-        errDiv.style.display = 'block'; return;
-    }
 
     // Verificar si la categoría tiene marcas y exigir selección (busca en cualquier familia)
     var _marcasRequeridas = (function() {

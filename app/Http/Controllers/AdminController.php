@@ -16,8 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Imports\SicdDetallesImport;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class AdminController extends Controller
 {
@@ -464,6 +463,8 @@ class AdminController extends Controller
     public function cargaMasiva(Request $request)
     {
         abort_unless(auth()->user()->esAdmin(), 403);
+        ini_set('memory_limit', '1024M');
+        set_time_limit(300);
 
         $request->validate([
             'excel_masivo'  => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
@@ -477,7 +478,7 @@ class AdminController extends Controller
         ]);
 
         $vincularOc  = $request->boolean('vincular_oc');
-        $rows        = Excel::toCollection(new SicdDetallesImport, $request->file('excel_masivo'))->first();
+        $rows        = $this->leerExcelLigero($request->file('excel_masivo'));
         $motivo      = trim($request->input('motivo_masivo', '')) ?: 'Carga masiva de inventario';
         $codigoSicd  = strtoupper(trim($request->input('codigo_sicd', '')));
 
@@ -525,8 +526,6 @@ class AdminController extends Controller
         }
 
         $descripcion = $request->input('descripcion');
-
-        set_time_limit(300);
         $ccIdMasiva = $user->ccFiltro();
 
         // ── Precarga en memoria — elimina N+1 y timeouts ──────────────────
@@ -568,8 +567,17 @@ class AdminController extends Controller
             // Columna F (índice 5): TIPO — "SERVICIO" → servicio, cualquier otro → producto físico
             $tipoExcel   = strtoupper(trim((string) ($row[5] ?? '')));
             $esServicio  = $tipoExcel === 'SERVICIO';
+            // Columnas G/H/I (índices 6/7/8): presentación (opcional, retrocompatible)
+            $tipoPres    = trim((string) ($row[6] ?? ''));
+            $cantPres    = is_numeric($row[7] ?? '') ? (int) $row[7] : 0;
+            $unidadBase  = trim((string) ($row[8] ?? ''));
+            $manejaPres  = !$esServicio && $tipoPres !== '' && $cantPres >= 2;
 
             if ($desc === '' || $cantidad <= 0) continue;
+
+            // Si el item maneja presentación, la cantidad del Excel = presentaciones;
+            // convertir a unidades reales para stock e historial
+            $cantidadReal = $manejaPres ? ($cantidad * $cantPres) : $cantidad;
 
             // Auto-calculate total when Excel omits the column
             if ($totalNeto === null && $precioNeto !== null && $cantidad > 0) {
@@ -577,19 +585,24 @@ class AdminController extends Controller
             }
 
             $item = [
-                'descripcion'        => $desc,
-                'unidad'             => $unidadExcel,
-                'cantidad'           => $cantidad,
-                'precioNeto'         => $precioNeto,
-                'es_servicio'        => $esServicio,
-                'totalNeto'          => $totalNeto,
-                'unidad_medida_id'   => null,
-                'unidad_warning'     => null,
-                'unidad_discrepancia'=> null,
-                'monto_warning'      => null,
+                'descripcion'          => $desc,
+                'unidad'               => $unidadExcel,
+                'cantidad'             => $cantidad,        // unidades comerciales (para SicdDetalle)
+                'cantidad_real'        => $cantidadReal,    // unidades reales (para stock y BINCARD)
+                'precioNeto'           => $precioNeto,
+                'es_servicio'          => $esServicio,
+                'totalNeto'            => $totalNeto,
+                'unidad_medida_id'     => null,
+                'unidad_warning'       => null,
+                'unidad_discrepancia'  => null,
+                'monto_warning'        => null,
+                'maneja_presentacion'  => $manejaPres,
+                'tipo_presentacion'    => $manejaPres ? $tipoPres : null,
+                'cantidad_presentacion'=> $manejaPres ? $cantPres : null,
+                'unidad_base'          => $manejaPres && $unidadBase !== '' ? $unidadBase : null,
             ];
 
-            // ── Validación monetaria ───────────────────────────────────────
+            // ── Validación monetaria (usa cantidad comercial del Excel) ────
             if ($precioNeto !== null && $totalNeto !== null && $cantidad > 0) {
                 $calculado = round($cantidad * $precioNeto);
                 if (abs($calculado - $totalNeto) > 1) {
@@ -815,7 +828,16 @@ class AdminController extends Controller
                 $conflicto['nuevo_nombre']       = $conflicto['descripcion'];
                 $conflicto['nuevo_categoria_id'] = !empty($res['nuevo_categoria_id']) ? (int) $res['nuevo_categoria_id'] : null;
                 $conflicto['nuevo_marca_id']     = !empty($res['nuevo_marca_id'])     ? (int) $res['nuevo_marca_id']     : null;
+                $conflicto['nuevo_stock_minimo']  = (int) ($res['nuevo_stock_minimo']  ?? 0);
+                $conflicto['nuevo_stock_critico'] = (int) ($res['nuevo_stock_critico'] ?? 0);
                 $conflicto['contenedor_id']      = null;
+                // Package settings from modal (override any Excel-provided values)
+                $manejaPres = !empty($res['nuevo_maneja_presentacion']);
+                $conflicto['maneja_presentacion']   = $manejaPres;
+                $conflicto['tipo_presentacion']     = $manejaPres ? ($res['nuevo_tipo_presentacion']     ?? null) : null;
+                $conflicto['cantidad_presentacion'] = $manejaPres && !empty($res['nuevo_cantidad_presentacion'])
+                    ? (int) $res['nuevo_cantidad_presentacion'] : null;
+                $conflicto['unidad_base']           = $manejaPres ? ($res['nuevo_unidad_base'] ?? null) : null;
             } else {
                 $conflicto['producto_id'] = null;
             }
@@ -1031,17 +1053,22 @@ class AdminController extends Controller
 
                 // Crear producto nuevo si el usuario eligió esa opción
                 if (!$productoId && ($item['accion'] ?? '') === 'nuevo' && !empty($item['nuevo_nombre'])) {
+                    $manejaPres = !($item['es_servicio'] ?? false) && ($item['maneja_presentacion'] ?? false);
                     $nuevo = Producto::create([
-                        'nombre'           => $item['nuevo_nombre'],
-                        'categoria_id'     => $item['nuevo_categoria_id']  ?? null,
-                        'marca_id'         => $item['nuevo_marca_id']      ?? Marca::idSinMarca(),
-                        'unidad_medida_id' => $item['unidad_medida_id']    ?? null,
-                        'stock_actual'     => 0,
-                        'stock_minimo'     => (int) ($item['nuevo_stock_minimo']  ?? 0),
-                        'stock_critico'    => (int) ($item['nuevo_stock_critico'] ?? 0),
-                        'contenedor'       => $item['contenedor_id'] ?? 1,
-                        'centro_costo_id'  => $ccId,
-                        'es_servicio'      => $item['es_servicio'] ?? false,
+                        'nombre'                => $item['nuevo_nombre'],
+                        'categoria_id'          => $item['nuevo_categoria_id']  ?? null,
+                        'marca_id'              => $item['nuevo_marca_id']      ?? Marca::idSinMarca(),
+                        'unidad_medida_id'      => $item['unidad_medida_id']    ?? null,
+                        'stock_actual'          => 0,
+                        'stock_minimo'          => (int) ($item['nuevo_stock_minimo']  ?? 0),
+                        'stock_critico'         => (int) ($item['nuevo_stock_critico'] ?? 0),
+                        'contenedor'            => $item['contenedor_id'] ?? 1,
+                        'centro_costo_id'       => $ccId,
+                        'es_servicio'           => $item['es_servicio'] ?? false,
+                        'maneja_presentacion'   => $manejaPres,
+                        'tipo_presentacion'     => $manejaPres ? ($item['tipo_presentacion'] ?? null)     : null,
+                        'cantidad_presentacion' => $manejaPres ? ($item['cantidad_presentacion'] ?? null) : null,
+                        'unidad_base'           => $manejaPres ? ($item['unidad_base'] ?? null)           : null,
                     ]);
                     $productoId = $nuevo->id;
                 }
@@ -1090,9 +1117,31 @@ class AdminController extends Controller
                 $producto = Producto::find($productoId);
                 if (!$producto) continue;
 
+                // cantidad_real = real units (quantity × cantidad_presentacion, or quantity when no presentacion)
+                $cantidadReal = (int) ($item['cantidad_real'] ?? $item['cantidad']);
+
+                // Si el producto ya existe y tiene presentación, verificar si la cantidad es en presentaciones
+                // (para producto existente con presentacion, el Excel puede traer en presentaciones)
+                if ($cantidadReal === (int) $item['cantidad'] && $producto->tienePresentacion()) {
+                    // Producto existente con presentación: multiplicar si el item no trajo su propio factor
+                    if (!isset($item['maneja_presentacion']) || !$item['maneja_presentacion']) {
+                        // Backwards compat: si el Excel no trae columnas G/H/I, cantidad = real units
+                        $cantidadReal = (int) $item['cantidad'];
+                    }
+                }
+
                 // Servicios: registrar en historial para costos/BINCARD, pero NO tocar stock_actual
                 if (!$producto->es_servicio) {
-                    $producto->stock_actual += $item['cantidad'];
+                    $producto->stock_actual += $cantidadReal;
+                    // Actualizar presentación del producto si el Excel trae datos y el producto aún no la tiene
+                    if (!$producto->maneja_presentacion && ($item['maneja_presentacion'] ?? false)) {
+                        $producto->fill([
+                            'maneja_presentacion'   => true,
+                            'tipo_presentacion'     => $item['tipo_presentacion'] ?? null,
+                            'cantidad_presentacion' => $item['cantidad_presentacion'] ?? null,
+                            'unidad_base'           => $item['unidad_base'] ?? null,
+                        ]);
+                    }
                     $producto->actualizarFechasStock();
                     $producto->save();
                 }
@@ -1101,7 +1150,7 @@ class AdminController extends Controller
                     'producto_id'     => $producto->id,
                     'nombre_producto' => $producto->nombre,
                     'contenedor_id'   => $producto->contenedor,
-                    'cantidad'        => $item['cantidad'],
+                    'cantidad'        => $cantidadReal,
                     'tipo'            => 'entrada',
                     'motivo'          => $sicd ? "Carga masiva – SICD {$sicd->codigo_sicd}" : $motivo,
                     'aprobado_por' => Auth::user()->name,
@@ -1348,5 +1397,30 @@ class AdminController extends Controller
             'contenedor_nombre'=> '',
             'stock'            => 0,
         ]);
+    }
+
+    /**
+     * Lee un Excel con PhpSpreadsheet en modo datos-only (sin estilos ni fórmulas).
+     * Usa 95% menos memoria que el modo estándar. Devuelve Collection de arrays.
+     */
+    private function leerExcelLigero(\Illuminate\Http\UploadedFile $file): \Illuminate\Support\Collection
+    {
+        $path   = $file->getRealPath();
+        $reader = IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+
+        $spreadsheet = $reader->load($path);
+        $sheet       = $spreadsheet->getActiveSheet();
+        $rawRows     = $sheet->toArray(null, true, true, false);
+
+        // Liberar memoria del spreadsheet inmediatamente
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
+
+        // Saltar fila 1 (cabeceras) y convertir a Collection igual que SicdDetallesImport
+        $rows = collect(array_slice($rawRows, 1))
+            ->map(fn($row) => collect(array_values($row)));
+
+        return $rows;
     }
 }

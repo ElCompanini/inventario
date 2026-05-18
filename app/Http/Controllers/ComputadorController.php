@@ -104,30 +104,44 @@ class ComputadorController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('computadores'), 403);
 
-        $catId = (int) $request->input('cat_id');
+        $catId        = (int) $request->input('cat_id');
+        $computadorId = (int) $request->input('computador_id', 0);
 
         $productos = Producto::where('categoria_id', $catId)
             ->where('activo', true)
-            ->where('stock_actual', '>', 0)
             ->where('es_servicio', false)
             ->with(['unidadMedida:id,abreviacion'])
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'stock_actual', 'unidad', 'categoria_id', 'unidad_medida_id']);
 
-        $preciosPorProducto = \App\Models\Precio::whereIn('producto_id', $productos->pluck('id'))
+        $ids = $productos->pluck('id');
+
+        $preciosPorProducto = \App\Models\Precio::whereIn('producto_id', $ids)
             ->orderByDesc('created_at')
             ->get(['producto_id', 'precio_neto'])
             ->groupBy('producto_id')
             ->map(fn($g) => $g->first()->precio_neto ?? 0);
 
+        // Cantidad instalada en este equipo por producto (solo activos)
+        $instaladoPorProducto = collect();
+        if ($computadorId) {
+            $instaladoPorProducto = ComputadorComponente::where('computador_id', $computadorId)
+                ->where('activo', true)
+                ->whereIn('producto_id', $ids)
+                ->get(['producto_id', 'cantidad'])
+                ->groupBy('producto_id')
+                ->map(fn($g) => $g->sum('cantidad'));
+        }
+
         return response()->json(
             $productos->map(fn($p) => [
-                'id'     => $p->id,
-                'nombre' => $p->nombre,
-                'stock'  => $p->stock_actual,
-                'cat_id' => $p->categoria_id,
-                'unidad' => optional($p->unidadMedida)->abreviacion ?? ($p->unidad ?? ''),
-                'precio' => (float) ($preciosPorProducto[$p->id] ?? 0),
+                'id'        => $p->id,
+                'nombre'    => $p->nombre,
+                'stock'     => $p->stock_actual,
+                'cat_id'    => $p->categoria_id,
+                'unidad'    => optional($p->unidadMedida)->abreviacion ?? ($p->unidad ?? ''),
+                'precio'    => (float) ($preciosPorProducto[$p->id] ?? 0),
+                'instalado' => (int) ($instaladoPorProducto[$p->id] ?? 0),
             ])->values()
         );
     }

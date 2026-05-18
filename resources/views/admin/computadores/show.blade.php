@@ -401,11 +401,12 @@ html.dark .btn-desarmar:hover { background:#991b1b; }
 
 @push('scripts')
 <script>
-var EQ_CATS         = @json($categoriasJson);
-var EQ_AJAX         = '{{ route('admin.computadores.productos-categoria') }}';
-var EQ_RETIRAR_BASE = '{{ route('admin.computadores.componentes.retirar', [$computador->id, '__ID__']) }}'.replace('/__ID__/retirar', '');
-var catActiva       = null;
-var cargando        = false;
+var EQ_CATS          = @json($categoriasJson);
+var EQ_AJAX          = '{{ route('admin.computadores.productos-categoria') }}';
+var EQ_RETIRAR_BASE  = '{{ route('admin.computadores.componentes.retirar', [$computador->id, '__ID__']) }}'.replace('/__ID__/retirar', '');
+var EQ_COMPUTADOR_ID = {{ $computador->id }};
+var catActiva        = null;
+var cargando         = false;
 
 // ── Renderizar tabs de categorías (por ID) ────────────────────────────────
 function renderTabs() {
@@ -451,7 +452,7 @@ function fetchProductos(catId) {
         + '</div>';
     vacio.style.display = 'none';
 
-    fetch(EQ_AJAX + '?cat_id=' + catId, {
+    fetch(EQ_AJAX + '?cat_id=' + catId + '&computador_id=' + EQ_COMPUTADOR_ID, {
         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
     })
     .then(function(r) { return r.json(); })
@@ -476,12 +477,18 @@ function renderProductos(prods) {
     vacio.style.display = 'none';
 
     grid.innerHTML = prods.map(function(p) {
-        var sinStock = p.stock <= 0;
-        var stockClr = sinStock ? (dm ? '#f87171' : '#dc2626') : (dm ? '#4ade80' : '#16a34a');
-        var precio   = p.precio > 0 ? '$' + Number(p.precio).toLocaleString('es-CL') : '—';
-        var nombre   = p.nombre.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+        var sinStock    = p.stock <= 0;
+        var stockClr    = sinStock ? (dm ? '#f87171' : '#dc2626') : (dm ? '#4ade80' : '#16a34a');
+        var precio      = p.precio > 0 ? '$' + Number(p.precio).toLocaleString('es-CL') : '—';
+        var nombre      = p.nombre.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+        var instaladoBadge = p.instalado > 0
+            ? '<span style="font-size:0.65rem;font-weight:700;color:' + (dm?'#818cf8':'#4f46e5') + ';background:' + (dm?'rgba(79,70,229,.18)':'#eef2ff') + ';border-radius:9999px;padding:1px 7px;">Instalado: ' + p.instalado + '</span>'
+            : '';
         return '<div class="prod-card" style="position:relative;animation:eq-fade-in .18s ease both;">'
-             + '<p style="font-size:0.8rem;font-weight:700;color:' + (dm?'#f1f5f9':'#111827') + ';margin:0 0 0.4rem;line-height:1.3;">' + p.nombre + '</p>'
+             + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.4rem;margin-bottom:0.35rem;">'
+             + '<p style="font-size:0.8rem;font-weight:700;color:' + (dm?'#f1f5f9':'#111827') + ';margin:0;line-height:1.3;flex:1;">' + p.nombre + '</p>'
+             + instaladoBadge
+             + '</div>'
              + '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">'
              + '<div style="display:flex;flex-direction:column;gap:1px;">'
              + '<span style="font-size:0.7rem;color:' + stockClr + ';font-weight:700;">Stock: ' + p.stock + ' ' + p.unidad + '</span>'

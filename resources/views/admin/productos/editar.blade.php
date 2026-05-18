@@ -36,10 +36,17 @@
                 <div class="flex justify-between items-center">
                     <span class="text-gray-500">Stock actual</span>
                     @php $estado = $producto->estadoStock(); @endphp
-                    <span class="text-2xl font-bold
-                        {{ $estado === 'critico' ? 'text-red-600' : ($estado === 'minimo' ? 'text-yellow-600' : 'text-green-600') }}">
-                        {{ $producto->stock_actual }}
-                    </span>
+                    <div class="text-right">
+                        <span class="text-2xl font-bold
+                            {{ $estado === 'critico' ? 'text-red-600' : ($estado === 'minimo' ? 'text-yellow-600' : 'text-green-600') }}">
+                            {{ $producto->stock_actual }}
+                        </span>
+                        @if($producto->tienePresentacion())
+                            <p class="text-xs font-medium mt-0.5" style="color:#2563eb;">
+                                {{ $producto->cantidadVisual((int)$producto->stock_actual) }}
+                            </p>
+                        @endif
+                    </div>
                 </div>
                 <div class="flex justify-between text-xs text-gray-500">
                     <span>Stock mínimo: <strong>{{ $producto->stock_minimo }}</strong></span>
@@ -93,17 +100,68 @@
 
             {{-- Cantidad --}}
             <div class="mb-5">
-                <label for="cantidad" class="block text-sm font-medium text-gray-700 mb-1">
-                    Cantidad <span class="text-red-500">*</span>
-                </label>
-                <input type="number" name="cantidad" id="cantidad"
-                       value="{{ old('cantidad') }}"
-                       min="1" required
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                              focus:outline-none focus:ring-2 focus:ring-indigo-500
-                              {{ $errors->has('cantidad') ? 'border-red-400 bg-red-50' : '' }}"
-                       placeholder="Ej: 50">
-                <p class="text-xs text-gray-400 mt-1">Stock disponible: {{ $producto->stock_actual }}</p>
+                @if($producto->tienePresentacion())
+                {{-- Salida: info visual de stock --}}
+                <div id="salidaPkgInfo" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8;"
+                     class="mb-3 px-3 py-2 rounded-lg text-sm">
+                    <span style="color:#1d4ed8;">
+                        📦 Stock actual: <strong>{{ $producto->stock_actual }}</strong> unidades
+                        &nbsp;= <strong>{{ $producto->cantidadVisual((int)$producto->stock_actual) }}</strong>
+                    </span>
+                </div>
+
+                {{-- Entrada: toggle "ingresar por paquetes" --}}
+                <div id="togglePkgWrap" style="display:flex;" class="mb-3 items-center gap-2">
+                    <input type="checkbox" id="togglePkg"
+                           class="w-4 h-4 border-gray-300 rounded focus:ring-blue-500"
+                           style="accent-color:#2563eb;"
+                           onchange="onTogglePkg()">
+                    <label for="togglePkg" class="text-sm font-medium cursor-pointer" style="color:#1d4ed8;">
+                        Ingresar por paquetes
+                        <span class="font-normal text-xs ml-1" style="color:#9ca3af;">
+                            (1 {{ $producto->tipo_presentacion }} = {{ $producto->cantidad_presentacion }} {{ $producto->unidad_base ?: 'unidad' }})
+                        </span>
+                    </label>
+                </div>
+
+                {{-- Paquetes input (visible cuando toggle ON) --}}
+                <div id="pkgInputWrap" style="display:none;" class="mb-3">
+                    <label for="pkg_cantidad" class="block text-sm font-medium text-gray-700 mb-1">
+                        Cantidad en {{ $producto->tipo_presentacion }}s <span class="text-red-500">*</span>
+                    </label>
+                    <input type="number" id="pkg_cantidad"
+                           min="1" step="1"
+                           oninput="onPkgCantidadChange()"
+                           class="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                           style="border:1px solid #60a5fa; focus-ring-color:#2563eb;"
+                           placeholder="Ej: 3">
+                    <div id="pkgPreview" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8;"
+                         class="mt-2 px-3 py-2 rounded-lg text-sm font-medium"></div>
+                </div>
+                @endif
+
+                {{-- Campo cantidad (unidades reales) --}}
+                <div id="realCantidadWrap">
+                    <label for="cantidad" class="block text-sm font-medium text-gray-700 mb-1">
+                        Cantidad <span class="text-red-500">*</span>
+                        @if($producto->tienePresentacion())
+                        <span id="labelUnidadesReales" class="font-normal text-xs text-gray-400">(unidades reales)</span>
+                        @endif
+                    </label>
+                    <input type="number" name="cantidad" id="cantidad"
+                           value="{{ old('cantidad') }}"
+                           min="1" required
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                                  focus:outline-none focus:ring-2 focus:ring-indigo-500
+                                  {{ $errors->has('cantidad') ? 'border-red-400 bg-red-50' : '' }}"
+                           placeholder="Ej: 50">
+                    <p class="text-xs text-gray-400 mt-1">
+                        Stock disponible: {{ $producto->stock_actual }} unidades
+                        @if($producto->tienePresentacion())
+                        <span style="color:#2563eb;" class="font-medium">({{ $producto->cantidadVisual((int)$producto->stock_actual) }})</span>
+                        @endif
+                    </p>
+                </div>
             </div>
 
             {{-- Motivo --}}
@@ -213,7 +271,8 @@
 <div id="modalStock" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-prod-in .25s cubic-bezier(.22,.68,0,1.2) both;">
         <h2 class="text-lg font-bold text-gray-800 mb-1">Confirmar modificación de stock</h2>
-        <p class="text-sm text-gray-500 mb-6">Esta acción se registrará en el historial de cambios y no puede deshacerse.</p>
+        <p class="text-sm text-gray-500 mb-2">Esta acción se registrará en el historial de cambios y no puede deshacerse.</p>
+        <div id="modalStockResumen" class="mb-5 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-medium"></div>
         <div class="flex justify-end gap-3">
             <button type="button" onclick="cerrarModalStock()"
                     class="btn-secondary px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
@@ -256,6 +315,77 @@
 
 @push('scripts')
 <script>
+    // ── Paquetes ──────────────────────────────────────────────────────────
+    var HAS_PKG  = {{ $producto->tienePresentacion() ? 'true' : 'false' }};
+    var PKG_QTY  = {{ $producto->tienePresentacion() ? (int)$producto->cantidad_presentacion : 0 }};
+    var PKG_TIPO = '{{ addslashes($producto->tipo_presentacion ?? '') }}';
+    var PKG_BASE = '{{ addslashes($producto->unidad_base ?? 'unidad') }}';
+    var pkgModeActive = false;
+
+    function onTipoChange() {
+        if (!HAS_PKG) return;
+        var tipo = (document.querySelector('input[name="tipo"]:checked') || {}).value;
+        var toggleWrap = document.getElementById('togglePkgWrap');
+        var salidaInfo  = document.getElementById('salidaPkgInfo');
+
+        if (tipo === 'entrada') {
+            toggleWrap.style.display = 'flex';
+            salidaInfo.style.display  = 'none';
+        } else {
+            // salida — show visual info, hide package toggle
+            toggleWrap.style.display = 'none';
+            salidaInfo.style.display  = '';
+            // reset pkg mode
+            if (pkgModeActive) {
+                document.getElementById('togglePkg').checked = false;
+                onTogglePkg();
+            }
+        }
+    }
+
+    function onTogglePkg() {
+        pkgModeActive = document.getElementById('togglePkg').checked;
+        var pkgWrap  = document.getElementById('pkgInputWrap');
+        var realWrap = document.getElementById('realCantidadWrap');
+        if (pkgModeActive) {
+            pkgWrap.style.display  = '';
+            realWrap.style.display = 'none';
+            document.getElementById('cantidad').removeAttribute('required');
+            document.getElementById('cantidad').value = '';
+            document.getElementById('pkg_cantidad').focus();
+        } else {
+            pkgWrap.style.display  = 'none';
+            realWrap.style.display = '';
+            document.getElementById('cantidad').setAttribute('required', 'required');
+            document.getElementById('cantidad').value = '';
+            document.getElementById('pkgPreview').style.display = 'none';
+        }
+    }
+
+    function onPkgCantidadChange() {
+        var pkgs    = parseInt(document.getElementById('pkg_cantidad').value, 10);
+        var preview = document.getElementById('pkgPreview');
+        if (!pkgs || pkgs < 1) {
+            preview.style.display = 'none';
+            document.getElementById('cantidad').value = '';
+            return;
+        }
+        var real = pkgs * PKG_QTY;
+        document.getElementById('cantidad').value = real;
+        preview.style.display = '';
+        preview.innerHTML = '<strong>' + pkgs + ' ' + PKG_TIPO + (pkgs > 1 ? 's' : '') + '</strong>'
+            + ' &nbsp;=&nbsp; '
+            + '<strong>' + real + ' ' + PKG_BASE + (real !== 1 ? 's' : '') + '</strong> reales';
+    }
+
+    // Wire tipo radio change
+    document.querySelectorAll('input[name="tipo"]').forEach(function(r) {
+        r.addEventListener('change', onTipoChange);
+    });
+    // Run on load to set initial state
+    onTipoChange();
+
+    // ── Cancelar ─────────────────────────────────────────────────────────
     function abrirModalCancelarStock() {
         var cantidad = document.getElementById('cantidad').value.trim();
         var motivo   = document.getElementById('motivo').value.trim();
@@ -274,7 +404,31 @@
         if (e.target === this) cerrarModalCancelarStock();
     });
 
+    // ── Confirmar stock ───────────────────────────────────────────────────
     function abrirModalStock() {
+        // Package mode: validate and convert
+        if (HAS_PKG && pkgModeActive) {
+            var pkgs = parseInt(document.getElementById('pkg_cantidad').value, 10);
+            if (!pkgs || pkgs < 1) {
+                document.getElementById('pkg_cantidad').focus();
+                return;
+            }
+            var real = pkgs * PKG_QTY;
+            document.getElementById('cantidad').value = real;
+            document.getElementById('cantidad').setAttribute('required', 'required');
+        }
+
+        // Build resumen for modal
+        var tipo  = (document.querySelector('input[name="tipo"]:checked') || {}).value || '';
+        var cant  = document.getElementById('cantidad').value;
+        var label = tipo === 'entrada' ? '↑ Entrada' : '↓ Salida';
+        var resumen = label + ': ' + cant + ' unidades';
+        if (HAS_PKG && pkgModeActive) {
+            var pkgs = parseInt(document.getElementById('pkg_cantidad').value, 10);
+            resumen += ' (' + pkgs + ' ' + PKG_TIPO + (pkgs > 1 ? 's' : '') + ')';
+        }
+        document.getElementById('modalStockResumen').textContent = resumen;
+
         var m = document.getElementById('modalStock');
         m.classList.remove('hidden'); m.classList.add('flex');
     }
@@ -286,6 +440,7 @@
         if (e.target === this) cerrarModalStock();
     });
 
+    // ── Traslado ──────────────────────────────────────────────────────────
     function abrirModalTraslado() {
         var m = document.getElementById('modalTraslado');
         m.classList.remove('hidden'); m.classList.add('flex');

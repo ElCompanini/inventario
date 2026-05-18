@@ -225,19 +225,24 @@ class CatalogoController extends Controller
         $esFamiliaServicios = $categoriaObj?->familia?->tipo === 'servicios';
 
         $data = $request->validate([
-            'nombre'          => ['required', 'string', 'max:200'],
-            'categoria_id'    => ['required', 'integer', 'exists:categorias,id'],
-            'marca_id'        => ['nullable', 'integer', 'exists:marcas,id'],
-            'stock_minimo'    => $esFamiliaServicios ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
-            'stock_critico'   => $esFamiliaServicios ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
-            'contenedor'      => $esFamiliaServicios ? ['nullable', 'integer', 'exists:containers,id'] : ['required', 'integer', 'exists:containers,id'],
-            'unidad_medida_id'=> $esFamiliaServicios ? ['nullable', 'integer', 'exists:unidades_medida,id'] : ['required', 'integer', 'exists:unidades_medida,id'],
-            'codigo_barras'   => ['nullable', 'string', 'max:100', 'unique:productos,codigo_barras'],
-            'es_servicio'     => ['nullable', 'boolean'],
+            'nombre'               => ['required', 'string', 'max:200'],
+            'categoria_id'         => ['required', 'integer', 'exists:categorias,id'],
+            'marca_id'             => ['nullable', 'integer', 'exists:marcas,id'],
+            'stock_minimo'         => $esFamiliaServicios ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
+            'stock_critico'        => $esFamiliaServicios ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
+            'contenedor'           => $esFamiliaServicios ? ['nullable', 'integer', 'exists:containers,id'] : ['required', 'integer', 'exists:containers,id'],
+            'unidad_medida_id'     => $esFamiliaServicios ? ['nullable', 'integer', 'exists:unidades_medida,id'] : ['required', 'integer', 'exists:unidades_medida,id'],
+            'codigo_barras'        => ['nullable', 'string', 'max:100', 'unique:productos,codigo_barras'],
+            'es_servicio'          => ['nullable', 'boolean'],
+            'maneja_presentacion'  => ['nullable', 'boolean'],
+            'tipo_presentacion'    => ['nullable', 'string', 'max:50'],
+            'cantidad_presentacion'=> ['nullable', 'integer', 'min:2', 'max:9999'],
+            'unidad_base'          => ['nullable', 'string', 'max:50'],
         ], [
-            'nombre.required'           => 'El nombre del producto es obligatorio.',
-            'codigo_barras.unique'      => 'Ese código de barras ya está asignado a otro producto.',
-            'unidad_medida_id.required' => 'Debes seleccionar una unidad de medida.',
+            'nombre.required'              => 'El nombre del producto es obligatorio.',
+            'codigo_barras.unique'         => 'Ese código de barras ya está asignado a otro producto.',
+            'unidad_medida_id.required'    => 'Debes seleccionar una unidad de medida.',
+            'cantidad_presentacion.min'    => 'La cantidad por presentación debe ser al menos 2.',
         ]);
 
         $sinMarcaId = Marca::idSinMarca();
@@ -263,18 +268,24 @@ class CatalogoController extends Controller
 
         $ccId = $this->ccId();
 
+        $manejaPresentacion = !$esServicio && $request->boolean('maneja_presentacion', false);
+
         $producto = Producto::create([
-            'nombre'           => strtoupper(trim($data['nombre'])),
-            'codigo_barras'    => $data['codigo_barras'] ?? null,
-            'stock_actual'     => 0,
-            'stock_minimo'     => $data['stock_minimo'] ?? 0,
-            'stock_critico'    => $data['stock_critico'] ?? 0,
-            'contenedor'       => $data['contenedor'] ?? null,
-            'unidad_medida_id' => $data['unidad_medida_id'] ?? null,
-            'categoria_id'     => $data['categoria_id'],
-            'marca_id'         => $marcaId,
-            'centro_costo_id'  => $ccId,
-            'es_servicio'      => $esServicio,
+            'nombre'                => strtoupper(trim($data['nombre'])),
+            'codigo_barras'         => $data['codigo_barras'] ?? null,
+            'stock_actual'          => 0,
+            'stock_minimo'          => $data['stock_minimo'] ?? 0,
+            'stock_critico'         => $data['stock_critico'] ?? 0,
+            'contenedor'            => $data['contenedor'] ?? null,
+            'unidad_medida_id'      => $data['unidad_medida_id'] ?? null,
+            'categoria_id'          => $data['categoria_id'],
+            'marca_id'              => $marcaId,
+            'centro_costo_id'       => $ccId,
+            'es_servicio'           => $esServicio,
+            'maneja_presentacion'   => $manejaPresentacion,
+            'tipo_presentacion'     => $manejaPresentacion ? ($data['tipo_presentacion'] ?? null) : null,
+            'cantidad_presentacion' => $manejaPresentacion ? ($data['cantidad_presentacion'] ?? null) : null,
+            'unidad_base'           => $manejaPresentacion ? ($data['unidad_base'] ?? null) : null,
         ]);
 
         if ($request->ajax()) {
@@ -319,17 +330,27 @@ class CatalogoController extends Controller
         abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         $data = $request->validate([
-            'stock_minimo'  => ['required', 'integer', 'min:0'],
-            'stock_critico' => ['required', 'integer', 'min:0'],
-            'contenedor'    => ['nullable', 'integer', 'exists:containers,id'],
-            'marca_id'      => ['nullable', 'integer', 'exists:marcas,id'],
+            'stock_minimo'         => ['required', 'integer', 'min:0'],
+            'stock_critico'        => ['required', 'integer', 'min:0'],
+            'contenedor'           => ['nullable', 'integer', 'exists:containers,id'],
+            'marca_id'             => ['nullable', 'integer', 'exists:marcas,id'],
+            'maneja_presentacion'  => ['nullable', 'boolean'],
+            'tipo_presentacion'    => ['nullable', 'string', 'max:50'],
+            'cantidad_presentacion'=> ['nullable', 'integer', 'min:2', 'max:9999'],
+            'unidad_base'          => ['nullable', 'string', 'max:50'],
         ]);
 
+        $manejaPresentacion = !$producto->es_servicio && $request->boolean('maneja_presentacion', false);
+
         $producto->update([
-            'stock_minimo'  => $data['stock_minimo'],
-            'stock_critico' => $data['stock_critico'],
-            'contenedor'    => $data['contenedor'] ?? null,
-            'marca_id'      => $data['marca_id'] ?? $producto->marca_id,
+            'stock_minimo'          => $data['stock_minimo'],
+            'stock_critico'         => $data['stock_critico'],
+            'contenedor'            => $data['contenedor'] ?? null,
+            'marca_id'              => $data['marca_id'] ?? $producto->marca_id,
+            'maneja_presentacion'   => $manejaPresentacion,
+            'tipo_presentacion'     => $manejaPresentacion ? ($data['tipo_presentacion'] ?? null) : null,
+            'cantidad_presentacion' => $manejaPresentacion ? ($data['cantidad_presentacion'] ?? null) : null,
+            'unidad_base'           => $manejaPresentacion ? ($data['unidad_base'] ?? null) : null,
         ]);
 
         if ($request->ajax()) {

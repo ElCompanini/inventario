@@ -14,28 +14,28 @@ class UserSeeder extends Seeder
             'name'     => 'Administrador',
             'email'    => 'admin@inventario.com',
             'password' => Hash::make('admin123'),
-            'rol'      => 'admin',
+            'rol'      => '1',
         ]);
 
         User::create([
             'name'     => 'Usuario Demo',
             'email'    => 'usuario@inventario.com',
             'password' => Hash::make('user123'),
-            'rol'      => 'usuario',
+            'rol'      => '0',
         ]);
 
         User::create([
             'name'     => 'Fernando',
             'email'    => 'fernando@inventario.com',
             'password' => Hash::make('fernando123'),
-            'rol'      => 'admin',
+            'rol'      => '2',
         ]);
 
         User::create([
             'name'     => 'Lucas',
             'email'    => 'lucas@lucas.com',
             'password' => Hash::make('lucas'),
-            'rol'      => 'admin',
+            'rol'      => '1',
         ]);
     }
 }

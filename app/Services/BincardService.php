@@ -111,7 +111,7 @@ class BincardService
                     // ✅ Link directo — muestra SOLO la OC que causó este ingreso
                     $ocDirecta = $ocsDirectas[$mov->orden_compra_id];
                     $tipoDoc   = 'SICD / OC';
-                    $nDoc      = $sicdLabel . ' | ' . $ocDirecta->numero_oc;
+                    $nDoc      = $sicdLabel . ' | OC ' . $ocDirecta->numero_oc;
                     $rutProv   = $ocDirecta->api_proveedor_rut   ?? '—';
                     $proveedor = $ocDirecta->api_proveedor_nombre ?? '—';
 
@@ -126,7 +126,7 @@ class BincardService
 
                     if ($ocFromMotivo) {
                         $tipoDoc   = 'SICD / OC';
-                        $nDoc      = $sicdLabel . ' | ' . $ocFromMotivo->numero_oc;
+                        $nDoc      = $sicdLabel . ' | OC ' . $ocFromMotivo->numero_oc;
                         $rutProv   = $ocFromMotivo->api_proveedor_rut   ?? '—';
                         $proveedor = $ocFromMotivo->api_proveedor_nombre ?? '—';
                     } else {
@@ -155,7 +155,7 @@ class BincardService
                 $precio = $preciosPorOrigenOc[$precioKey]
                     // Fallback: primer precio con ese sicd_id (registros históricos)
                     ?? $preciosPorOrigen->get('Sicd|' . $sicd->id)?->first();
-                if ($precio) $costoUnit = $precio->precio_neto;
+                if ($precio) $costoUnit = round($precio->precio_neto * 1.19, 2);
 
             } elseif ($mov->origen === 'gasto_menor' && isset($gastos[$mov->origen_id])) {
                 $gasto   = $gastos[$mov->origen_id];
@@ -163,7 +163,8 @@ class BincardService
                 $nDoc      = $gasto->folio;
                 $rutProv   = $gasto->rut_proveedor;
                 $proveedor = $gasto->proveedor_nombre ?? '—';
-                $costoUnit = $gasto->precio_neto ?: ($gasto->cantidad > 0 ? round($gasto->monto / $gasto->cantidad, 2) : null);
+                $precioNetaGM = $gasto->precio_neto ?: ($gasto->cantidad > 0 ? round($gasto->monto / $gasto->cantidad, 2) : null);
+                $costoUnit = $precioNetaGM !== null ? round($precioNetaGM * 1.19, 2) : null;
 
             } elseif ($mov->tipo === 'entrada') {
                 $tipoDoc = 'Documento Interno';

@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('solicitudes', function (Blueprint $table) {
-            $table->timestamp('updated_at')->nullable();
-        });
+        if (!Schema::hasColumn('solicitudes', 'updated_at')) {
+            Schema::table('solicitudes', function (Blueprint $table) {
+                $table->timestamp('updated_at')->nullable();
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('solicitudes', function (Blueprint $table) {
-            $table->dropColumn('updated_at');
-        });
+        if (Schema::hasColumn('solicitudes', 'updated_at')) {
+            Schema::table('solicitudes', function (Blueprint $table) {
+                $table->dropColumn('updated_at');
+            });
+        }
     }
 };

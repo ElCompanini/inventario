@@ -253,15 +253,19 @@
         'familia_id'=> $c->familia_id,
         'marcas'    => $c->marcas->map(fn($m) => ['id' => $m->id, 'nombre' => $m->nombre, 'activo' => (bool)$m->activo])->values(),
         'productos' => $c->productos->map(fn($p) => [
-            'id'           => $p->id,
-            'nombre'       => $p->nombre,
-            'stock_actual' => $p->stock_actual,
-            'stock_minimo' => $p->stock_minimo,
-            'stock_critico'=> $p->stock_critico,
-            'contenedor_id'=> $p->contenedor,
-            'marca_id'     => $p->marca_id,
-            'marca_nombre' => $p->marca?->nombre,
-            'es_servicio'  => (bool) $p->es_servicio,
+            'id'                    => $p->id,
+            'nombre'                => $p->nombre,
+            'stock_actual'          => $p->stock_actual,
+            'stock_minimo'          => $p->stock_minimo,
+            'stock_critico'         => $p->stock_critico,
+            'contenedor_id'         => $p->contenedor,
+            'marca_id'              => $p->marca_id,
+            'marca_nombre'          => $p->marca?->nombre,
+            'es_servicio'           => (bool) $p->es_servicio,
+            'maneja_presentacion'   => (bool) $p->maneja_presentacion,
+            'tipo_presentacion'     => $p->tipo_presentacion,
+            'cantidad_presentacion' => $p->cantidad_presentacion,
+            'unidad_base'           => $p->unidad_base,
         ])->values(),
     ])->values(),
 ])->values()) !!}
@@ -385,6 +389,46 @@
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <option value="">— Selecciona una unidad —</option>
                 </select>
+            </div>
+
+            {{-- Paquetes (oculto para servicios) --}}
+            <div id="prod-pres-wrapper" style="border-top:1px solid #f3f4f6; padding-top:0.875rem;">
+                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; user-select:none;">
+                    <input type="checkbox" id="prod-maneja-pres" onchange="togglePresentacionFields()"
+                           style="width:1rem; height:1rem; accent-color:#4f46e5; cursor:pointer;">
+                    <span style="font-size:0.875rem; font-weight:600; color:#374151;">¿Maneja paquetes?</span>
+                    <span style="font-size:0.75rem; color:#9ca3af;">(caja, bolsa, pack…)</span>
+                </label>
+                <div id="prod-pres-fields" style="display:none; margin-top:0.75rem; display:grid; grid-template-columns:1fr 1fr; gap:0.625rem;">
+                    <div style="grid-column:span 1;">
+                        <label style="display:block; font-size:0.8125rem; font-weight:500; color:#374151; margin-bottom:0.25rem;">Tipo de paquete <span style="color:#ef4444;">*</span></label>
+                        <select id="prod-tipo-pres"
+                                style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4375rem 0.625rem; font-size:0.8125rem; outline:none;">
+                            <option value="">— Selecciona —</option>
+                            @foreach(['Caja','Paquete','Bolsa','Pack','Kit','Rollo','Resma','Tubo','Bidón','Saco','Pallet','Otro'] as $tp)
+                            <option value="{{ $tp }}">{{ $tp }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div style="grid-column:span 1;">
+                        <label style="display:block; font-size:0.8125rem; font-weight:500; color:#374151; margin-bottom:0.25rem;">Unidades por paquete <span style="color:#ef4444;">*</span></label>
+                        <input type="number" id="prod-cant-pres" min="2" max="9999" placeholder="Ej: 40"
+                               style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4375rem 0.625rem; font-size:0.8125rem; outline:none;">
+                    </div>
+                    <div style="grid-column:span 2;">
+                        <label style="display:block; font-size:0.8125rem; font-weight:500; color:#374151; margin-bottom:0.25rem;">Unidad base <span style="color:#ef4444;">*</span></label>
+                        <select id="prod-unidad-base"
+                                style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4375rem 0.625rem; font-size:0.8125rem; outline:none;">
+                            <option value="">— Selecciona —</option>
+                            @foreach(['Unidad','Pieza','Metro','Metro lineal','Metro cúbico','Litro','Kilogramo','Par','Juego','Otro'] as $ub)
+                            <option value="{{ $ub }}">{{ $ub }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div style="grid-column:span 2; background:#eff6ff; border:1px solid #bfdbfe; border-radius:0.5rem; padding:0.5rem 0.75rem;">
+                        <p id="prod-pres-preview" style="font-size:0.75rem; color:#1d4ed8; margin:0;"></p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1524,9 +1568,13 @@ function abrirModalProducto() {
         document.getElementById('prod-stock-wrap').style.display     = 'none';
         document.getElementById('prod-contenedor-wrapper').style.display = 'none';
         document.getElementById('prod-unidad-wrapper').style.display    = 'none';
+        document.getElementById('prod-pres-wrapper').style.display     = 'none';
+        resetPresentacionFields();
     } else {
         // Physical product mode: full form
         document.getElementById('modal-prod-titulo').textContent   = 'Nuevo producto';
+        document.getElementById('prod-pres-wrapper').style.display = 'block';
+        resetPresentacionFields();
         document.getElementById('modal-prod-subtitulo').textContent = '';
         document.getElementById('prod-nombre-label').innerHTML = 'Nombre del producto <span style="color:#ef4444">*</span>';
         document.getElementById('prod-nombre').placeholder = 'Ej: Cable HDMI 1.8m';
@@ -1561,6 +1609,15 @@ function abrirModalProducto() {
     setTimeout(function() { document.getElementById('prod-nombre').focus(); }, 50);
 }
 
+// Wire up preview update on presentacion inputs (once, after DOM ready)
+document.addEventListener('DOMContentLoaded', function() {
+    ['prod-tipo-pres','prod-cant-pres','prod-unidad-base'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', actualizarPreviewPres);
+        if (el) el.addEventListener('change', actualizarPreviewPres);
+    });
+});
+
 function editarProducto(prodId) {
     var cat  = catalogoData.flatMap(function(f) { return f.categorias; }).find(function(c) { return c.id === catActualId; });
     var prod = cat ? cat.productos.find(function(p) { return p.id === prodId; }) : null;
@@ -1576,11 +1633,50 @@ function editarProducto(prodId) {
     document.getElementById('prod-contenedor-wrapper').style.display = 'none';
     document.getElementById('prod-unidad-wrapper').style.display = 'none';
     document.getElementById('prod-nombre-wrapper').style.display = 'none';
+    // Presentación
+    if (!prod.es_servicio) {
+        document.getElementById('prod-pres-wrapper').style.display = 'block';
+        document.getElementById('prod-maneja-pres').checked = !!prod.maneja_presentacion;
+        document.getElementById('prod-tipo-pres').value   = prod.tipo_presentacion || '';
+        document.getElementById('prod-cant-pres').value   = prod.cantidad_presentacion || '';
+        document.getElementById('prod-unidad-base').value = prod.unidad_base || '';
+        document.getElementById('prod-pres-fields').style.display = prod.maneja_presentacion ? 'grid' : 'none';
+        actualizarPreviewPres();
+    } else {
+        document.getElementById('prod-pres-wrapper').style.display = 'none';
+    }
     abrirModal('modal-producto');
     setTimeout(function() { document.getElementById('prod-stock-minimo').focus(); }, 50);
 }
 
 function cerrarModalProducto() { cerrarModal('modal-producto'); }
+
+/* ── Presentaciones ──────────────────────────────────────────────── */
+function togglePresentacionFields() {
+    var checked = document.getElementById('prod-maneja-pres').checked;
+    var fields  = document.getElementById('prod-pres-fields');
+    fields.style.display = checked ? 'grid' : 'none';
+    if (!checked) actualizarPreviewPres();
+}
+function actualizarPreviewPres() {
+    var preview = document.getElementById('prod-pres-preview');
+    var tipo    = document.getElementById('prod-tipo-pres')?.value;
+    var cant    = parseInt(document.getElementById('prod-cant-pres')?.value) || 0;
+    var base    = document.getElementById('prod-unidad-base')?.value;
+    if (tipo && cant >= 2 && base) {
+        preview.textContent = '→ 1 ' + tipo + ' = ' + cant + ' ' + base + '(s)  ·  Ejemplo: 3 ' + tipo + '(s) = ' + (3 * cant) + ' ' + base + '(s)';
+    } else {
+        preview.textContent = 'Completa los campos para ver el equivalente.';
+    }
+}
+function resetPresentacionFields() {
+    document.getElementById('prod-maneja-pres').checked = false;
+    document.getElementById('prod-pres-fields').style.display = 'none';
+    document.getElementById('prod-tipo-pres').value    = '';
+    document.getElementById('prod-cant-pres').value    = '';
+    document.getElementById('prod-unidad-base').value  = '';
+    document.getElementById('prod-pres-preview').textContent = '';
+}
 
 async function eliminarProducto(prodId, nombre) {
     if (!confirm('¿Inactivar el producto "' + nombre + '"?\n\nEl producto quedará inactivo y no aparecerá en el inventario, pero sus datos históricos se conservan.')) return;
@@ -1669,6 +1765,16 @@ async function guardarProducto() {
                 body.append('unidad_medida_id', unidadId);
             }
         }
+        // Presentación (solo para productos físicos)
+        if (!IS_FAMILIA_SERVICIOS) {
+            var manejaPres = document.getElementById('prod-maneja-pres')?.checked;
+            body.append('maneja_presentacion', manejaPres ? '1' : '0');
+            if (manejaPres) {
+                body.append('tipo_presentacion',    document.getElementById('prod-tipo-pres')?.value || '');
+                body.append('cantidad_presentacion', document.getElementById('prod-cant-pres')?.value || '');
+                body.append('unidad_base',           document.getElementById('prod-unidad-base')?.value || '');
+            }
+        }
         var res  = await fetch(url, { method, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
         var json = await res.json();
         if (!res.ok || !json.ok) {
@@ -1680,6 +1786,13 @@ async function guardarProducto() {
             if (prod) {
                 prod.stock_minimo  = parseInt(stock_minimo);
                 prod.stock_critico = parseInt(stock_critico);
+                if (!IS_FAMILIA_SERVICIOS) {
+                    var manejaPres = document.getElementById('prod-maneja-pres')?.checked;
+                    prod.maneja_presentacion   = manejaPres;
+                    prod.tipo_presentacion     = manejaPres ? (document.getElementById('prod-tipo-pres')?.value || null) : null;
+                    prod.cantidad_presentacion = manejaPres ? (parseInt(document.getElementById('prod-cant-pres')?.value) || null) : null;
+                    prod.unidad_base           = manejaPres ? (document.getElementById('prod-unidad-base')?.value || null) : null;
+                }
             }
             var prods = cat ? cat.productos : [];
             if (!IS_FAMILIA_SERVICIOS && marcaActualId) prods = prods.filter(function(p) { return p.marca_id === marcaActualId; });

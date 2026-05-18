@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ config('app.name') }} — Iniciar sesión</title>
+    <link rel="icon" type="image/jpeg" href="{{ asset('images/hospital.jpg') }}">
     <script>if(localStorage.getItem('darkMode')==='1')document.documentElement.classList.add('dark');</script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>

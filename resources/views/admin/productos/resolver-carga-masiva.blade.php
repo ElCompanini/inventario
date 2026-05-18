@@ -46,7 +46,12 @@
         @foreach($pendiente['exactos'] as $e)
             <li>{{ $e['descripcion'] }}
                 <span class="cm-exactos-qty">× {{ $e['cantidad'] }}
-                    @if(!empty($e['unidad_medida_nombre'])) {{ $e['unidad_medida_nombre'] }}
+                    @if(!empty($e['maneja_presentacion']))
+                        <span style="background:#ede9fe;color:#6d28d9;font-size:0.65rem;font-weight:700;padding:1px 5px;border-radius:9999px;margin-left:3px;">
+                            📦 {{ $e['tipo_presentacion'] }} × {{ $e['cantidad_presentacion'] }}
+                            → {{ $e['cantidad_real'] ?? ($e['cantidad'] * $e['cantidad_presentacion']) }} {{ $e['unidad_base'] }}(s) reales
+                        </span>
+                    @elseif(!empty($e['unidad_medida_nombre'])) {{ $e['unidad_medida_nombre'] }}
                     @elseif(!empty($e['unidad'])) {{ $e['unidad'] }}
                     @endif
                 </span>
@@ -94,6 +99,12 @@
                         <p class="text-xs mt-0.5 cm-meta">
                             Unidad Excel: <strong>{{ $c['unidad'] ?: '—' }}</strong>
                             · Cant: <strong>{{ $c['cantidad'] }}</strong>
+                            @if(!empty($c['maneja_presentacion']))
+                                <span style="display:inline-flex; align-items:center; gap:3px; background:#ede9fe; color:#6d28d9; font-size:0.7rem; font-weight:700; padding:1px 6px; border-radius:9999px; margin-left:4px;">
+                                    📦 {{ $c['tipo_presentacion'] }} × {{ $c['cantidad_presentacion'] }}
+                                    → {{ $c['cantidad_real'] ?? ($c['cantidad'] * $c['cantidad_presentacion']) }} {{ $c['unidad_base'] }}(s)
+                                </span>
+                            @endif
                             @if(!empty($c['precioNeto'])) · P. Neto: ${{ number_format($c['precioNeto'], 0, ',', '.') }} @endif
                             @if(!empty($c['totalNeto']))  · Total: ${{ number_format($c['totalNeto'], 0, ',', '.') }} @endif
                         </p>
@@ -135,7 +146,7 @@
                 @php $uw = $c['unidad_warning']; @endphp
                 <div class="cm-warning-unidad" style="margin-bottom:0.75rem;">
                     <div style="display:flex; align-items:flex-start; gap:0.5rem; margin-bottom:0.5rem;">
-                        <svg style="width:1rem;height:1rem;flex-shrink:0;margin-top:0.1rem;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <svg class="cm-warn-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                         </svg>
                         <div>
@@ -301,6 +312,10 @@
                         <input type="hidden" name="resoluciones[{{ $i }}][nuevo_marca_id]"     id="resolver-marca-hidden-{{ $i }}" value="">
                         <input type="hidden" name="resoluciones[{{ $i }}][nuevo_stock_minimo]"  id="resolver-min-hidden-{{ $i }}"  value="0">
                         <input type="hidden" name="resoluciones[{{ $i }}][nuevo_stock_critico]" id="resolver-crit-hidden-{{ $i }}" value="0">
+                        <input type="hidden" name="resoluciones[{{ $i }}][nuevo_maneja_presentacion]"   id="resolver-pkg-activo-{{ $i }}" value="0">
+                        <input type="hidden" name="resoluciones[{{ $i }}][nuevo_tipo_presentacion]"     id="resolver-pkg-tipo-{{ $i }}" value="">
+                        <input type="hidden" name="resoluciones[{{ $i }}][nuevo_cantidad_presentacion]" id="resolver-pkg-cant-{{ $i }}" value="">
+                        <input type="hidden" name="resoluciones[{{ $i }}][nuevo_unidad_base]"           id="resolver-pkg-base-{{ $i }}" value="">
                     </div>
                 </label>
 
@@ -394,6 +409,43 @@
                            class="cm-input" style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.6rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
                 </div>
             </div>
+            {{-- ── Paquetes ── --}}
+            <div style="border-top:1px solid #f3f4f6; padding-top:0.75rem; margin-bottom:0.75rem;">
+                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; user-select:none; margin-bottom:0.4rem;">
+                    <input type="checkbox" id="resolver-modal-pkg-toggle" onchange="resolverTogglePkg()"
+                           style="width:1rem; height:1rem; accent-color:#2563eb; cursor:pointer; flex-shrink:0;">
+                    <span class="cm-modal-label" style="font-size:0.8rem; font-weight:600; margin:0;">¿Maneja paquetes?</span>
+                    <span class="cm-modal-sub" style="font-size:0.72rem; margin:0;">(caja, bolsa, pack…)</span>
+                </label>
+                <div id="resolver-modal-pkg-fields" style="display:none; grid-template-columns:1fr 1fr; gap:0.625rem;">
+                    <div>
+                        <label class="cm-modal-label" style="display:block; font-size:0.75rem; font-weight:600; margin-bottom:0.25rem;">Tipo de paquete <span style="color:#ef4444;">*</span></label>
+                        <select id="resolver-modal-pkg-tipo" oninput="resolverActualizarPkgPreview()" onchange="resolverActualizarPkgPreview()"
+                                class="cm-input" style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.6rem; font-size:0.8rem; outline:none; box-sizing:border-box;">
+                            <option value="">— Selecciona —</option>
+                            @foreach(['Caja','Paquete','Bolsa','Pack','Kit','Rollo','Resma','Tubo','Bidón','Saco','Pallet','Otro'] as $tp)
+                            <option value="{{ $tp }}">{{ $tp }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="cm-modal-label" style="display:block; font-size:0.75rem; font-weight:600; margin-bottom:0.25rem;">Unidades por paquete <span style="color:#ef4444;">*</span></label>
+                        <input type="number" id="resolver-modal-pkg-cant" min="2" max="9999" placeholder="Ej: 100"
+                               oninput="resolverActualizarPkgPreview()"
+                               class="cm-input" style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.6rem; font-size:0.8rem; outline:none; box-sizing:border-box;">
+                    </div>
+                    <div style="grid-column:span 2;">
+                        <label class="cm-modal-label" style="display:block; font-size:0.75rem; font-weight:600; margin-bottom:0.25rem;">Unidad base <span style="color:#ef4444;">*</span></label>
+                        <input type="text" id="resolver-modal-pkg-base" placeholder="Ej: Unidad"
+                               oninput="resolverActualizarPkgPreview()"
+                               class="cm-input" style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.6rem; font-size:0.8rem; outline:none; box-sizing:border-box;">
+                    </div>
+                    <div style="grid-column:span 2; background:#eff6ff; border:1px solid #bfdbfe; border-radius:0.5rem; padding:0.5rem 0.75rem; display:none;" id="resolver-modal-pkg-preview-wrap">
+                        <p id="resolver-modal-pkg-preview" style="font-size:0.75rem; color:#1d4ed8; margin:0;"></p>
+                    </div>
+                </div>
+            </div>
+
             <div id="resolver-modal-error" style="display:none; font-size:0.8rem; color:#dc2626; background:#fef2f2; border-radius:0.375rem; padding:0.4rem 0.6rem; margin-bottom:0.75rem;"></div>
         </div>
         <div class="cm-modal-footer" style="padding:0.75rem 1.25rem 1.25rem; border-top:1px solid #f3f4f6; display:flex; justify-content:flex-end; gap:0.5rem;">
@@ -428,6 +480,17 @@
 .cm-meta        { color:#64748b; }
 .cm-sim-badge   { }
 .cm-sim-inline  { color:#6366f1; }
+
+@keyframes cm-pulse-icon {
+    0%, 100% { opacity:1;   transform:scale(1); }
+    50%       { opacity:0.6; transform:scale(1.22); }
+}
+.cm-warn-icon {
+    width:1.4rem; height:1.4rem; flex-shrink:0; margin-top:0.05rem;
+    color:#ea580c;
+    animation:cm-pulse-icon 1.6s ease-in-out infinite;
+}
+html.dark .cm-warn-icon { color:#fb923c; }
 
 .cm-warning-monto {
     background:#fef3c7; border:1px solid #fcd34d; border-radius:0.5rem;
@@ -519,6 +582,11 @@ html.dark .cm-modal-footer { background:#1e293b; border-color:#334155; }
 html.dark .cm-btn-cancel   { background:#334155; color:#cbd5e1; border-color:#475569; }
 html.dark .cm-input        { background:#0f172a; color:#e2e8f0; border-color:#334155; }
 
+/* Package preview in modal */
+#resolver-modal-pkg-preview-wrap { background:#eff6ff; border:1px solid #bfdbfe; }
+html.dark #resolver-modal-pkg-preview-wrap { background:#172554; border-color:#1e40af; }
+html.dark #resolver-modal-pkg-preview { color:#93c5fd; }
+
 /* Cancel modal overlay close on backdrop */
 #modal-cancelar-carga { cursor: default; }
 </style>
@@ -546,6 +614,14 @@ var _resolverModalIdx  = null;
 var _resolverFamiliaId = null;
 var _resolverCatId     = null;
 var _resolverMarcaId   = null;
+
+// Package data pre-loaded from Excel (indexed by conflict position)
+var resolverPkgData = {!! json_encode(collect($pendiente['conflictos'])->mapWithKeys(fn($c, $i) => [$i => [
+    'activo' => !empty($c['maneja_presentacion']),
+    'tipo'   => $c['tipo_presentacion'] ?? '',
+    'cant'   => $c['cantidad_presentacion'] ? (int)$c['cantidad_presentacion'] : null,
+    'base'   => $c['unidad_base'] ?? '',
+]])->all(), JSON_HEX_TAG | JSON_HEX_AMP) !!};
 
 /* ── Resolución de unidad ─────────────────────────────────────────── */
 function setUnidAccion(idx, accion) {
@@ -696,6 +772,27 @@ function resolverAbrirModal(idx, nombre) {
     document.getElementById('resolver-modal-marca-wrap').style.display = 'none';
     document.getElementById('resolver-modal-minimo').value  = document.getElementById('resolver-min-hidden-'  + idx).value || '0';
     document.getElementById('resolver-modal-critico').value = document.getElementById('resolver-crit-hidden-' + idx).value || '0';
+
+    // ── Package fields: restore previous user selection or pre-populate from Excel ──
+    var savedActivo = document.getElementById('resolver-pkg-activo-' + idx).value === '1';
+    var savedTipo   = document.getElementById('resolver-pkg-tipo-' + idx).value;
+    var savedCant   = document.getElementById('resolver-pkg-cant-' + idx).value;
+    var savedBase   = document.getElementById('resolver-pkg-base-' + idx).value;
+    var pkgEx       = resolverPkgData[idx] || {};
+
+    // Priority: previously saved by user > Excel data > blank
+    var useActivo = savedActivo || (!savedTipo && pkgEx.activo);
+    var useTipo   = savedTipo   || (pkgEx.activo ? (pkgEx.tipo || '') : '');
+    var useCant   = savedCant   || (pkgEx.activo ? (pkgEx.cant || '') : '');
+    var useBase   = savedBase   || (pkgEx.activo ? (pkgEx.base || '') : '');
+
+    document.getElementById('resolver-modal-pkg-toggle').checked = useActivo;
+    document.getElementById('resolver-modal-pkg-tipo').value = useTipo;
+    document.getElementById('resolver-modal-pkg-cant').value = useCant;
+    document.getElementById('resolver-modal-pkg-base').value = useBase;
+    document.getElementById('resolver-modal-pkg-fields').style.display = useActivo ? 'grid' : 'none';
+    resolverActualizarPkgPreview();
+
     resolverRenderFamilias();
     resolverRenderCategorias();
     document.getElementById('resolver-modal-nuevo').style.display = 'flex';
@@ -703,6 +800,33 @@ function resolverAbrirModal(idx, nombre) {
 
 function resolverCerrarModal() {
     document.getElementById('resolver-modal-nuevo').style.display = 'none';
+}
+
+function resolverTogglePkg() {
+    var activo = document.getElementById('resolver-modal-pkg-toggle').checked;
+    document.getElementById('resolver-modal-pkg-fields').style.display = activo ? 'grid' : 'none';
+    if (!activo) {
+        document.getElementById('resolver-modal-pkg-preview-wrap').style.display = 'none';
+        document.getElementById('resolver-modal-pkg-preview').textContent = '';
+    } else {
+        resolverActualizarPkgPreview();
+        document.getElementById('resolver-modal-pkg-tipo').focus();
+    }
+}
+
+function resolverActualizarPkgPreview() {
+    var tipo = (document.getElementById('resolver-modal-pkg-tipo').value || '').trim();
+    var cant = parseInt(document.getElementById('resolver-modal-pkg-cant').value) || 0;
+    var base = (document.getElementById('resolver-modal-pkg-base').value || '').trim();
+    var wrap = document.getElementById('resolver-modal-pkg-preview-wrap');
+    var prev = document.getElementById('resolver-modal-pkg-preview');
+    if (tipo && cant >= 2 && base) {
+        prev.textContent = '1 ' + tipo + ' = ' + cant + ' ' + base + (base.slice(-1).toLowerCase() !== 's' ? 's' : '');
+        wrap.style.display = '';
+    } else {
+        wrap.style.display = 'none';
+        prev.textContent = '';
+    }
 }
 
 function resolverRenderFamilias() {
@@ -749,12 +873,10 @@ function resolverRenderCategorias() {
         var fam = resolverFamilias.find(function(f) { return f.id === _resolverFamiliaId; });
         if (fam) catsToShow = fam.categorias;
     } else {
-        // Sin familia o SIN FAMILIA → todas las categorías excepto PARTES Y PIEZAS y SERVICIOS
+        // Sin familia o SIN FAMILIA → todas las categorías EXCEPTO SERVICIOS
         resolverFamilias.forEach(function(f) {
             if (f.tipo === 'servicios') return;
-            f.categorias.forEach(function(c) {
-                if (!esCatPYP(c.id)) catsToShow.push(c);
-            });
+            f.categorias.forEach(function(c) { catsToShow.push(c); });
         });
     }
     catsToShow.forEach(function(c) {
@@ -796,19 +918,45 @@ function resolverConfirmarModal() {
     var errDiv = document.getElementById('resolver-modal-error');
     errDiv.style.display = 'none';
     if (!_resolverCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.style.display = 'block'; return; }
-    // Bloquear categorías de PARTES Y PIEZAS cuando no hay familia real seleccionada
-    var sinFamOrNone = (!_resolverFamiliaId || _resolverFamiliaId === SIN_FAMILIA_ID);
-    if (sinFamOrNone && esCatPYP(_resolverCatId)) {
-        errDiv.textContent = 'Las categorías de PARTES Y PIEZAS requieren una familia real.';
-        errDiv.style.display = 'block'; return;
+
+    // ── Validate package fields if toggle ON ──
+    var pkgActivo = document.getElementById('resolver-modal-pkg-toggle').checked;
+    var pkgTipo   = (document.getElementById('resolver-modal-pkg-tipo').value || '').trim();
+    var pkgCant   = parseInt(document.getElementById('resolver-modal-pkg-cant').value) || 0;
+    var pkgBase   = (document.getElementById('resolver-modal-pkg-base').value || '').trim();
+    if (pkgActivo) {
+        if (!pkgTipo || pkgCant < 2 || !pkgBase) {
+            errDiv.textContent = 'Si el producto maneja paquetes, completa tipo, cantidad (≥ 2) y unidad base.';
+            errDiv.style.display = 'block';
+            return;
+        }
     }
+
     var min  = parseInt(document.getElementById('resolver-modal-minimo').value)  || 0;
     var crit = parseInt(document.getElementById('resolver-modal-critico').value) || 0;
     var idx  = _resolverModalIdx;
+
+    // Save base fields
     document.getElementById('resolver-cat-hidden-'  + idx).value = _resolverCatId;
     document.getElementById('resolver-marca-hidden-'+ idx).value = _resolverMarcaId || '';
     document.getElementById('resolver-min-hidden-'  + idx).value = min;
     document.getElementById('resolver-crit-hidden-' + idx).value = crit;
+
+    // Save package fields
+    document.getElementById('resolver-pkg-activo-' + idx).value = pkgActivo ? '1' : '0';
+    document.getElementById('resolver-pkg-tipo-'   + idx).value = pkgActivo ? pkgTipo : '';
+    document.getElementById('resolver-pkg-cant-'   + idx).value = pkgActivo ? pkgCant : '';
+    document.getElementById('resolver-pkg-base-'   + idx).value = pkgActivo ? pkgBase : '';
+
+    // Clear any validation error for this item
+    var panelNuevo = document.getElementById('panel-nuevo-' + idx);
+    if (panelNuevo) {
+        var errMsg = panelNuevo.querySelector('.resolver-nuevo-error');
+        if (errMsg) errMsg.remove();
+        var btn = panelNuevo.querySelector('button');
+        if (btn) { btn.style.outline = ''; btn.style.outlineOffset = ''; }
+    }
+
     var fam  = _resolverFamiliaId ? resolverFamilias.find(function(f) { return f.id === _resolverFamiliaId; }) : null;
     var cat  = resolverBuscarCat(_resolverCatId);
     var marca = (cat && cat.marcas && _resolverMarcaId) ? cat.marcas.find(function(m) { return m.id === _resolverMarcaId; }) : null;
@@ -816,7 +964,8 @@ function resolverConfirmarModal() {
     if (resumen) {
         var famNombre = fam ? fam.nombre + ' › ' : '';
         var marcaTxt  = marca ? ' · ' + marca.nombre : ' · sin marca';
-        resumen.textContent = '✓ ' + famNombre + (cat ? cat.nombre : '') + marcaTxt + ' · Mín:' + min + ' / Crít:' + crit;
+        var pkgStr    = pkgActivo ? (' · 📦 ' + pkgTipo + ' × ' + pkgCant) : '';
+        resumen.textContent = '✓ ' + famNombre + (cat ? cat.nombre : '') + marcaTxt + ' · Mín:' + min + ' / Crít:' + crit + pkgStr;
         resumen.classList.remove('hidden');
     }
     resolverCerrarModal();
@@ -965,7 +1114,47 @@ document.addEventListener('keydown', function(e) {
 });
 
 // Mark form submit so unload doesn't double-cancel
-document.querySelector('form[action="{{ route("admin.productos.carga.masiva.confirmar") }}"]').addEventListener('submit', function() {
+document.querySelector('form[action="{{ route("admin.productos.carga.masiva.confirmar") }}"]').addEventListener('submit', function(e) {
+    // Validate: "nuevo" items must have a category selected
+    var errores = [];
+    @foreach($pendiente['conflictos'] as $i => $c)
+    (function() {
+        var radios = document.querySelectorAll('input[name="resoluciones[{{ $i }}][accion]"]');
+        var seleccionado = '';
+        radios.forEach(function(r) { if (r.checked) seleccionado = r.value; });
+        if (seleccionado === 'nuevo') {
+            var catHidden = document.getElementById('resolver-cat-hidden-{{ $i }}');
+            if (!catHidden || !catHidden.value) {
+                errores.push({{ $i }});
+            }
+        }
+    })();
+    @endforeach
+
+    if (errores.length > 0) {
+        e.preventDefault();
+        // Remove previous error messages
+        document.querySelectorAll('.resolver-nuevo-error').forEach(function(el) { el.remove(); });
+        errores.forEach(function(idx) {
+            var card = document.getElementById('panel-nuevo-' + idx);
+            if (!card) return;
+            var existing = card.querySelector('.resolver-nuevo-error');
+            if (existing) existing.remove();
+            var msg = document.createElement('p');
+            msg.className = 'resolver-nuevo-error';
+            msg.style.cssText = 'color:#dc2626;font-size:0.8rem;font-weight:600;margin:0.5rem 0 0;';
+            msg.textContent = 'Debes configurar el nuevo producto antes de confirmar.';
+            card.appendChild(msg);
+            // Highlight the configure button
+            var btn = card.querySelector('button');
+            if (btn) { btn.style.outline = '2px solid #dc2626'; btn.style.outlineOffset = '2px'; }
+        });
+        // Scroll to first offending item
+        var firstCard = document.getElementById('panel-nuevo-' + errores[0]);
+        if (firstCard) firstCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
     _confirmingCarga = true;
 });
 

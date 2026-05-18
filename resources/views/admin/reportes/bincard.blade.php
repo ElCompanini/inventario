@@ -10,6 +10,11 @@
 .bincard-neutral { background:#fff; }
 .bincard-alt     { background:#f8fafc; }
 
+/* Badges tipo movimiento */
+.bc-mov-entrada { background:#dcfce7; color:#15803d; }
+.bc-mov-salida  { background:#fee2e2; color:#dc2626; }
+.bc-mov-neutral { background:#f3f4f6; color:#6b7280; }
+
 /* Dark mode — BINCARD */
 html.dark .bincard-th      { background:#1e1b4b; border-color:#4f46e5; }
 html.dark .bincard-td      { border-color:#334155; color:#e2e8f0; }
@@ -18,6 +23,9 @@ html.dark .bincard-salida  { background:#2d0a0a; }
 html.dark .bincard-neutral { background:#1e293b; }
 html.dark .bincard-alt     { background:#162032; }
 html.dark .bincard-td > *  { color:inherit; }
+html.dark .bc-mov-entrada  { background:rgba(22,163,74,0.2); color:#4ade80; }
+html.dark .bc-mov-salida   { background:rgba(220,38,38,0.2); color:#f87171; }
+html.dark .bc-mov-neutral  { background:rgba(100,116,139,0.2); color:#94a3b8; }
 </style>
 @endpush
 
@@ -191,8 +199,8 @@ html.dark .bincard-td > *  { color:inherit; }
         @if(auth()->user()->esAdmin() && ($data['costo_promedio'] || $data['ultimo_costo']))
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
             @foreach([
-                ['Costo Promedio', $data['costo_promedio'] ? '$' . number_format($data['costo_promedio'], 0, ',', '.') : '—'],
-                ['Último Costo', $data['ultimo_costo'] ? '$' . number_format($data['ultimo_costo'], 0, ',', '.') : '—'],
+                ['Costo Prom. c/IVA', $data['costo_promedio'] ? '$' . number_format($data['costo_promedio'], 0, ',', '.') : '—'],
+                ['Último Costo c/IVA', $data['ultimo_costo'] ? '$' . number_format($data['ultimo_costo'], 0, ',', '.') : '—'],
                 ['Valor Inventario', $data['valor_inventario'] ? '$' . number_format($data['valor_inventario'], 0, ',', '.') : '—'],
             ] as [$label, $val])
             <div style="text-align:center; padding:.5rem; background:#eff6ff; border-radius:.5rem; border:1px solid #bfdbfe;">
@@ -225,9 +233,9 @@ html.dark .bincard-td > *  { color:inherit; }
                     <th class="bincard-th" style="color:#fca5a5;">Salida</th>
                     <th class="bincard-th" style="color:#a5b4fc;">Saldo</th>
                     @if(auth()->user()->esAdmin())
-                    <th class="bincard-th">Costo Unit.</th>
+                    <th class="bincard-th">Costo Unit. c/IVA</th>
                     <th class="bincard-th">Valor Mov.</th>
-                    <th class="bincard-th">Costo Prom.</th>
+                    <th class="bincard-th">Costo Prom. c/IVA</th>
                     <th class="bincard-th">Valor Saldo</th>
                     @endif
                     <th class="bincard-th" style="text-align:left;">Usuario</th>
@@ -245,9 +253,8 @@ html.dark .bincard-td > *  { color:inherit; }
                 <tr class="{{ $cls }}">
                     <td class="bincard-td whitespace-nowrap">{{ $fila['fecha'] }}</td>
                     <td class="bincard-td text-center">
-                        <span style="font-size:.68rem; font-weight:700; padding:2px 7px; border-radius:9999px; white-space:nowrap;
-                            background:{{ $esE ? '#dcfce7' : ($esS ? '#fee2e2' : '#f3f4f6') }};
-                            color:{{ $esE ? '#15803d' : ($esS ? '#dc2626' : '#6b7280') }};">
+                        <span class="{{ $esE ? 'bc-mov-entrada' : ($esS ? 'bc-mov-salida' : 'bc-mov-neutral') }}"
+                              style="font-size:.68rem; font-weight:700; padding:2px 7px; border-radius:9999px; white-space:nowrap; display:inline-block;">
                             {{ $fila['tipo_movimiento'] }}
                         </span>
                     </td>

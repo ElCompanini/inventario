@@ -32,17 +32,24 @@ class RetiroController extends Controller
 
         $productos = Producto::with(['categoria.familia'])
             ->where('nombre', 'like', "%{$q}%")
+            ->where('es_servicio', false)
+            ->whereDoesntHave('categoria.familia', fn($f) => $f->where('tipo', 'servicios'))
             ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId))
-            ->select('id', 'nombre', 'stock_actual', 'categoria_id', 'centro_costo_id')
+            ->select('id', 'nombre', 'stock_actual', 'categoria_id', 'centro_costo_id',
+                     'maneja_presentacion', 'tipo_presentacion', 'cantidad_presentacion', 'unidad_base')
             ->orderBy('nombre')
             ->limit(12)
             ->get()
             ->map(fn($p) => [
-                'id'          => $p->id,
-                'nombre'      => $p->nombre,
-                'stock_actual'=> $p->stock_actual,
-                'categoria'   => $p->categoria?->nombre ?? '',
-                'familia'     => $p->categoria?->familia?->nombre ?? '',
+                'id'           => $p->id,
+                'nombre'       => $p->nombre,
+                'stock_actual' => $p->stock_actual,
+                'categoria'    => $p->categoria?->nombre ?? '',
+                'familia'      => $p->categoria?->familia?->nombre ?? '',
+                'stock_visual' => $p->tienePresentacion() ? $p->cantidadVisual((int)$p->stock_actual) : null,
+                'pkg_qty'      => $p->tienePresentacion() ? (int)$p->cantidad_presentacion : null,
+                'pkg_tipo'     => $p->tipo_presentacion,
+                'pkg_base'     => $p->unidad_base ?: 'unidad',
             ]);
 
         return response()->json($productos);
@@ -78,6 +85,10 @@ class RetiroController extends Controller
             DB::transaction(function () use ($user, $ccId, $items, $motivo) {
                 foreach ($items as $item) {
                     $producto = Producto::lockForUpdate()->findOrFail($item['producto_id']);
+
+                    if ($producto->es_servicio) {
+                        throw new \Exception("El producto \"{$producto->nombre}\" es un servicio y no puede retirarse.");
+                    }
 
                     if ($ccId && $producto->centro_costo_id !== $ccId) {
                         throw new \Exception("No tienes acceso al producto \"{$producto->nombre}\".");

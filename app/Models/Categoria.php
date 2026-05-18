@@ -29,12 +29,11 @@ class Categoria extends Model
     }
 
     /**
-     * Categories available under SIN FAMILIA: all categories whose family
-     * is a normal (non-special) family. Dynamically includes any new
-     * families/categories added in the future without code changes.
+     * Categories available under SIN FAMILIA: all categories from any family
+     * except SERVICIOS. Includes normal, sin_familia, partes_piezas, etc.
      */
     public function scopeParaSinFamilia(Builder $query): Builder
     {
-        return $query->whereHas('familia', fn($q) => $q->where('tipo', 'normal'));
+        return $query->whereHas('familia', fn($q) => $q->whereNotIn('tipo', ['servicios', 'partes_piezas']));
     }
 }
