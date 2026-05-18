@@ -3,19 +3,9 @@
 
 @section('content')
 
-<div class="mb-5 flex items-center justify-between gap-4">
-    <div>
-        <h1 class="text-2xl font-bold text-gray-800">Gastos Menores</h1>
-        <p class="text-sm text-gray-500 mt-1">Registro de compras de gasto menor con sus boletas y productos asociados</p>
-    </div>
-    <button type="button" id="btn-abrir-gasto-menor"
-        style="background:#d97706; color:#fff; font-size:0.82rem; font-weight:600; padding:0.5rem 1.1rem; border-radius:0.5rem; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:0.4rem; transition:background .15s; white-space:nowrap;"
-        onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#d97706'">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        Nueva Compra
-    </button>
+<div class="mb-5">
+    <h1 class="text-2xl font-bold text-gray-800">Gastos Menores</h1>
+    <p class="text-sm text-gray-500 mt-1">Registro de compras de gasto menor con sus boletas y productos asociados</p>
 </div>
 
 @if(session('success'))

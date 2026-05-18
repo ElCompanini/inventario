@@ -373,6 +373,7 @@ class OrdenCompraController extends Controller
                 $sicdIds[$sicd->id] = $sicd;
 
                 if ($recibido > 0 && $detalle->producto) {
+                    $stockAntes = $detalle->producto->stock_actual;
                     $detalle->producto->stock_actual += $recibido;
 
                     $containerId = $request->input("container.{$ocDetalle->id}");
@@ -394,17 +395,23 @@ class OrdenCompraController extends Controller
                     }
 
                     HistorialCambio::create([
-                        'producto_id'     => $detalle->producto_id,
-                        'nombre_producto' => $detalle->producto->nombre,
-                        'contenedor_id'   => $detalle->producto->contenedor,
-                        'cantidad'        => $recibido,
-                        'tipo'            => 'entrada',
-                        'motivo'          => $motivoBase,
-                        'aprobado_por'    => $userName,
-                        'usuario_id'      => $userId,
-                        'origen'          => 'sicd',
-                        'origen_id'       => $sicd->id,
-                        'orden_compra_id' => $oc->id,
+                        'producto_id'        => $detalle->producto_id,
+                        'nombre_producto'    => $detalle->producto->nombre,
+                        'contenedor_id'      => $detalle->producto->contenedor,
+                        'cantidad'           => $recibido,
+                        'tipo'               => 'entrada',
+                        'motivo'             => $motivoBase,
+                        'aprobado_por'       => $userName,
+                        'usuario_id'         => $userId,
+                        'origen'             => 'sicd',
+                        'origen_id'          => $sicd->id,
+                        'origen_tipo'        => 'sicd',
+                        'orden_compra_id'    => $oc->id,
+                        'doc_origen'         => 'OC ' . $oc->numero_oc,
+                        'doc_referencia'     => 'SICD ' . $sicd->codigo_sicd,
+                        'stock_anterior'     => $stockAntes,
+                        'stock_posterior'    => $detalle->producto->stock_actual,
+                        'usuario_ejecutor_id'=> $userId,
                     ]);
 
                     $precioNeto = $ocDetalle->precio_neto ?? $detalle->precio_neto;

@@ -26,6 +26,48 @@ html.dark .bincard-td > *  { color:inherit; }
 html.dark .bc-mov-entrada  { background:rgba(22,163,74,0.2); color:#4ade80; }
 html.dark .bc-mov-salida   { background:rgba(220,38,38,0.2); color:#f87171; }
 html.dark .bc-mov-neutral  { background:rgba(100,116,139,0.2); color:#94a3b8; }
+
+/* Servicio: badges de acción operacional */
+.bc-accion-recepcion  { background:#dbeafe; color:#1d4ed8; }
+.bc-accion-ejecucion  { background:#fef9c3; color:#92400e; }
+.bc-accion-baja       { background:#fee2e2; color:#dc2626; }
+.bc-accion-admin      { background:#f3f4f6; color:#6b7280; }
+html.dark .bc-accion-recepcion { background:rgba(59,130,246,0.2);  color:#93c5fd; }
+html.dark .bc-accion-ejecucion { background:rgba(234,179,8,0.2);   color:#fde047; }
+html.dark .bc-accion-baja      { background:rgba(220,38,38,0.2);   color:#f87171; }
+html.dark .bc-accion-admin     { background:rgba(100,116,139,0.2); color:#94a3b8; }
+
+/* Badges de origen del movimiento */
+.bc-orig-sol      { background:#fef9c3; color:#92400e; }
+.bc-orig-dev      { background:#d1fae5; color:#065f46; }
+.bc-orig-compra   { background:#dbeafe; color:#1e40af; }
+.bc-orig-armado   { background:#ffedd5; color:#9a3412; }
+.bc-orig-ajuste   { background:#f3f4f6; color:#374151; }
+.bc-orig-traslado { background:#ede9fe; color:#5b21b6; }
+.bc-orig-manual   { background:#f8fafc; color:#64748b; }
+html.dark .bc-orig-sol    { background:rgba(234,179,8,0.2);   color:#fde047; }
+html.dark .bc-orig-dev    { background:rgba(16,185,129,0.2);  color:#6ee7b7; }
+html.dark .bc-orig-compra { background:rgba(59,130,246,0.2);  color:#93c5fd; }
+html.dark .bc-orig-armado { background:rgba(249,115,22,0.2);  color:#fdba74; }
+html.dark .bc-orig-ajuste { background:rgba(100,116,139,0.2); color:#94a3b8; }
+html.dark .bc-orig-traslado{ background:rgba(139,92,246,0.2); color:#c4b5fd; }
+html.dark .bc-orig-manual { background:rgba(51,65,85,0.4);    color:#94a3b8; }
+
+/* Saldo — columna destacada */
+.bc-saldo-cell {
+    background: linear-gradient(135deg,#1e3a5f,#1e40af) !important;
+    color:#fff !important;
+    font-weight:800 !important;
+    font-size:.82rem !important;
+    text-align:center;
+    min-width:68px;
+    border-color:#2563eb !important;
+    letter-spacing:.02em;
+}
+.bc-saldo-positivo { color:#86efac !important; }
+.bc-saldo-cero     { color:#fcd34d !important; }
+.bc-saldo-negativo { color:#fca5a5 !important; }
+html.dark .bc-saldo-cell { background:linear-gradient(135deg,#1e1b4b,#1e3a5f) !important; }
 </style>
 @endpush
 
@@ -73,12 +115,65 @@ html.dark .bc-mov-neutral  { background:rgba(100,116,139,0.2); color:#94a3b8; }
             <select name="tipo"
                     style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.8rem; background:#fff;">
                 <option value="">— Todos —</option>
-                @foreach(['entrada','salida','ajuste','merma','transferencia','retiro','devolucion'] as $t)
+                @foreach(['entrada','salida','devolucion','ajuste','merma','traslado','retiro'] as $t)
                     <option value="{{ $t }}" {{ request('tipo') === $t ? 'selected' : '' }}>{{ ucfirst($t) }}</option>
                 @endforeach
             </select>
         </div>
     </div>
+
+    {{-- Filtros avanzados colapsables --}}
+    <div style="margin-top:.75rem;">
+        <button type="button" onclick="toggleFiltrosAvanzados()"
+                style="font-size:.75rem; font-weight:600; color:#4f46e5; background:none; border:none; cursor:pointer; padding:0; display:inline-flex; align-items:center; gap:.3rem;">
+            <svg id="icon-filtros-adv" style="width:13px;height:13px; transition:transform .2s;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+            </svg>
+            Filtros avanzados
+            @if(request()->hasAny(['origen','registrado_por','usuario_filtro','proveedor_filtro','n_documento_filtro']))
+                <span style="background:#ef4444; color:#fff; font-size:.65rem; font-weight:700; padding:1px 6px; border-radius:9999px;">activos</span>
+            @endif
+        </button>
+        <div id="filtros-avanzados" style="{{ request()->hasAny(['origen','registrado_por','usuario_filtro','proveedor_filtro','n_documento_filtro']) ? '' : 'display:none;' }} margin-top:.75rem;">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Origen</label>
+                    <select name="origen"
+                            style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.78rem; background:#fff;">
+                        <option value="">— Todos —</option>
+                        @foreach(['sicd'=>'SICD / OC','gasto_menor'=>'Compra Directa','solicitud'=>'Solicitud','computador_armado'=>'Armado'] as $val => $label)
+                            <option value="{{ $val }}" {{ request('origen') === $val ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Usuario (solicitante)</label>
+                    <input type="text" name="usuario_filtro" value="{{ request('usuario_filtro') }}"
+                           placeholder="Nombre..."
+                           style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.78rem;">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Registrado por</label>
+                    <input type="text" name="registrado_por" value="{{ request('registrado_por') }}"
+                           placeholder="Admin que ejecutó..."
+                           style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.78rem;">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Proveedor</label>
+                    <input type="text" name="proveedor_filtro" value="{{ request('proveedor_filtro') }}"
+                           placeholder="Nombre proveedor..."
+                           style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.78rem;">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">N° Documento</label>
+                    <input type="text" name="n_documento_filtro" value="{{ request('n_documento_filtro') }}"
+                           placeholder="SOL-1, OC-xxx, SICD..."
+                           style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.78rem;">
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="mt-4 flex items-center gap-3">
         <button type="submit"
                 style="padding:.45rem 1.25rem; font-size:.82rem; font-weight:700; color:#fff; background:#4f46e5; border:none; border-radius:.5rem; cursor:pointer; display:inline-flex; align-items:center; gap:.4rem;"
@@ -134,7 +229,13 @@ html.dark .bc-mov-neutral  { background:rgba(100,116,139,0.2); color:#94a3b8; }
         <div class="flex items-center justify-between">
             <div>
                 <p style="font-size:0.7rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; opacity:.7; margin:0;">Sistema de Gestión de Inventario</p>
-                <h2 style="font-size:1.25rem; font-weight:800; margin:.1rem 0 0;">TARJETA BINCARD — CONTROL DE EXISTENCIAS</h2>
+                <h2 style="font-size:1.25rem; font-weight:800; margin:.1rem 0 0;">
+                    @if($data['es_servicio'])
+                        HISTORIAL OPERACIONAL — SERVICIO ADMINISTRATIVO
+                    @else
+                        TARJETA BINCARD — CONTROL DE EXISTENCIAS
+                    @endif
+                </h2>
             </div>
             <div style="text-align:right; font-size:0.72rem; opacity:.8;">
                 <p style="margin:0;">Emitido: {{ $data['generado_at'] }}</p>
@@ -177,8 +278,30 @@ html.dark .bc-mov-neutral  { background:rgba(100,116,139,0.2); color:#94a3b8; }
         </div>
     </div>
 
-    {{-- KPIs de stock --}}
+    {{-- KPIs de stock (bienes físicos) / Resumen operacional (servicios) --}}
     <div style="padding:.75rem 1.5rem; background:#fff; border-bottom:1px solid #e2e8f0;">
+    @if($data['es_servicio'])
+        {{-- Servicio: resumen sin stock físico ni valorización --}}
+        @php $ultimaFila = collect($data['filas'])->last(); @endphp
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            @foreach([
+                ['Total Registros',          count($data['filas']),   '#4f46e5'],
+                ['Solicitudes/Asociaciones', $data['total_entradas'], '#16a34a'],
+                ['Ejecuciones/Consumos',     $data['total_salidas'],  '#f59e0b'],
+            ] as [$label, $val, $color])
+            <div style="text-align:center; padding:.5rem; background:#f8fafc; border-radius:.5rem; border:1px solid #e2e8f0;">
+                <p style="font-size:.65rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin:0;">{{ $label }}</p>
+                <p style="font-size:1.3rem; font-weight:800; color:{{ $color }}; margin:.1rem 0 0;">{{ $val ?: '—' }}</p>
+            </div>
+            @endforeach
+        </div>
+        @if($ultimaFila)
+        <p style="margin:.6rem 0 0; font-size:.72rem; color:#6b7280;">
+            Última actividad: <strong>{{ $ultimaFila['fecha'] }}</strong> — {{ $ultimaFila['usuario'] }}
+        </p>
+        @endif
+    @else
+        {{-- Bien físico: KPIs de inventario completos --}}
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             @php $estado = $producto->estadoStock(); @endphp
             @foreach([
@@ -210,114 +333,216 @@ html.dark .bc-mov-neutral  { background:rgba(100,116,139,0.2); color:#94a3b8; }
             @endforeach
         </div>
         @endif
+    @endif
     </div>
 </div>
 
-{{-- ══ TABLA PRINCIPAL BINCARD ════════════════════════════════════════ --}}
+{{-- ══ TABLA PRINCIPAL ════════════════════════════════════════════════ --}}
 <div class="bg-white rounded-xl shadow overflow-hidden">
     <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        @if($data['es_servicio'])
+        <h3 class="text-sm font-semibold text-gray-700">Historial Operacional del Servicio</h3>
+        @else
         <h3 class="text-sm font-semibold text-gray-700">Historial de Movimientos</h3>
-        <span class="text-xs text-gray-400">{{ count($data['filas']) }} movimiento(s)</span>
+        @endif
+        <span class="text-xs text-gray-400">{{ count($data['filas']) }} {{ $data['es_servicio'] ? 'registro(s)' : 'movimiento(s)' }}</span>
     </div>
     <div class="overflow-x-auto">
-        <table style="width:100%; border-collapse:collapse; font-size:.75rem;">
-            <thead>
-                <tr>
-                    <th class="bincard-th" style="text-align:left;">Fecha</th>
-                    <th class="bincard-th">Tipo Mov.</th>
-                    <th class="bincard-th">Tipo Doc.</th>
-                    <th class="bincard-th" style="text-align:left;">N° Documento</th>
-                    <th class="bincard-th">RUT Proveedor</th>
-                    <th class="bincard-th" style="text-align:left;">Proveedor</th>
-                    <th class="bincard-th" style="color:#86efac;">Entrada</th>
-                    <th class="bincard-th" style="color:#fca5a5;">Salida</th>
-                    <th class="bincard-th" style="color:#a5b4fc;">Saldo</th>
-                    @if(auth()->user()->esAdmin())
-                    <th class="bincard-th">Costo Unit. c/IVA</th>
-                    <th class="bincard-th">Valor Mov.</th>
-                    <th class="bincard-th">Costo Prom. c/IVA</th>
-                    <th class="bincard-th">Valor Saldo</th>
-                    @endif
-                    <th class="bincard-th" style="text-align:left;">Usuario</th>
-                    <th class="bincard-th" style="text-align:left; min-width:180px;">Observaciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($data['filas'] as $idx => $fila)
-                @php
-                    $esE = $fila['entrada'] !== null;
-                    $esS = $fila['salida']  !== null;
-                    $base = $idx % 2 === 0 ? '' : 'bincard-alt';
-                    $cls  = $esE ? 'bincard-entrada' : ($esS ? 'bincard-salida' : $base);
-                @endphp
-                <tr class="{{ $cls }}">
-                    <td class="bincard-td whitespace-nowrap">{{ $fila['fecha'] }}</td>
-                    <td class="bincard-td text-center">
-                        <span class="{{ $esE ? 'bc-mov-entrada' : ($esS ? 'bc-mov-salida' : 'bc-mov-neutral') }}"
-                              style="font-size:.68rem; font-weight:700; padding:2px 7px; border-radius:9999px; white-space:nowrap; display:inline-block;">
-                            {{ $fila['tipo_movimiento'] }}
-                        </span>
-                    </td>
-                    <td class="bincard-td text-center text-gray-600">{{ $fila['tipo_documento'] }}</td>
-                    <td class="bincard-td font-mono" style="color:#4f46e5; font-size:.72rem;">{{ $fila['n_documento'] }}</td>
-                    <td class="bincard-td text-center text-gray-600 whitespace-nowrap">{{ $fila['rut_proveedor'] }}</td>
-                    <td class="bincard-td text-gray-700" style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ $fila['proveedor'] }}</td>
-                    <td class="bincard-td text-center font-bold" style="color:#16a34a;">
-                        {{ $fila['entrada'] !== null ? $fila['entrada'] : '' }}
-                    </td>
-                    <td class="bincard-td text-center font-bold" style="color:#dc2626;">
-                        {{ $fila['salida'] !== null ? $fila['salida'] : '' }}
-                    </td>
-                    <td class="bincard-td text-center font-bold" style="color:#4f46e5;">{{ $fila['saldo'] }}</td>
-                    @if(auth()->user()->esAdmin())
-                    <td class="bincard-td text-right text-gray-700">
-                        {{ $fila['costo_unitario'] ? '$' . number_format($fila['costo_unitario'], 0, ',', '.') : '—' }}
-                    </td>
-                    <td class="bincard-td text-right font-semibold">
-                        {{ $fila['valor_movimiento'] ? '$' . number_format($fila['valor_movimiento'], 0, ',', '.') : '—' }}
-                    </td>
-                    <td class="bincard-td text-right text-gray-500" style="font-size:.7rem;">
-                        {{ $fila['costo_promedio'] ? '$' . number_format($fila['costo_promedio'], 0, ',', '.') : '—' }}
-                    </td>
-                    <td class="bincard-td text-right font-semibold" style="color:#1d4ed8;">
-                        {{ $fila['valor_saldo'] ? '$' . number_format($fila['valor_saldo'], 0, ',', '.') : '—' }}
-                    </td>
-                    @endif
-                    <td class="bincard-td text-gray-600 whitespace-nowrap">{{ $fila['usuario'] }}</td>
-                    <td class="bincard-td text-gray-500" style="font-size:.72rem; max-width:200px;">{{ $fila['observaciones'] }}</td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="15" style="text-align:center; padding:2rem; color:#9ca3af; font-size:.82rem;">
-                        No hay movimientos para los filtros seleccionados.
-                    </td>
-                </tr>
-                @endforelse
 
-                {{-- Fila de totales --}}
-                @if(count($data['filas']) > 0)
-                <tr style="background:#1e3a5f; color:#fff; font-weight:700;">
-                    <td class="bincard-td" colspan="6" style="color:#fff; border-color:#2563eb; text-align:right; font-size:.8rem;">
-                        TOTALES Y SALDO FINAL
-                    </td>
-                    <td class="bincard-td text-center" style="color:#86efac; font-size:.9rem; border-color:#2563eb;">{{ $data['total_entradas'] ?: '—' }}</td>
-                    <td class="bincard-td text-center" style="color:#fca5a5; font-size:.9rem; border-color:#2563eb;">{{ $data['total_salidas'] ?: '—' }}</td>
-                    <td class="bincard-td text-center" style="color:#a5b4fc; font-size:.9rem; border-color:#2563eb;">{{ $data['saldo_final'] }}</td>
-                    @if(auth()->user()->esAdmin())
-                    <td class="bincard-td" style="border-color:#2563eb;"></td>
-                    <td class="bincard-td" style="border-color:#2563eb;"></td>
-                    <td class="bincard-td text-right" style="color:#bfdbfe; border-color:#2563eb; font-size:.8rem;">
-                        {{ $data['costo_promedio'] ? '$' . number_format($data['costo_promedio'], 0, ',', '.') : '—' }}
-                    </td>
-                    <td class="bincard-td text-right" style="color:#a5b4fc; border-color:#2563eb; font-size:.9rem;">
-                        {{ $data['valor_inventario'] ? '$' . number_format($data['valor_inventario'], 0, ',', '.') : '—' }}
-                    </td>
-                    @endif
-                    <td class="bincard-td" colspan="2" style="border-color:#2563eb;"></td>
-                </tr>
+    @if($data['es_servicio'])
+    {{-- ── Tabla historial operacional (servicios) ─────────────────────── --}}
+    <table style="width:100%; border-collapse:collapse; font-size:.75rem;">
+        <thead>
+            <tr>
+                <th class="bincard-th" style="text-align:left;">Fecha</th>
+                <th class="bincard-th">Acción</th>
+                <th class="bincard-th" style="text-align:left;">N° Documento</th>
+                <th class="bincard-th">RUT Proveedor</th>
+                <th class="bincard-th" style="text-align:left;">Proveedor</th>
+                <th class="bincard-th" style="text-align:left;">Usuario</th>
+                <th class="bincard-th" style="text-align:left; min-width:180px;">Observaciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($data['filas'] as $idx => $fila)
+            @php
+                [$accionLabel, $accionCls] = match(strtolower($fila['tipo_movimiento'])) {
+                    'entrada'            => ['Servicio asociado',     'bc-accion-recepcion'],
+                    'salida', 'retiro'   => ['Servicio ejecutado',    'bc-accion-ejecucion'],
+                    'merma'              => ['Baja administrativa',   'bc-accion-baja'],
+                    default              => [ucfirst(strtolower($fila['tipo_movimiento'])), 'bc-accion-admin'],
+                };
+                $rowBg = $idx % 2 === 0 ? 'bincard-neutral' : 'bincard-alt';
+            @endphp
+            <tr class="{{ $rowBg }}">
+                <td class="bincard-td whitespace-nowrap">{{ $fila['fecha'] }}</td>
+                <td class="bincard-td text-center">
+                    <span class="{{ $accionCls }}"
+                          style="font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:9999px; white-space:nowrap; display:inline-block;">
+                        {{ $accionLabel }}
+                    </span>
+                </td>
+                <td class="bincard-td font-mono" style="color:#4f46e5; font-size:.72rem;">{{ $fila['n_documento'] }}</td>
+                <td class="bincard-td text-center text-gray-600 whitespace-nowrap">{{ $fila['rut_proveedor'] }}</td>
+                <td class="bincard-td text-gray-700" style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ $fila['proveedor'] }}</td>
+                <td class="bincard-td text-gray-600 whitespace-nowrap">{{ $fila['usuario'] }}</td>
+                <td class="bincard-td text-gray-500" style="font-size:.72rem; max-width:200px;">{{ $fila['observaciones'] }}</td>
+            </tr>
+            @empty
+            <tr>
+                <td colspan="8" style="text-align:center; padding:2rem; color:#9ca3af; font-size:.82rem;">
+                    No hay registros operacionales para los filtros seleccionados.
+                </td>
+            </tr>
+            @endforelse
+
+            @if(count($data['filas']) > 0)
+            <tr style="background:#1e3a5f; color:#fff; font-weight:700;">
+                <td class="bincard-td" colspan="7" style="color:#bfdbfe; border-color:#2563eb; text-align:right; font-size:.8rem;">
+                    TOTAL DE REGISTROS
+                </td>
+                <td class="bincard-td text-center" style="color:#a5b4fc; font-size:.9rem; border-color:#2563eb;">
+                    {{ count($data['filas']) }}
+                </td>
+            </tr>
+            @endif
+        </tbody>
+    </table>
+
+    @else
+    {{-- ── Tabla BINCARD física (bienes físicos) ───────────────────────── --}}
+    <table style="width:100%; border-collapse:collapse; font-size:.75rem;">
+        <thead>
+            <tr>
+                <th class="bincard-th" style="text-align:left;">Fecha</th>
+                <th class="bincard-th">Tipo Mov.</th>
+                <th class="bincard-th">Origen</th>
+                <th class="bincard-th" style="text-align:left;">N° Documento</th>
+                <th class="bincard-th">RUT Proveedor</th>
+                <th class="bincard-th" style="text-align:left;">Proveedor</th>
+                <th class="bincard-th" style="color:#cbd5e1;">Stk. Ant.</th>
+                <th class="bincard-th" style="color:#86efac;">Entrada</th>
+                <th class="bincard-th" style="color:#fca5a5;">Salida</th>
+                <th class="bincard-th" style="color:#a5b4fc;">Saldo</th>
+                @if(auth()->user()->esAdmin())
+                <th class="bincard-th">Costo Unit. c/IVA</th>
+                <th class="bincard-th">Valor Mov.</th>
+                <th class="bincard-th">Costo Prom. c/IVA</th>
+                <th class="bincard-th">Valor Saldo</th>
                 @endif
-            </tbody>
-        </table>
+                <th class="bincard-th" style="text-align:left;">Usuario</th>
+                <th class="bincard-th" style="text-align:left;">Ejecutado Por</th>
+                <th class="bincard-th" style="text-align:left; min-width:160px;">Observaciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($data['filas'] as $idx => $fila)
+            @php
+                $esE = $fila['entrada'] !== null;
+                $esS = $fila['salida']  !== null;
+                $base = $idx % 2 === 0 ? '' : 'bincard-alt';
+                $cls  = $esE ? 'bincard-entrada' : ($esS ? 'bincard-salida' : $base);
+                $origCls = match($fila['origen_label']) {
+                    'Solicitud'  => 'bc-orig-sol',
+                    'Devolución' => 'bc-orig-dev',
+                    'Compra'     => 'bc-orig-compra',
+                    'Armado'     => 'bc-orig-armado',
+                    'Ajuste'     => 'bc-orig-ajuste',
+                    'Traslado'   => 'bc-orig-traslado',
+                    default      => 'bc-orig-manual',
+                };
+                $saldoCls = $fila['saldo'] > 0 ? 'bc-saldo-positivo' : ($fila['saldo'] == 0 ? 'bc-saldo-cero' : 'bc-saldo-negativo');
+                $esSolicitud = ($fila['_origen'] ?? '') === 'solicitud' && !empty($fila['_origen_id']);
+            @endphp
+            <tr class="{{ $cls }}">
+                <td class="bincard-td whitespace-nowrap">{{ $fila['fecha'] }}</td>
+                <td class="bincard-td text-center">
+                    <span class="{{ $esE ? 'bc-mov-entrada' : ($esS ? 'bc-mov-salida' : 'bc-mov-neutral') }}"
+                          style="font-size:.68rem; font-weight:700; padding:2px 7px; border-radius:9999px; white-space:nowrap; display:inline-block;">
+                        {{ $fila['tipo_movimiento'] }}
+                    </span>
+                </td>
+                <td class="bincard-td text-center">
+                    <span class="{{ $origCls }}"
+                          style="font-size:.65rem; font-weight:700; padding:2px 6px; border-radius:9999px; white-space:nowrap; display:inline-block;">
+                        {{ $fila['origen_label'] }}
+                    </span>
+                </td>
+                <td class="bincard-td font-mono" style="font-size:.72rem;">
+                    @if($esSolicitud)
+                        <a href="{{ route('admin.solicitudes') }}" style="color:#4f46e5; font-weight:700; text-decoration:none;"
+                           title="Ver solicitudes">{{ $fila['n_documento'] }}</a>
+                    @else
+                        <span style="color:#4f46e5; font-weight:700;">{{ $fila['n_documento'] }}</span>
+                    @endif
+                    @if(!empty($fila['n_referencia']))
+                        <span style="display:block; font-size:.65rem; color:#94a3b8; font-weight:400; margin-top:2px;">ref. {{ $fila['n_referencia'] }}</span>
+                    @endif
+                </td>
+                <td class="bincard-td text-center text-gray-600 whitespace-nowrap">{{ $fila['rut_proveedor'] }}</td>
+                <td class="bincard-td text-gray-700" style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ $fila['proveedor'] }}</td>
+                <td class="bincard-td text-center text-gray-400" style="font-size:.7rem;">{{ $fila['stock_anterior'] }}</td>
+                <td class="bincard-td text-center font-bold" style="color:#16a34a;">
+                    {{ $fila['entrada'] !== null ? $fila['entrada'] : '' }}
+                </td>
+                <td class="bincard-td text-center font-bold" style="color:#dc2626;">
+                    {{ $fila['salida'] !== null ? $fila['salida'] : '' }}
+                </td>
+                <td class="bincard-td bc-saldo-cell">
+                    <span class="{{ $saldoCls }}">{{ $fila['saldo'] }}</span>
+                </td>
+                @if(auth()->user()->esAdmin())
+                <td class="bincard-td text-right text-gray-700">
+                    {{ $fila['costo_unitario'] ? '$' . number_format($fila['costo_unitario'], 0, ',', '.') : '—' }}
+                </td>
+                <td class="bincard-td text-right font-semibold">
+                    {{ $fila['valor_movimiento'] ? '$' . number_format($fila['valor_movimiento'], 0, ',', '.') : '—' }}
+                </td>
+                <td class="bincard-td text-right text-gray-500" style="font-size:.7rem;">
+                    {{ $fila['costo_promedio'] ? '$' . number_format($fila['costo_promedio'], 0, ',', '.') : '—' }}
+                </td>
+                <td class="bincard-td text-right font-semibold" style="color:#1d4ed8;">
+                    {{ $fila['valor_saldo'] ? '$' . number_format($fila['valor_saldo'], 0, ',', '.') : '—' }}
+                </td>
+                @endif
+                <td class="bincard-td text-gray-600 whitespace-nowrap">{{ $fila['usuario'] }}</td>
+                <td class="bincard-td text-gray-500 whitespace-nowrap" style="font-size:.7rem;">{{ $fila['registrado_por'] }}</td>
+                <td class="bincard-td text-gray-500" style="font-size:.72rem; max-width:180px;">{{ $fila['observaciones'] }}</td>
+            </tr>
+            @empty
+            <tr>
+                <td colspan="20" style="text-align:center; padding:2rem; color:#9ca3af; font-size:.82rem;">
+                    No hay movimientos para los filtros seleccionados.
+                </td>
+            </tr>
+            @endforelse
+
+            {{-- Fila de totales --}}
+            @if(count($data['filas']) > 0)
+            <tr style="background:#1e3a5f; color:#fff; font-weight:700;">
+                <td class="bincard-td" colspan="8" style="color:#fff; border-color:#2563eb; text-align:right; font-size:.8rem;">
+                    TOTALES Y SALDO FINAL
+                </td>
+                <td class="bincard-td text-center" style="color:#86efac; font-size:.9rem; border-color:#2563eb;">{{ $data['total_entradas'] ?: '—' }}</td>
+                <td class="bincard-td text-center" style="color:#fca5a5; font-size:.9rem; border-color:#2563eb;">{{ $data['total_salidas'] ?: '—' }}</td>
+                <td class="bincard-td text-center" style="color:#a5b4fc; font-size:.9rem; border-color:#2563eb;">{{ $data['saldo_final'] }}</td>
+                @if(auth()->user()->esAdmin())
+                <td class="bincard-td" style="border-color:#2563eb;"></td>
+                <td class="bincard-td" style="border-color:#2563eb;"></td>
+                <td class="bincard-td text-right" style="color:#bfdbfe; border-color:#2563eb; font-size:.8rem;">
+                    {{ $data['costo_promedio'] ? '$' . number_format($data['costo_promedio'], 0, ',', '.') : '—' }}
+                </td>
+                <td class="bincard-td text-right" style="color:#a5b4fc; border-color:#2563eb; font-size:.9rem;">
+                    {{ $data['valor_inventario'] ? '$' . number_format($data['valor_inventario'], 0, ',', '.') : '—' }}
+                </td>
+                @endif
+                <td class="bincard-td" colspan="3" style="border-color:#2563eb;"></td>
+            </tr>
+            @endif
+        </tbody>
+    </table>
+    @endif
+
     </div>
 </div>
 @endif
@@ -370,6 +595,14 @@ html.dark .bc-mov-neutral  { background:rgba(100,116,139,0.2); color:#94a3b8; }
 
 @push('scripts')
 <script>
+function toggleFiltrosAvanzados() {
+    var panel = document.getElementById('filtros-avanzados');
+    var icon  = document.getElementById('icon-filtros-adv');
+    var open  = panel.style.display !== 'none';
+    panel.style.display = open ? 'none' : 'block';
+    icon.style.transform = open ? '' : 'rotate(180deg)';
+}
+
 const BINCARDS_POR_PRODUCTO = @json($bincardsPorProducto ?? []);
 const BINCARD_URL_BASE = '{{ route('admin.reportes.bincard') }}';
 

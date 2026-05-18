@@ -103,6 +103,7 @@ class RetiroController extends Controller
 
                     if ($user->esAdmin()) {
                         // — ADMIN: descuenta stock directamente —
+                        $stockAntes = $producto->stock_actual;
                         $producto->stock_actual -= (int) $item['cantidad'];
                         $producto->actualizarFechasStock();
                         $producto->save();
@@ -118,15 +119,18 @@ class RetiroController extends Controller
 
                         // Registrar en historial
                         HistorialCambio::create([
-                            'producto_id'     => $producto->id,
-                            'nombre_producto' => $producto->nombre,
-                            'contenedor_id'   => $producto->contenedor,
-                            'usuario_id'      => $user->id,
-                            'tipo'            => 'salida',
-                            'cantidad'     => (int) $item['cantidad'],
-                            'motivo'       => $motivo,
-                            'aprobado_por' => $user->name,
-                            'origen'       => 'solicitud',
+                            'producto_id'        => $producto->id,
+                            'nombre_producto'    => $producto->nombre,
+                            'contenedor_id'      => $producto->contenedor,
+                            'usuario_id'         => $user->id,
+                            'tipo'               => 'salida',
+                            'cantidad'           => (int) $item['cantidad'],
+                            'motivo'             => $motivo,
+                            'aprobado_por'       => $user->name,
+                            'origen_tipo'        => 'retiro_directo',
+                            'stock_anterior'     => $stockAntes,
+                            'stock_posterior'    => $producto->stock_actual,
+                            'usuario_ejecutor_id'=> $user->id,
                         ]);
                     } else {
                         // — USUARIO NORMAL: crea solicitud pendiente (activa círculo naranja) —

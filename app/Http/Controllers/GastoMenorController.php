@@ -204,6 +204,7 @@ class GastoMenorController extends Controller
                     }
                 }
 
+                $stockAntes = $producto->stock_actual;
                 $producto->stock_actual += (int) $item['cantidad'];
                 $producto->actualizarFechasStock();
                 $producto->save();
@@ -224,16 +225,22 @@ class GastoMenorController extends Controller
                 ]);
 
                 $historial = HistorialCambio::create([
-                    'producto_id'     => $producto->id,
-                    'nombre_producto' => $producto->nombre,
-                    'contenedor_id'   => $producto->contenedor,
-                    'cantidad'     => $item['cantidad'],
-                    'tipo'         => 'entrada',
-                    'motivo'       => "Compra de gasto menor — Folio {$request->folio}",
-                    'aprobado_por' => Auth::user()->name,
-                    'usuario_id'   => Auth::id(),
-                    'origen'       => 'gasto_menor',
-                    'origen_id'    => $gasto->id,
+                    'producto_id'        => $producto->id,
+                    'nombre_producto'    => $producto->nombre,
+                    'contenedor_id'      => $producto->contenedor,
+                    'cantidad'           => $item['cantidad'],
+                    'tipo'               => 'entrada',
+                    'motivo'             => "Compra de gasto menor — Folio {$request->folio}",
+                    'aprobado_por'       => Auth::user()->name,
+                    'usuario_id'         => Auth::id(),
+                    'origen'             => 'gasto_menor',
+                    'origen_id'          => $gasto->id,
+                    'origen_tipo'        => 'gasto_menor',
+                    'doc_origen'         => 'GM-' . str_pad($gasto->id_gm, 4, '0', STR_PAD_LEFT),
+                    'doc_referencia'     => $request->folio ? 'Folio ' . $request->folio : null,
+                    'stock_anterior'     => $stockAntes,
+                    'stock_posterior'    => $producto->stock_actual,
+                    'usuario_ejecutor_id'=> Auth::id(),
                 ]);
 
                 $gasto->historial_cambio_id = $historial->id;

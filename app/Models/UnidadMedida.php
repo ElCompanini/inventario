@@ -10,9 +10,9 @@ class UnidadMedida extends Model
     use SoftDeletes;
     protected $table = 'unidades_medida';
 
-    protected $fillable = ['nombre', 'abreviacion', 'descripcion', 'factor_conversion', 'activo'];
+    protected $fillable = ['nombre', 'abreviacion', 'descripcion', 'factor_conversion', 'activo', 'es_presentacion'];
 
-    protected $casts = ['activo' => 'boolean'];
+    protected $casts = ['activo' => 'boolean', 'es_presentacion' => 'boolean'];
 
     protected static function booted(): void
     {
@@ -30,5 +30,10 @@ class UnidadMedida extends Model
     public function scopeActivas($query)
     {
         return $query->where('activo', true);
+    }
+
+    public function scopeNoEsPresentacion($query)
+    {
+        return $query->where('es_presentacion', false);
     }
 }

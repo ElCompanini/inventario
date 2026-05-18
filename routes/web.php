@@ -44,6 +44,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/productos', [ProductoController::class, 'index'])->name('dashboard');
     Route::get('/mis-solicitudes', [SolicitudController::class, 'index'])->name('solicitudes.mis');
     Route::post('/solicitudes', [SolicitudController::class, 'store'])->name('solicitudes.store');
+    Route::post('/solicitudes/{id}/solicitar-devolucion', [SolicitudController::class, 'solicitarDevolucion'])->name('solicitudes.solicitar-devolucion');
     Route::get('/api/sel-productos', [ProductoController::class, 'apiSeleccion'])->name('api.sel.productos');
 
     // Retiro de piezas (todos los usuarios autenticados)
@@ -61,12 +62,18 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/dashboard/actividad-excel',        [DashboardController::class, 'exportarActividadExcel'])->name('dashboard.actividad-excel');
     Route::get('/dashboard/actividad-pdf',          [DashboardController::class, 'exportarActividadPdf'])->name('dashboard.actividad-pdf');
     Route::get('/dashboard/total-utilizado', [DashboardController::class, 'totalUtilizado'])->name('dashboard.total-utilizado');
+    Route::get('/dashboard/variacion-presupuestaria', [DashboardController::class, 'variacionPresupuestaria'])->name('dashboard.variacion-presupuestaria');
     Route::get('/computadores/productos-categoria', [\App\Http\Controllers\ComputadorController::class, 'productosPorCategoria'])->name('computadores.productos-categoria');
 
     Route::get('/solicitudes', [AdminController::class, 'solicitudes'])->name('solicitudes');
     Route::get('/solicitudes/rechazadas', [AdminController::class, 'rechazadas'])->name('solicitudes.rechazadas');
     Route::post('/solicitudes/{id}/aprobar', [AdminController::class, 'aprobar'])->name('solicitudes.aprobar');
     Route::post('/solicitudes/{id}/rechazar', [AdminController::class, 'rechazar'])->name('solicitudes.rechazar');
+    Route::post('/solicitudes/{id}/devolucion',      [AdminController::class, 'registrarDevolucion'])->name('solicitudes.devolucion');
+    Route::post('/solicitudes/{id}/abrir-devolucion',  [AdminController::class, 'abrirDevolucion'])->name('solicitudes.abrir');
+    Route::post('/solicitudes/{id}/cerrar-devolucion', [AdminController::class, 'cerrarDevolucion'])->name('solicitudes.cerrar');
+    Route::post('/devoluciones/{id}/aprobar',  [AdminController::class, 'aprobarDevolucion'])->name('devoluciones.aprobar');
+    Route::post('/devoluciones/{id}/rechazar', [AdminController::class, 'rechazarDevolucion'])->name('devoluciones.rechazar');
     Route::get('/historial', [AdminController::class, 'historial'])->name('historial');
     // Rutas estáticas de productos PRIMERO (antes del wildcard {id})
     Route::post('/productos/carga-masiva', [AdminController::class, 'cargaMasiva'])->name('productos.carga.masiva');
@@ -175,6 +182,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Historial de Reporterías
     Route::get('/reportes/historial',                    [ReporteriaIndexController::class, 'index'])->name('reportes.historial');
+    Route::get('/reportes/historial/vp/{id}',            [ReporteriaIndexController::class, 'showVp'])->name('reportes.historial.vp');
     Route::get('/reportes/historial/{id}/descargar',     [ReporteriaIndexController::class, 'descargar'])->name('reportes.historial.descargar');
     Route::delete('/reportes/historial/{id}',            [ReporteriaIndexController::class, 'destroy'])->name('reportes.historial.destroy');
     Route::post('/gastos-menores', [GastoMenorController::class, 'store'])->name('gastos-menores.store');

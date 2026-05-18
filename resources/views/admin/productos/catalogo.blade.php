@@ -415,16 +415,6 @@
                         <input type="number" id="prod-cant-pres" min="2" max="9999" placeholder="Ej: 40"
                                style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4375rem 0.625rem; font-size:0.8125rem; outline:none;">
                     </div>
-                    <div style="grid-column:span 2;">
-                        <label style="display:block; font-size:0.8125rem; font-weight:500; color:#374151; margin-bottom:0.25rem;">Unidad base <span style="color:#ef4444;">*</span></label>
-                        <select id="prod-unidad-base"
-                                style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4375rem 0.625rem; font-size:0.8125rem; outline:none;">
-                            <option value="">— Selecciona —</option>
-                            @foreach(['Unidad','Pieza','Metro','Metro lineal','Metro cúbico','Litro','Kilogramo','Par','Juego','Otro'] as $ub)
-                            <option value="{{ $ub }}">{{ $ub }}</option>
-                            @endforeach
-                        </select>
-                    </div>
                     <div style="grid-column:span 2; background:#eff6ff; border:1px solid #bfdbfe; border-radius:0.5rem; padding:0.5rem 0.75rem;">
                         <p id="prod-pres-preview" style="font-size:0.75rem; color:#1d4ed8; margin:0;"></p>
                     </div>
@@ -1245,6 +1235,18 @@ function renderMarcas(cat) {
     </button>`;
     lista.appendChild(liTodas);
 
+    // "Sin Marca" row — products with no brand assigned
+    const sinMarcaCount = (cat?.productos ?? []).filter(function(p) { return !p.marca_id; }).length;
+    const isSinMarca = marcaActualId === 0;
+    const liSinMarca = document.createElement('li');
+    liSinMarca.innerHTML = `<button onclick="seleccionarMarca(0, 'Sin Marca')" id="marca-btn-sin-marca"
+        class="btn-ghost w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between
+               ${isSinMarca ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-gray-500 hover:bg-gray-50'}">
+        <span>SIN MARCA</span>
+        <span class="text-xs ${sinMarcaCount > 0 ? 'text-amber-500' : 'text-gray-300'} ml-2 shrink-0">${sinMarcaCount}</span>
+    </button>`;
+    lista.appendChild(liSinMarca);
+
     const marcasActivas = catMarcas.filter(function(m) { return m.activo !== false; });
 
     if (marcasActivas.length === 0) {
@@ -1290,12 +1292,17 @@ function seleccionarMarca(marcaId, marcaNombre) {
     renderMarcas(cat);
 
     let prods = cat ? cat.productos : [];
-    if (marcaId) prods = prods.filter(function(p) { return p.marca_id === marcaId; });
+    if (marcaId === 0) {
+        // Sin Marca: products with no brand assigned
+        prods = prods.filter(function(p) { return !p.marca_id; });
+    } else if (marcaId) {
+        prods = prods.filter(function(p) { return p.marca_id === marcaId; });
+    }
 
     const total = cat ? cat.productos.length : 0;
     const shown = prods.length;
-    document.getElementById('subtitulo-categoria').textContent = marcaId
-        ? (shown === 0 ? 'Sin productos de ' + marcaNombre : shown + ' de ' + total + ' producto' + (total !== 1 ? 's' : ''))
+    document.getElementById('subtitulo-categoria').textContent = (marcaId !== null)
+        ? (shown === 0 ? 'Sin productos ' + (marcaId === 0 ? 'sin marca' : 'de ' + marcaNombre) : shown + ' de ' + total + ' producto' + (total !== 1 ? 's' : ''))
         : (total === 0 ? 'Sin productos' : (total === 1 ? '1 producto' : total + ' productos'));
 
     renderProductos(prods);
@@ -1361,7 +1368,8 @@ async function guardarMarcaCatalogo() {
             renderMarcas(cat);
             if (catActualId) {
                 let prods = cat ? cat.productos : [];
-                if (marcaActualId) prods = prods.filter(function(p) { return p.marca_id === marcaActualId; });
+                if (marcaActualId > 0) prods = prods.filter(function(p) { return p.marca_id === marcaActualId; });
+                else if (marcaActualId === 0) prods = prods.filter(function(p) { return !p.marca_id; });
                 renderProductos(prods);
             }
         }
@@ -1528,7 +1536,7 @@ function abrirModalProducto() {
             showAviso('No hay unidades de medida disponibles. Crea al menos una unidad de medida antes de agregar productos.', 'warn');
             return;
         }
-        if (!marcaActualId) {
+        if (marcaActualId === null) {
             showAviso('Selecciona una marca en el panel antes de agregar un producto.', 'warn');
             return;
         }
@@ -1609,9 +1617,17 @@ function abrirModalProducto() {
     setTimeout(function() { document.getElementById('prod-nombre').focus(); }, 50);
 }
 
+// Deriva "Unidad", "Metro lineal", etc. desde el nombre de la unidad de medida seleccionada
+function getUnidadBaseFromSelected() {
+    var sel = document.getElementById('prod-unidad');
+    if (!sel || !sel.value) return 'unidad';
+    var txt = (sel.options[sel.selectedIndex]?.text || '').replace(/\s*\(.*?\)\s*$/, '').trim();
+    return txt.toLowerCase().replace(/\b\w/g, function(c) { return c.toUpperCase(); }) || 'unidad';
+}
+
 // Wire up preview update on presentacion inputs (once, after DOM ready)
 document.addEventListener('DOMContentLoaded', function() {
-    ['prod-tipo-pres','prod-cant-pres','prod-unidad-base'].forEach(function(id) {
+    ['prod-tipo-pres','prod-cant-pres','prod-unidad'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('input', actualizarPreviewPres);
         if (el) el.addEventListener('change', actualizarPreviewPres);
@@ -1639,7 +1655,6 @@ function editarProducto(prodId) {
         document.getElementById('prod-maneja-pres').checked = !!prod.maneja_presentacion;
         document.getElementById('prod-tipo-pres').value   = prod.tipo_presentacion || '';
         document.getElementById('prod-cant-pres').value   = prod.cantidad_presentacion || '';
-        document.getElementById('prod-unidad-base').value = prod.unidad_base || '';
         document.getElementById('prod-pres-fields').style.display = prod.maneja_presentacion ? 'grid' : 'none';
         actualizarPreviewPres();
     } else {
@@ -1662,8 +1677,8 @@ function actualizarPreviewPres() {
     var preview = document.getElementById('prod-pres-preview');
     var tipo    = document.getElementById('prod-tipo-pres')?.value;
     var cant    = parseInt(document.getElementById('prod-cant-pres')?.value) || 0;
-    var base    = document.getElementById('prod-unidad-base')?.value;
-    if (tipo && cant >= 2 && base) {
+    var base    = getUnidadBaseFromSelected();
+    if (tipo && cant >= 2) {
         preview.textContent = '→ 1 ' + tipo + ' = ' + cant + ' ' + base + '(s)  ·  Ejemplo: 3 ' + tipo + '(s) = ' + (3 * cant) + ' ' + base + '(s)';
     } else {
         preview.textContent = 'Completa los campos para ver el equivalente.';
@@ -1674,7 +1689,6 @@ function resetPresentacionFields() {
     document.getElementById('prod-pres-fields').style.display = 'none';
     document.getElementById('prod-tipo-pres').value    = '';
     document.getElementById('prod-cant-pres').value    = '';
-    document.getElementById('prod-unidad-base').value  = '';
     document.getElementById('prod-pres-preview').textContent = '';
 }
 
@@ -1727,7 +1741,7 @@ async function guardarProducto() {
 
     if (!IS_FAMILIA_SERVICIOS) {
         // Physical product validations
-        if (!editandoProdId && !marcaActualId) {
+        if (!editandoProdId && marcaActualId === null) {
             errDiv.textContent = 'Selecciona una marca en el panel antes de crear un producto.';
             errDiv.classList.remove('hidden');
             return;
@@ -1760,7 +1774,7 @@ async function guardarProducto() {
             if (IS_FAMILIA_SERVICIOS) {
                 body.append('es_servicio', '1');
             } else {
-                body.append('marca_id', marcaActualId);
+                if (marcaActualId) body.append('marca_id', marcaActualId);
                 body.append('contenedor', contenedorId);
                 body.append('unidad_medida_id', unidadId);
             }
@@ -1772,7 +1786,7 @@ async function guardarProducto() {
             if (manejaPres) {
                 body.append('tipo_presentacion',    document.getElementById('prod-tipo-pres')?.value || '');
                 body.append('cantidad_presentacion', document.getElementById('prod-cant-pres')?.value || '');
-                body.append('unidad_base',           document.getElementById('prod-unidad-base')?.value || '');
+                body.append('unidad_base',           getUnidadBaseFromSelected());
             }
         }
         var res  = await fetch(url, { method, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
@@ -1791,11 +1805,12 @@ async function guardarProducto() {
                     prod.maneja_presentacion   = manejaPres;
                     prod.tipo_presentacion     = manejaPres ? (document.getElementById('prod-tipo-pres')?.value || null) : null;
                     prod.cantidad_presentacion = manejaPres ? (parseInt(document.getElementById('prod-cant-pres')?.value) || null) : null;
-                    prod.unidad_base           = manejaPres ? (document.getElementById('prod-unidad-base')?.value || null) : null;
+                    prod.unidad_base           = manejaPres ? getUnidadBaseFromSelected() : null;
                 }
             }
             var prods = cat ? cat.productos : [];
-            if (!IS_FAMILIA_SERVICIOS && marcaActualId) prods = prods.filter(function(p) { return p.marca_id === marcaActualId; });
+            if (!IS_FAMILIA_SERVICIOS && marcaActualId > 0) prods = prods.filter(function(p) { return p.marca_id === marcaActualId; });
+            else if (!IS_FAMILIA_SERVICIOS && marcaActualId === 0) prods = prods.filter(function(p) { return !p.marca_id; });
             renderProductos(prods);
             cerrarModalProducto();
         } else {
@@ -1807,14 +1822,18 @@ async function guardarProducto() {
                     id: json.id, nombre: json.nombre,
                     stock_actual: 0, stock_minimo: parseInt(stock_minimo), stock_critico: parseInt(stock_critico),
                     contenedor_id: null,
-                    marca_id: IS_FAMILIA_SERVICIOS ? null : marcaActualId,
+                    marca_id: IS_FAMILIA_SERVICIOS ? null : (marcaActualId || null),
                     marca_nombre: marcaSel ? marcaSel.nombre : null,
                     es_servicio: IS_FAMILIA_SERVICIOS,
                 });
                 if (catActualId === prodCatId) {
                     const label = IS_FAMILIA_SERVICIOS ? 'servicio' : 'producto';
                     document.getElementById('subtitulo-categoria').textContent = cat.productos.length + ' ' + label + (cat.productos.length !== 1 ? 's' : '');
-                    var prodsVis = (!IS_FAMILIA_SERVICIOS && marcaActualId) ? cat.productos.filter(function(p) { return p.marca_id === marcaActualId; }) : cat.productos;
+                    var prodsVis = (!IS_FAMILIA_SERVICIOS && marcaActualId > 0)
+                        ? cat.productos.filter(function(p) { return p.marca_id === marcaActualId; })
+                        : (!IS_FAMILIA_SERVICIOS && marcaActualId === 0)
+                            ? cat.productos.filter(function(p) { return !p.marca_id; })
+                            : cat.productos;
                     renderProductos(prodsVis);
                     if (!IS_FAMILIA_SERVICIOS) renderMarcas(cat);
                 }
@@ -1829,8 +1848,6 @@ async function guardarProducto() {
         btn.textContent = IS_FAMILIA_SERVICIOS ? 'Guardar' : 'Guardar';
     }
 }
-
-document.getElementById('modal-producto').addEventListener('click', function(e) { if (e.target === e.currentTarget) cerrarModalProducto(); });
 
 // Auto-select first category on load
 window.addEventListener('DOMContentLoaded', function() {

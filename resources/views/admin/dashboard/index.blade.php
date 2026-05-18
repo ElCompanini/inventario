@@ -63,10 +63,18 @@
     html.dark .bincard-entradas .bc-sub { color: #34d399; }
 
     /* Skeleton / activity badge */
-    .tipo-badge-entrada { background:#dcfce7; color:#15803d; }
-    .tipo-badge-salida  { background:#fee2e2; color:#b91c1c; }
-    html.dark .tipo-badge-entrada { background:rgba(22,163,74,.18); color:#86efac; }
-    html.dark .tipo-badge-salida  { background:rgba(185,28,28,.18); color:#fca5a5; }
+    .tipo-badge-entrada    { background:#dcfce7; color:#15803d; }
+    .tipo-badge-salida     { background:#fee2e2; color:#b91c1c; }
+    .tipo-badge-devolucion { background:#d1fae5; color:#065f46; }
+    .tipo-badge-ajuste     { background:#f1f5f9; color:#475569; }
+    .tipo-badge-traslado   { background:#dbeafe; color:#1d4ed8; }
+    .tipo-badge-merma      { background:#ffedd5; color:#c2410c; }
+    html.dark .tipo-badge-entrada    { background:rgba(22,163,74,.18);   color:#86efac; }
+    html.dark .tipo-badge-salida     { background:rgba(185,28,28,.18);   color:#fca5a5; }
+    html.dark .tipo-badge-devolucion { background:rgba(6,95,70,.25);     color:#6ee7b7; }
+    html.dark .tipo-badge-ajuste     { background:rgba(71,85,105,.25);   color:#94a3b8; }
+    html.dark .tipo-badge-traslado   { background:rgba(29,78,216,.20);   color:#93c5fd; }
+    html.dark .tipo-badge-merma      { background:rgba(194,65,12,.20);   color:#fdba74; }
 
     .estado-pill {
         display: inline-block; font-size:.68rem; font-weight:600;
@@ -135,6 +143,22 @@
     html.dark .act-servicio-badge {
         background:rgba(109,40,217,0.2); border:1px solid rgba(139,92,246,0.4); color:#c4b5fd;
     }
+
+    /* Variación Presupuestaria modal */
+    #modal-vp > div { background:#fff; }
+    html.dark #modal-vp > div { background:#1e293b; }
+    html.dark #vp-tabla thead tr { background:#1e1b4b; }
+    html.dark #vp-tabla tbody tr { border-color:#334155; color:#e2e8f0; }
+    html.dark #vp-tabla tbody tr:nth-child(even) { background:#162032; }
+    html.dark #modal-vp input, html.dark #modal-vp select {
+        background:#0f172a !important; border-color:#334155 !important; color:#e2e8f0 !important;
+    }
+    html.dark #modal-vp h2 { color:#f1f5f9 !important; }
+    html.dark #modal-vp [style*="border-bottom:1px solid #e5e7eb"] { border-color:#334155 !important; }
+    html.dark #modal-vp [style*="border-bottom:1px solid #f1f5f9"] { border-color:#1e293b !important; }
+    html.dark #modal-vp [style*="border-top:1px solid #f1f5f9"] { border-color:#1e293b !important; }
+    html.dark #modal-vp [style*="background:#f8fafc"] { background:#0f172a !important; }
+    html.dark #modal-vp [style*="background:#fff"] { background:#1e293b !important; }
 </style>
 @endpush
 
@@ -236,12 +260,16 @@
         </div>
     </a>
 
-    {{-- Variación Presupuestaria --}}
-    <a href="{{ route('admin.ordenes.index') }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
+    {{-- Variación Presupuestaria — abre modal VP --}}
+    <button type="button" onclick="abrirVP()"
+        class="kpi-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 text-left w-full cursor-pointer"
+        title="Abrir análisis detallado de Variación Presupuestaria">
         <div class="flex items-center justify-between mb-2">
             <span class="dash-section-title">Variación Presupuestaria</span>
-            <div class="kpi-icon-emerald w-8 h-8 rounded-lg flex items-center justify-center">
-                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+            <div style="background:rgba(99,102,241,0.12); border-radius:0.5rem; padding:0.4rem; flex-shrink:0;">
+                <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/>
+                </svg>
             </div>
         </div>
         {{-- SICD: neto → IVA → total --}}
@@ -275,8 +303,9 @@
             @else
                 <span class="text-xs text-gray-400">Sin movimientos este mes</span>
             @endif
+            <span class="block text-[10px] text-indigo-500 dark:text-indigo-400 mt-1 font-semibold">Ver análisis detallado →</span>
         </div>
-    </a>
+    </button>
 
     {{-- EQUIPOS ARMADOS --}}
     <a href="{{ route('admin.computadores.index') }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
@@ -365,19 +394,49 @@
         <div id="act-lista" class="space-y-1.5 max-h-72 overflow-y-auto pr-1">
             @forelse($actividadReciente as $mov)
             @php
-                $modulo = match($mov->origen) {
-                    'gasto_menor'        => 'Gasto Menor',
-                    'orden_compra'       => 'OC',
-                    'sicd'               => 'SICD',
-                    'solicitud'          => 'Solicitud',
-                    'retiro'             => 'Retiro',
-                    'computador_armado'  => 'Armado Equipo',
-                    default              => 'Manual',
+                $origenTipo = $mov->origen_tipo ?? null;
+                $modulo = match(true) {
+                    $origenTipo === 'solicitud'          => 'Solicitud',
+                    $origenTipo === 'devolucion'         => 'Devolución',
+                    $origenTipo === 'retiro_directo'     => 'Retiro',
+                    $origenTipo === 'sicd'               => 'SICD',
+                    $origenTipo === 'orden_compra'       => 'OC',
+                    $origenTipo === 'gasto_menor'        => 'Gasto Menor',
+                    $origenTipo === 'computador_armado'  => 'Armado',
+                    $origenTipo === 'ajuste'             => 'Ajuste',
+                    $origenTipo === 'traslado'           => 'Traslado',
+                    $origenTipo === 'entrada_manual'     => 'Manual',
+                    $origenTipo === 'merma'              => 'Merma',
+                    $mov->origen === 'gasto_menor'       => 'Gasto Menor',
+                    $mov->origen === 'orden_compra'      => 'OC',
+                    $mov->origen === 'sicd'              => 'SICD',
+                    $mov->origen === 'solicitud'         => 'Solicitud',
+                    $mov->origen === 'retiro'            => 'Retiro',
+                    $mov->origen === 'computador_armado' => 'Armado',
+                    default                              => 'Manual',
+                };
+                $tipoIconPath = match($mov->tipo) {
+                    'entrada'    => 'M12 20V4M6 10l6-6 6 6',
+                    'salida'     => 'M12 4v16M6 14l6 6 6-6',
+                    'devolucion' => 'M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3',
+                    'ajuste'     => 'M4 6h16M7 12h10M9 18h6',
+                    'traslado'   => 'M7 16l-4-4 4-4M17 8l4 4-4 4M3 12h18',
+                    'merma'      => 'M3 6l6 6 4-4 8 8',
+                    default      => 'M12 5v14',
+                };
+                $tipoText = match($mov->tipo) {
+                    'entrada'    => 'Ent.',
+                    'salida'     => 'Sal.',
+                    'devolucion' => 'Dev.',
+                    'ajuste'     => 'Aj.',
+                    'traslado'   => 'Mov.',
+                    'merma'      => 'Mrm.',
+                    default      => strtoupper(substr($mov->tipo, 0, 4)).'.',
                 };
             @endphp
             <div class="flex items-center gap-3 px-3 py-2 rounded-lg alert-row">
-                <span class="tipo-badge-{{ $mov->tipo }} text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 text-center shrink-0">
-                    {{ $mov->tipo === 'entrada' ? '↑ Ent.' : '↓ Sal.' }}
+                <span class="tipo-badge-{{ $mov->tipo }} inline-flex items-center justify-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 shrink-0">
+                    <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $tipoIconPath }}"/></svg>{{ $tipoText }}
                 </span>
                 <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">
                     {{ $mov->nombre_producto }}
@@ -933,6 +992,112 @@
 </div>
 
 
+{{-- ══ MODAL VARIACIÓN PRESUPUESTARIA ══════════════════════════════════════ --}}
+<div id="modal-vp" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.55); overflow-y:auto; align-items:flex-start; justify-content:center; padding:2rem 1rem;">
+<div style="background:#fff; border-radius:1rem; width:100%; max-width:1100px; margin:0 auto; box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+    <!-- Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid #e5e7eb;">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+            <div style="background:rgba(99,102,241,0.12); border-radius:0.5rem; padding:0.5rem;">
+                <svg style="width:1.25rem;height:1.25rem;color:#4f46e5;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/>
+                </svg>
+            </div>
+            <div>
+                <h2 style="font-size:1rem;font-weight:700;color:#1e293b;margin:0;">Variación Presupuestaria</h2>
+                <p id="vp-periodo-label" style="font-size:0.75rem;color:#64748b;margin:0;">SICD vs Órdenes de Compra consolidadas</p>
+            </div>
+        </div>
+        <button onclick="cerrarVP()" style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:0.25rem;">
+            <svg style="width:1.25rem;height:1.25rem;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+
+    <!-- Filtros -->
+    <div style="padding:1rem 1.5rem; border-bottom:1px solid #f1f5f9; background:#f8fafc;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:0.75rem; align-items:end;">
+            <div>
+                <label style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:0.3rem;">Desde</label>
+                <input type="date" id="vp-desde" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.4rem 0.6rem;font-size:0.8rem;background:#fff;">
+            </div>
+            <div>
+                <label style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:0.3rem;">Hasta</label>
+                <input type="date" id="vp-hasta" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.4rem 0.6rem;font-size:0.8rem;background:#fff;">
+            </div>
+            <div>
+                <label style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:0.3rem;">Estado SICD</label>
+                <select id="vp-estado-sicd" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.4rem 0.6rem;font-size:0.8rem;background:#fff;">
+                    <option value="">— Todos —</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="agrupado">Agrupado</option>
+                    <option value="recibido">Recibido</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:0.7rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:0.3rem;">Proveedor</label>
+                <input type="text" id="vp-proveedor" placeholder="Nombre proveedor..." style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.4rem 0.6rem;font-size:0.8rem;background:#fff;">
+            </div>
+            <div style="display:flex;gap:0.5rem;">
+                <button onclick="fetchVP()" id="vp-btn-calc" style="flex:1;background:#4f46e5;color:#fff;border:none;border-radius:0.5rem;padding:0.45rem 0.75rem;font-size:0.8rem;font-weight:600;cursor:pointer;">
+                    Calcular
+                </button>
+                <button onclick="limpiarVP()" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:0.5rem;padding:0.45rem 0.6rem;font-size:0.8rem;cursor:pointer;">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI summary -->
+    <div id="vp-kpis" style="display:none; padding:1rem 1.5rem; border-bottom:1px solid #f1f5f9;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;">
+            <div id="vp-card-sicd" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:0.75rem;padding:0.875rem 1rem;">
+                <p style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:0 0 .2rem;">Total SICD (con IVA)</p>
+                <p id="vp-kpi-sicd" style="font-size:1.25rem;font-weight:800;margin:0;">—</p>
+                <p id="vp-kpi-nsicds" style="font-size:0.65rem;margin:.15rem 0 0;">— SICD</p>
+            </div>
+            <div id="vp-card-oc" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:0.75rem;padding:0.875rem 1rem;">
+                <p style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:0 0 .2rem;">Total OC Consolidado</p>
+                <p id="vp-kpi-oc" style="font-size:1.25rem;font-weight:800;margin:0;">—</p>
+                <p id="vp-kpi-nocs" style="font-size:0.65rem;margin:.15rem 0 0;">— OC</p>
+            </div>
+            <div id="vp-kpi-variacion-card" style="border-radius:0.75rem;padding:0.875rem 1rem;border:1px solid #e2e8f0;">
+                <p id="vp-kpi-var-label" style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:0 0 .2rem;">Variación (OC − SICD)</p>
+                <p id="vp-kpi-variacion" style="font-size:1.25rem;font-weight:800;margin:0;">—</p>
+                <p id="vp-kpi-estado" style="font-size:0.7rem;font-weight:600;margin:.15rem 0 0;">—</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cuerpo: loading / tabla -->
+    <div style="padding:1rem 1.5rem; max-height:420px; overflow-y:auto;">
+        <div id="vp-loading" style="display:none;text-align:center;padding:2rem;color:#94a3b8;font-size:0.85rem;">Calculando variación...</div>
+        <div id="vp-empty"   style="display:none;text-align:center;padding:2rem;color:#94a3b8;font-size:0.85rem;">No se encontraron SICDs en el período seleccionado.</div>
+        <div id="vp-error"   style="display:none;text-align:center;padding:2rem;color:#ef4444;font-size:0.85rem;">Error al calcular. Intente nuevamente.</div>
+        <table id="vp-tabla" style="display:none;width:100%;border-collapse:collapse;font-size:0.75rem;">
+            <thead>
+                <tr style="background:#1e3a5f;color:#fff;">
+                    <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:left;white-space:nowrap;">Código SICD</th>
+                    <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:left;">Proveedor</th>
+                    <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:center;">Estado</th>
+                    <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:center;">Fecha</th>
+                    <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:right;">Total SICD</th>
+                    <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:right;">Total OC</th>
+                    <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:right;">OCs</th>
+                    <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:right;">Variación</th>
+                    <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:center;">Estado Var.</th>
+                </tr>
+            </thead>
+            <tbody id="vp-tbody"></tbody>
+        </table>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:.875rem 1.5rem; border-top:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;">
+        <p style="font-size:0.7rem;color:#94a3b8;margin:0;">* Los cálculos se guardan automáticamente en Historial de Reportería</p>
+        <button onclick="cerrarVP()" style="background:#f1f5f9;color:#64748b;border:none;border-radius:0.5rem;padding:0.4rem 1rem;font-size:0.8rem;cursor:pointer;">Cerrar</button>
+    </div>
+</div>
+</div>
+
 @push('scripts')
 <script>
 (function () {
@@ -1338,19 +1503,40 @@
     inpHasta.addEventListener('change', onDateChange);
 
     const origenColor = {
-        'Armado Equipo': 'text-violet-500 dark:text-violet-400',
-        'Gasto Menor':   'text-orange-500 dark:text-orange-400',
-        'OC':            'text-blue-500 dark:text-blue-400',
-        'SICD':          'text-indigo-500 dark:text-indigo-400',
-        'Solicitud':     'text-teal-500 dark:text-teal-400',
-        'Retiro':        'text-red-500 dark:text-red-400',
-        'Manual':        'text-gray-400',
+        'Solicitud':  'text-teal-500 dark:text-teal-400',
+        'Devolución': 'text-emerald-600 dark:text-emerald-400',
+        'Retiro':     'text-red-500 dark:text-red-400',
+        'SICD':       'text-indigo-500 dark:text-indigo-400',
+        'OC':         'text-blue-500 dark:text-blue-400',
+        'Gasto Menor':'text-orange-500 dark:text-orange-400',
+        'Armado':     'text-violet-500 dark:text-violet-400',
+        'Ajuste':     'text-slate-400 dark:text-slate-400',
+        'Traslado':   'text-blue-400 dark:text-blue-300',
+        'Merma':      'text-orange-600 dark:text-orange-400',
+        'Manual':     'text-gray-400',
+    };
+
+    const tipoIconPath = {
+        'entrada':    'M12 20V4M6 10l6-6 6 6',
+        'salida':     'M12 4v16M6 14l6 6 6-6',
+        'devolucion': 'M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3',
+        'ajuste':     'M4 6h16M7 12h10M9 18h6',
+        'traslado':   'M7 16l-4-4 4-4M17 8l4 4-4 4M3 12h18',
+        'merma':      'M3 6l6 6 4-4 8 8',
+    };
+    const tipoText = {
+        'entrada':    'Ent.',
+        'salida':     'Sal.',
+        'devolucion': 'Dev.',
+        'ajuste':     'Aj.',
+        'traslado':   'Mov.',
+        'merma':      'Mrm.',
     };
 
     function renderRow(mov) {
-        const badge = mov.tipo === 'entrada'
-            ? '<span class="tipo-badge-entrada text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 text-center shrink-0">↑ Ent.</span>'
-            : '<span class="tipo-badge-salida text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 text-center shrink-0">↓ Sal.</span>';
+        const path = tipoIconPath[mov.tipo] ?? 'M12 5v14';
+        const text = tipoText[mov.tipo] ?? mov.tipo.slice(0,4)+'.';
+        const badge = `<span class="tipo-badge-${mov.tipo} inline-flex items-center justify-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase w-14 shrink-0"><svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>${text}</span>`;
         const oCls = origenColor[mov.origen] ?? 'text-gray-400';
         const servBadge = mov.es_servicio
             ? '<span class="act-servicio-badge">SERVICIO</span>'
@@ -1590,6 +1776,204 @@
     // ── Carga inicial ─────────────────────────────────────────────────────
     loadCascade([], [], false);
     fetchTU();
+})();
+
+// ── Variación Presupuestaria ──────────────────────────────────────────
+(function () {
+    const ENDPOINT = "{{ route('admin.dashboard.variacion-presupuestaria') }}";
+    const modal    = document.getElementById('modal-vp');
+    const inpDesde = document.getElementById('vp-desde');
+    const inpHasta = document.getElementById('vp-hasta');
+    const tbody    = document.getElementById('vp-tbody');
+    const tabla    = document.getElementById('vp-tabla');
+    const loading  = document.getElementById('vp-loading');
+    const empty    = document.getElementById('vp-empty');
+    const errDiv   = document.getElementById('vp-error');
+    const kpis     = document.getElementById('vp-kpis');
+
+    const moneda = n => '$' + Math.round(Math.abs(n)).toLocaleString('es-CL');
+    const ymd    = d => d.toISOString().slice(0, 10);
+    const dark   = () => document.documentElement.classList.contains('dark');
+
+    function vpDarkCards() {
+        const d  = dark();
+        const cs = document.getElementById('vp-card-sicd');
+        const co = document.getElementById('vp-card-oc');
+        const vl = document.getElementById('vp-kpi-var-label');
+        if (cs) {
+            cs.style.background  = d ? 'rgba(6,95,70,0.18)'    : '#f0fdf4';
+            cs.style.borderColor = d ? 'rgba(52,211,153,0.25)' : '#bbf7d0';
+            cs.querySelectorAll('p').forEach(p => p.style.color = d ? '#34d399' : '#15803d');
+        }
+        if (co) {
+            co.style.background  = d ? 'rgba(29,78,216,0.18)'   : '#eff6ff';
+            co.style.borderColor = d ? 'rgba(147,197,253,0.25)' : '#bfdbfe';
+            co.querySelectorAll('p').forEach(p => p.style.color = d ? '#93c5fd' : '#1d4ed8');
+        }
+        if (vl) vl.style.color = d ? '#94a3b8' : '#64748b';
+    }
+
+    window.abrirVP = function () {
+        const hoy    = new Date();
+        const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        if (!inpDesde.value) inpDesde.value = ymd(inicio);
+        if (!inpHasta.value) inpHasta.value = ymd(hoy);
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        vpDarkCards();
+    };
+
+    window.cerrarVP = function () {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    };
+
+    window.limpiarVP = function () {
+        inpDesde.value = '';
+        inpHasta.value = '';
+        document.getElementById('vp-estado-sicd').value = '';
+        document.getElementById('vp-proveedor').value   = '';
+        [tabla, loading, empty, errDiv, kpis].forEach(el => el.style.display = 'none');
+        tbody.innerHTML = '';
+    };
+
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) cerrarVP();
+    });
+
+    // Auto-abrir desde Historial Reporterías (?abrir_vp=1&vp_desde=X&vp_hasta=Y)
+    (function () {
+        const p = new URLSearchParams(window.location.search);
+        if (p.get('abrir_vp') !== '1') return;
+        const desde = p.get('vp_desde');
+        const hasta  = p.get('vp_hasta');
+        if (desde) inpDesde.value = desde;
+        if (hasta)  inpHasta.value = hasta;
+        const estSicd = document.getElementById('vp-estado-sicd');
+        const inpProv = document.getElementById('vp-proveedor');
+        if (estSicd && p.get('vp_estado_sicd')) estSicd.value = p.get('vp_estado_sicd');
+        if (inpProv && p.get('vp_proveedor'))   inpProv.value  = p.get('vp_proveedor');
+        // Limpiar params de la URL sin recargar
+        history.replaceState(null, '', window.location.pathname);
+        // Abrir modal y lanzar consulta
+        window.abrirVP();
+        window.fetchVP();
+    })();
+
+    window.fetchVP = function () {
+        const desde = inpDesde.value;
+        const hasta = inpHasta.value;
+        if (!desde || !hasta) { alert('Selecciona un rango de fechas.'); return; }
+
+        [tabla, empty, errDiv, kpis].forEach(el => el.style.display = 'none');
+        loading.style.display = 'block';
+        tbody.innerHTML = '';
+
+        const params = new URLSearchParams({
+            desde,
+            hasta,
+            estado_sicd: document.getElementById('vp-estado-sicd').value,
+            proveedor:   document.getElementById('vp-proveedor').value,
+        });
+
+        fetch(ENDPOINT + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                loading.style.display = 'none';
+
+                // KPIs
+                document.getElementById('vp-kpi-sicd').textContent     = moneda(data.total_sicd);
+                document.getElementById('vp-kpi-oc').textContent        = moneda(data.total_oc);
+                document.getElementById('vp-kpi-nsicds').textContent    = data.n_sicds + ' SICD';
+                document.getElementById('vp-kpi-nocs').textContent      = data.n_ocs   + ' OC';
+                document.getElementById('vp-periodo-label').textContent = data.periodo;
+
+                const varCard = document.getElementById('vp-kpi-variacion-card');
+                const varEl   = document.getElementById('vp-kpi-variacion');
+                const estEl   = document.getElementById('vp-kpi-estado');
+                const v    = data.variacion;
+                const dark = document.documentElement.classList.contains('dark');
+
+                if (v > 0) {
+                    varEl.textContent         = '+' + moneda(v);
+                    varEl.style.color         = dark ? '#f87171' : '#dc2626';
+                    estEl.textContent         = 'Sobre presupuesto';
+                    estEl.style.color         = dark ? '#f87171' : '#dc2626';
+                    varCard.style.background  = dark ? 'rgba(220,38,38,0.15)' : '#fef2f2';
+                    varCard.style.borderColor = dark ? 'rgba(248,113,113,0.25)' : '#fecaca';
+                } else if (v < 0) {
+                    varEl.textContent         = '-' + moneda(Math.abs(v));
+                    varEl.style.color         = dark ? '#34d399' : '#16a34a';
+                    estEl.textContent         = 'Bajo presupuesto';
+                    estEl.style.color         = dark ? '#34d399' : '#16a34a';
+                    varCard.style.background  = dark ? 'rgba(6,95,70,0.18)' : '#f0fdf4';
+                    varCard.style.borderColor = dark ? 'rgba(52,211,153,0.25)' : '#bbf7d0';
+                } else {
+                    varEl.textContent         = '$0';
+                    varEl.style.color         = dark ? '#94a3b8' : '#64748b';
+                    estEl.textContent         = 'Sin variación';
+                    estEl.style.color         = dark ? '#94a3b8' : '#64748b';
+                    varCard.style.background  = dark ? 'rgba(51,65,85,0.3)' : '#f8fafc';
+                    varCard.style.borderColor = dark ? '#334155' : '#e2e8f0';
+                }
+                kpis.style.display = 'block';
+                vpDarkCards();
+
+                if (data.filas.length === 0) {
+                    empty.style.display = 'block';
+                    return;
+                }
+
+                // Tabla
+                const d2 = dark;
+                const estadoBadge = d2 ? {
+                    pendiente: ['rgba(146,64,14,0.25)','#fcd34d','Pendiente'],
+                    agrupado:  ['rgba(29,78,216,0.22)','#93c5fd','Agrupado'],
+                    recibido:  ['rgba(6,95,70,0.25)',  '#6ee7b7','Recibido'],
+                } : {
+                    pendiente: ['#fef3c7','#92400e','Pendiente'],
+                    agrupado:  ['#dbeafe','#1e40af','Agrupado'],
+                    recibido:  ['#d1fae5','#065f46','Recibido'],
+                };
+
+                tbody.innerHTML = data.filas.map((f, i) => {
+                    const v2     = f.variacion;
+                    const vColor = v2 > 0
+                        ? (d2 ? '#f87171' : '#dc2626')
+                        : (v2 < 0 ? (d2 ? '#34d399' : '#16a34a') : (d2 ? '#94a3b8' : '#64748b'));
+                    const vBg    = v2 > 0
+                        ? (d2 ? 'rgba(220,38,38,0.18)'  : '#fef2f2')
+                        : (v2 < 0 ? (d2 ? 'rgba(6,95,70,0.18)' : '#f0fdf4') : (d2 ? 'rgba(51,65,85,0.3)' : '#f8fafc'));
+                    const vLabel = v2 > 0 ? 'Sobre ppto.' : (v2 < 0 ? 'Bajo ppto.' : 'Sin variación');
+                    const vStr   = v2 > 0 ? '+' + moneda(v2) : (v2 < 0 ? '-' + moneda(Math.abs(v2)) : '$0');
+                    const [sBg, sCol, sLab] = estadoBadge[f.estado] ?? (d2 ? ['rgba(51,65,85,0.3)','#94a3b8',f.estado] : ['#f3f4f6','#374151',f.estado]);
+                    const rowBg  = d2
+                        ? (i % 2 === 0 ? '#1e293b' : '#162032')
+                        : (i % 2 === 0 ? '#fff' : '#f8fafc');
+                    const rowBorder = d2 ? '#334155' : '#f1f5f9';
+                    const colMuted  = d2 ? '#94a3b8' : '#64748b';
+                    const colText   = d2 ? '#e2e8f0' : '#374151';
+                    const ocsStr = f.ocs.map(o => o.numero ? 'OC-' + o.numero : '—').join(', ') || '—';
+                    return `<tr style="background:${rowBg};border-bottom:1px solid ${rowBorder};">
+                        <td style="padding:.45rem .65rem;font-weight:700;color:${d2?'#a5b4fc':'#4f46e5'};font-family:monospace;">${f.codigo ?? ('SICD-'+String(f.sicd_id).padStart(6,'0'))}</td>
+                        <td style="padding:.45rem .65rem;color:${colText};max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.proveedor}">${f.proveedor}</td>
+                        <td style="padding:.45rem .65rem;text-align:center;"><span style="background:${sBg};color:${sCol};font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:9999px;">${sLab}</span></td>
+                        <td style="padding:.45rem .65rem;text-align:center;color:${colMuted};white-space:nowrap;">${f.fecha}</td>
+                        <td style="padding:.45rem .65rem;text-align:right;font-weight:600;color:${d2?'#34d399':'#15803d'};">${moneda(f.sicd_total)}</td>
+                        <td style="padding:.45rem .65rem;text-align:right;font-weight:600;color:${d2?'#93c5fd':'#1d4ed8'};">${moneda(f.oc_total)}</td>
+                        <td style="padding:.45rem .65rem;text-align:right;color:${colMuted};font-size:.7rem;" title="${ocsStr}">${f.n_ocs}</td>
+                        <td style="padding:.45rem .65rem;text-align:right;font-weight:700;color:${vColor};">${vStr}</td>
+                        <td style="padding:.45rem .65rem;text-align:center;"><span style="background:${vBg};color:${vColor};font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:9999px;white-space:nowrap;">${vLabel}</span></td>
+                    </tr>`;
+                }).join('');
+
+                tabla.style.display = 'table';
+            })
+            .catch(() => {
+                loading.style.display = 'none';
+                errDiv.style.display  = 'block';
+            });
+    };
 })();
 </script>
 @endpush

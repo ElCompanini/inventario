@@ -117,18 +117,23 @@ class ContainerController extends Controller
 
         DB::transaction(function () use ($productos, $destino, $data, $origen) {
             foreach ($productos as $producto) {
+                $stockActual = $producto->stock_actual;
                 $producto->contenedor = $destino->id;
                 $producto->save();
 
                 HistorialCambio::create([
-                    'producto_id'     => $producto->id,
-                    'nombre_producto' => $producto->nombre,
-                    'contenedor_id'   => $destino->id,
-                    'cantidad'        => $producto->stock_actual,
-                    'tipo'            => 'traslado',
-                    'motivo'          => "Traslado de {$origen->nombre} a {$destino->nombre}: {$data['motivo']}",
-                    'aprobado_por' => Auth::user()->name,
-                    'usuario_id'   => Auth::id(),
+                    'producto_id'        => $producto->id,
+                    'nombre_producto'    => $producto->nombre,
+                    'contenedor_id'      => $destino->id,
+                    'cantidad'           => $stockActual,
+                    'tipo'               => 'traslado',
+                    'motivo'             => "Traslado de {$origen->nombre} a {$destino->nombre}: {$data['motivo']}",
+                    'aprobado_por'       => Auth::user()->name,
+                    'usuario_id'         => Auth::id(),
+                    'origen_tipo'        => 'traslado',
+                    'stock_anterior'     => $stockActual,
+                    'stock_posterior'    => $stockActual,
+                    'usuario_ejecutor_id'=> Auth::id(),
                 ]);
             }
         });

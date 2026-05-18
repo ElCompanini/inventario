@@ -240,6 +240,307 @@
     <p id="sin-resultados" class="hidden text-center text-gray-400 py-10">Sin resultados para tu búsqueda.</p>
 @endif
 
+{{-- ══ SECCIÓN: Solicitudes de Devolución de Usuarios — Pendientes ═══════ --}}
+@if(isset($solicitudesDevolucionPendientes) && $solicitudesDevolucionPendientes->isNotEmpty())
+<div class="mt-10">
+    <div class="flex items-center gap-3 mb-4">
+        <h2 class="text-lg font-bold text-gray-700">Solicitudes de Devolución</h2>
+        <span style="font-size:.72rem; font-weight:700; background:#fef3c7; color:#92400e; padding:2px 10px; border-radius:9999px;">
+            {{ $solicitudesDevolucionPendientes->count() }} pendiente(s)
+        </span>
+    </div>
+    <p class="text-sm text-gray-400 mb-4 -mt-2">Solicitudes de devolución enviadas por usuarios. Aprueba para que el stock se reintegre, o rechaza con un motivo.</p>
+
+    <div class="space-y-3">
+        @foreach($solicitudesDevolucionPendientes as $dev)
+        @if(!$dev->producto) @continue @endif
+        @php
+            $devDoc = 'DEV-' . str_pad($dev->id, 6, '0', STR_PAD_LEFT);
+            $solDoc = 'SOL-' . str_pad($dev->solicitud_id, 6, '0', STR_PAD_LEFT);
+        @endphp
+
+        <div class="bg-white rounded-xl shadow overflow-hidden border-l-4 border-violet-400">
+            <div class="px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+
+                {{-- Info --}}
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                        <span class="font-bold text-gray-800 truncate">{{ $dev->producto->nombre }}</span>
+                        <span style="font-size:.68rem; font-weight:700; background:#ede9fe; color:#6d28d9; padding:2px 8px; border-radius:9999px;">
+                            Devolución pendiente
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
+                        <span>Solicitante: <strong class="text-gray-700">{{ $dev->usuario->name ?? '—' }}</strong></span>
+                        <span>Solicitud original: <strong class="text-indigo-600">{{ $solDoc }}</strong></span>
+                        <span>{{ $dev->created_at->format('d/m/Y H:i') }}</span>
+                        <span class="font-mono text-xs text-gray-400">{{ $devDoc }}</span>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1.5">
+                        <span class="font-semibold text-gray-700">Motivo:</span> {{ $dev->motivo }}
+                    </p>
+                </div>
+
+                {{-- Cantidad --}}
+                <div class="text-center flex-shrink-0">
+                    <p class="text-xs text-gray-400 mb-0.5">A devolver</p>
+                    <p class="text-2xl font-bold text-violet-600">{{ $dev->cantidad }}</p>
+                    <p class="text-xs text-gray-400">unidad(es)</p>
+                </div>
+
+                {{-- Botones --}}
+                @if(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'))
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:.5rem; flex-shrink:0;">
+                    {{-- Aprobar --}}
+                    <form method="POST" action="{{ route('admin.devoluciones.aprobar', $dev->id) }}">
+                        @csrf
+                        <button type="submit"
+                                style="display:inline-flex; align-items:center; gap:.4rem; padding:.5rem 1.1rem; font-size:.82rem; font-weight:700; color:#fff; background:#16a34a; border:none; border-radius:.5rem; cursor:pointer; transition:background .15s;"
+                                onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">
+                            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Aprobar
+                        </button>
+                    </form>
+                    {{-- Rechazar --}}
+                    <button type="button"
+                            onclick="abrirModalRechazoDevolucion({{ $dev->id }}, '{{ addslashes($devDoc) }}')"
+                            style="display:inline-flex; align-items:center; gap:.4rem; padding:.4rem .9rem; font-size:.78rem; font-weight:700; color:#dc2626; background:transparent; border:1.5px solid #fca5a5; border-radius:.5rem; cursor:pointer; transition:background .15s, border-color .15s;"
+                            onmouseover="this.style.background='#fef2f2'; this.style.borderColor='#ef4444';"
+                            onmouseout="this.style.background='transparent'; this.style.borderColor='#fca5a5';">
+                        <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        Rechazar
+                    </button>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endforeach
+    </div>
+</div>
+@endif
+
+{{-- Modal rechazo de devolución de usuario --}}
+<div id="modalRechazoDevolucion" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55); align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 60px rgba(0,0,0,.25); width:460px; max-width:calc(100vw - 2rem); padding:1.75rem; animation:modal-in .25s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.25rem;">
+            <svg style="width:1.1rem;height:1.1rem;color:#dc2626;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            <h2 style="font-size:1rem; font-weight:700; color:#1f2937; margin:0;">Rechazar Solicitud de Devolución</h2>
+        </div>
+        <p id="rdv-doc-label" style="font-size:.82rem; color:#4b5563; margin:0 0 1.25rem; padding-left:1.7rem;"></p>
+        <form id="formRechazoDevolucion" method="POST" action="">
+            @csrf
+            <div style="margin-bottom:1.25rem;">
+                <label style="display:block; font-size:.82rem; font-weight:600; color:#374151; margin-bottom:.35rem;">
+                    Motivo del rechazo <span style="color:#ef4444;">*</span>
+                </label>
+                <textarea name="motivo_rechazo" rows="3" required minlength="5" maxlength="500"
+                          placeholder="Ej: Ya se realizó la devolución completa, cantidad incorrecta..."
+                          style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.82rem; resize:vertical; box-sizing:border-box; outline:none;"
+                          onfocus="this.style.borderColor='#ef4444'; this.style.boxShadow='0 0 0 3px rgba(239,68,68,.12)'"
+                          onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'"></textarea>
+            </div>
+            <div style="display:flex; gap:.65rem; justify-content:flex-end; border-top:1px solid #f3f4f6; padding-top:1rem;">
+                <button type="button" onclick="document.getElementById('modalRechazoDevolucion').style.display='none'"
+                        style="padding:.45rem 1rem; font-size:.82rem; font-weight:600; color:#6b7280; background:#f3f4f6; border:none; border-radius:.5rem; cursor:pointer;"
+                        onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        style="padding:.45rem 1.25rem; font-size:.82rem; font-weight:700; color:#fff; background:#dc2626; border:none; border-radius:.5rem; cursor:pointer; display:inline-flex; align-items:center; gap:.4rem;"
+                        onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">
+                    <svg style="width:.85rem;height:.85rem;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    Confirmar rechazo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- ══ SECCIÓN: Solicitudes Aprobadas — Devoluciones ════════════════════ --}}
+@if(isset($solicitudesAprobadas) && $solicitudesAprobadas->isNotEmpty())
+<div class="mt-10">
+    <div class="flex items-center gap-3 mb-4">
+        <h2 class="text-lg font-bold text-gray-700">Devoluciones</h2>
+        <span style="font-size:.72rem; font-weight:700; background:#dbeafe; color:#1d4ed8; padding:2px 10px; border-radius:9999px;">
+            {{ $solicitudesAprobadas->count() }} solicitud(es)
+        </span>
+    </div>
+    <p class="text-sm text-gray-400 mb-4 -mt-2">Solicitudes de salida aprobadas. Abre el proceso de devolución para luego registrar unidades devueltas.</p>
+
+    <div class="space-y-3">
+        @foreach($solicitudesAprobadas as $sol)
+        @if(!$sol->producto) @continue @endif
+        @php
+            $yaDevuelto  = (int) ($devolucionesPorSolicitud[$sol->id] ?? 0);
+            $maxDevolver = $sol->cantidad - $yaDevuelto;
+            $devCompleta = $maxDevolver <= 0;
+            $pct         = $sol->cantidad > 0 ? min(100, round(($yaDevuelto / $sol->cantidad) * 100)) : 0;
+            $enDevolucion = $sol->estado === 'en_devolucion';
+            $borderColor  = $devCompleta ? 'border-gray-300' : ($enDevolucion ? 'border-blue-500' : 'border-amber-400');
+        @endphp
+
+        <div class="bg-white rounded-xl shadow overflow-hidden border-l-4 {{ $borderColor }}">
+            <div class="px-6 py-4 flex items-center justify-between gap-4">
+
+                {{-- Info --}}
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                        <span class="font-bold text-gray-800 truncate">{{ $sol->producto->nombre }}</span>
+                        @if($devCompleta)
+                            <span style="font-size:.68rem; font-weight:700; background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:9999px;">
+                                Devolución completa ✓
+                            </span>
+                        @elseif($enDevolucion)
+                            <span style="font-size:.68rem; font-weight:700; background:#dbeafe; color:#1d4ed8; padding:2px 8px; border-radius:9999px;">
+                                En devolución
+                            </span>
+                        @else
+                            <span style="font-size:.68rem; font-weight:700; background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:9999px;">
+                                Aprobada
+                            </span>
+                        @endif
+                    </div>
+                    <div class="flex items-center gap-5 text-sm text-gray-500 flex-wrap">
+                        <span>Solicitante: <strong class="text-gray-700">{{ $sol->usuario->name }}</strong></span>
+                        <span>Aprobada: <strong class="text-gray-700">{{ $sol->updated_at->format('d/m/Y') }}</strong></span>
+                        <span>#{{ $sol->id }}</span>
+                    </div>
+                    {{-- Barra de progreso devolución --}}
+                    <div class="mt-2 flex items-center gap-3">
+                        <div style="flex:1; height:6px; background:#e5e7eb; border-radius:9999px; overflow:hidden; max-width:180px;">
+                            <div style="height:100%; width:{{ $pct }}%; background:{{ $devCompleta ? '#16a34a' : '#3b82f6' }}; border-radius:9999px; transition:width .4s;"></div>
+                        </div>
+                        <span class="text-xs text-gray-500">
+                            {{ $yaDevuelto }} / {{ $sol->cantidad }} devueltos
+                        </span>
+                    </div>
+                </div>
+
+                {{-- Estadísticas --}}
+                <div class="hidden sm:flex items-center gap-6 text-center shrink-0">
+                    <div>
+                        <p class="text-xs text-gray-400 mb-0.5">Entregado</p>
+                        <p class="text-xl font-bold text-gray-800">{{ $sol->cantidad }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400 mb-0.5">Ya devuelto</p>
+                        <p class="text-xl font-bold" style="color:{{ $yaDevuelto > 0 ? '#16a34a' : '#9ca3af' }};">{{ $yaDevuelto }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400 mb-0.5">Devolvible</p>
+                        <p class="text-xl font-bold" style="color:{{ $devCompleta ? '#9ca3af' : '#1d4ed8' }};">{{ $maxDevolver }}</p>
+                    </div>
+                </div>
+
+                {{-- Botones según estado --}}
+                @if(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'))
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:.5rem; flex-shrink:0;">
+
+                    @if($sol->estado === 'aprobado' && !$devCompleta)
+                    {{-- Estado: aprobado → mostrar "Abrir solicitud" --}}
+                    <form method="POST" action="{{ route('admin.solicitudes.abrir', $sol->id) }}">
+                        @csrf
+                        <button type="submit"
+                                style="display:inline-flex; align-items:center; gap:.4rem; padding:.5rem 1.1rem; font-size:.82rem; font-weight:700; color:#fff; background:#d97706; border:none; border-radius:.5rem; cursor:pointer; transition:background .15s;"
+                                onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#d97706'">
+                            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+                            </svg>
+                            Abrir solicitud
+                        </button>
+                    </form>
+
+                    @elseif($enDevolucion && !$devCompleta)
+                    {{-- Estado: en_devolucion → "Registrar devolución" + "Cerrar solicitud" --}}
+                    <button type="button"
+                            onclick="abrirModalDevolucion({{ $sol->id }}, '{{ addslashes($sol->producto->nombre) }}', {{ $sol->cantidad }}, {{ $yaDevuelto }}, {{ $maxDevolver }})"
+                            style="display:inline-flex; align-items:center; gap:.4rem; padding:.5rem 1.1rem; font-size:.82rem; font-weight:700; color:#fff; background:#2563eb; border:none; border-radius:.5rem; cursor:pointer; transition:background .15s;"
+                            onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+                        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                        </svg>
+                        Registrar devolución
+                    </button>
+                    <form method="POST" action="{{ route('admin.solicitudes.cerrar', $sol->id) }}"
+                          onsubmit="return confirm('¿Cerrar la solicitud #{{ $sol->id }}? No se podrán registrar más devoluciones.')">
+                        @csrf
+                        <button type="submit"
+                                style="display:inline-flex; align-items:center; gap:.4rem; padding:.4rem .9rem; font-size:.78rem; font-weight:700; color:#dc2626; background:transparent; border:1.5px solid #fca5a5; border-radius:.5rem; cursor:pointer; transition:background .15s, border-color .15s;"
+                                onmouseover="this.style.background='#fef2f2'; this.style.borderColor='#ef4444';"
+                                onmouseout="this.style.background='transparent'; this.style.borderColor='#fca5a5';">
+                            <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7V5a4 4 0 00-8 0v2"/>
+                            </svg>
+                            Cerrar solicitud
+                        </button>
+                    </form>
+
+                    @endif
+                </div>
+                @endif
+            </div>
+        </div>
+        @endforeach
+    </div>
+</div>
+@endif
+
+{{-- Modal: registrar devolución --}}
+<div id="modalDevolucion" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55); align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 60px rgba(0,0,0,.25); width:480px; max-width:calc(100vw - 2rem); padding:1.75rem; animation:modal-in .25s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.25rem;">
+            <svg style="width:1.1rem; height:1.1rem; color:#2563eb;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+            <h2 style="font-size:1rem; font-weight:700; color:#1f2937; margin:0;">Registrar Devolución</h2>
+        </div>
+        <p id="dev-producto-nombre" style="font-size:.82rem; color:#4b5563; margin:0 0 1.25rem; padding-left:1.7rem;"></p>
+
+        <form id="formDevolucion" method="POST" action="">
+            @csrf
+            <div style="margin-bottom:1rem;">
+                <label style="display:block; font-size:.82rem; font-weight:600; color:#374151; margin-bottom:.35rem;">
+                    Cantidad a devolver <span style="color:#ef4444;">*</span>
+                    <span style="font-weight:400; color:#6b7280;">(máx: <span id="dev-max-label">0</span>)</span>
+                </label>
+                <input type="number" name="cantidad_devolucion" id="dev-cantidad"
+                       min="1" required
+                       style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.9rem; box-sizing:border-box; outline:none;"
+                       onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,.15)'"
+                       onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'">
+                <p style="font-size:.72rem; color:#6b7280; margin:.3rem 0 0;">
+                    Entregado: <strong id="dev-entregado">0</strong> ud. &nbsp;·&nbsp; Ya devuelto: <strong id="dev-ya-devuelto">0</strong> ud.
+                </p>
+            </div>
+            <div style="margin-bottom:1.25rem;">
+                <label style="display:block; font-size:.82rem; font-weight:600; color:#374151; margin-bottom:.35rem;">
+                    Motivo de la devolución <span style="color:#ef4444;">*</span>
+                </label>
+                <textarea name="motivo_devolucion" id="dev-motivo" rows="3" required minlength="5" maxlength="500"
+                          placeholder="Ej: Materiales sobrantes tras finalizar la tarea..."
+                          style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.82rem; resize:vertical; box-sizing:border-box; outline:none;"
+                          onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,.15)'"
+                          onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'"></textarea>
+            </div>
+            <div style="display:flex; gap:.65rem; justify-content:flex-end; border-top:1px solid #f3f4f6; padding-top:1rem;">
+                <button type="button" onclick="cerrarModalDevolucion()"
+                        style="padding:.45rem 1rem; font-size:.82rem; font-weight:600; color:#6b7280; background:#f3f4f6; border:none; border-radius:.5rem; cursor:pointer;"
+                        onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        style="padding:.45rem 1.25rem; font-size:.82rem; font-weight:700; color:#fff; background:#2563eb; border:none; border-radius:.5rem; cursor:pointer; display:inline-flex; align-items:center; gap:.4rem;"
+                        onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+                    <svg style="width:.85rem; height:.85rem;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    Confirmar devolución
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {{-- Modal de rechazo con motivo --}}
 <div id="modalRechazo" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
@@ -572,6 +873,48 @@
     // Cerrar al hacer clic fuera del modal
     document.getElementById('modalRechazo').addEventListener('click', function(e) {
         if (e.target === this) cerrarModalRechazo();
+    });
+
+    // ── Modal de devolución ───────────────────────────────────────────────
+    function abrirModalDevolucion(id, nombre, cantidad, yaDevuelto, maxDevolver) {
+        document.getElementById('dev-producto-nombre').textContent = nombre;
+        document.getElementById('dev-entregado').textContent = cantidad;
+        document.getElementById('dev-ya-devuelto').textContent = yaDevuelto;
+        document.getElementById('dev-max-label').textContent = maxDevolver;
+        var inp = document.getElementById('dev-cantidad');
+        inp.value = '';
+        inp.max = maxDevolver;
+        document.getElementById('dev-motivo').value = '';
+        document.getElementById('formDevolucion').action = '/admin/solicitudes/' + id + '/devolucion';
+        var m = document.getElementById('modalDevolucion');
+        m.style.display = 'flex';
+        setTimeout(function() { inp.focus(); }, 50);
+    }
+
+    function cerrarModalDevolucion() {
+        document.getElementById('modalDevolucion').style.display = 'none';
+    }
+
+    document.getElementById('modalDevolucion').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalDevolucion();
+    });
+
+    // ── Modal rechazo de devolución de usuario ────────────────────────────
+    function abrirModalRechazoDevolucion(devId, devDoc) {
+        document.getElementById('rdv-doc-label').textContent = devDoc;
+        document.getElementById('formRechazoDevolucion').action = '/admin/devoluciones/' + devId + '/rechazar';
+        var m = document.getElementById('modalRechazoDevolucion');
+        m.style.display = 'flex';
+    }
+
+    document.getElementById('modalRechazoDevolucion').addEventListener('click', function(e) {
+        if (e.target === this) this.style.display = 'none';
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.getElementById('modalRechazoDevolucion').style.display = 'none';
+        }
     });
 </script>
 @endpush

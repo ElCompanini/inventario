@@ -12,8 +12,12 @@
         </svg>
         Volver a productos
     </a>
-    <h1 class="text-2xl font-bold text-gray-800">Modificar Stock Directamente</h1>
-    <p class="text-sm text-gray-500 mt-1">Esta acción se registrará en el historial de cambios</p>
+    <h1 class="text-2xl font-bold text-gray-800">
+        @if($producto->es_servicio) Detalle del Servicio @else Modificar Stock Directamente @endif
+    </h1>
+    <p class="text-sm text-gray-500 mt-1">
+        @if($producto->es_servicio) Servicio administrativo — los registros se generan mediante SICD, OC o Gastos Menores @else Esta acción se registrará en el historial de cambios @endif
+    </p>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -33,6 +37,16 @@
             </div>
 
             <div class="pt-3 border-t space-y-2">
+            @if($producto->es_servicio)
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-500">Tipo</span>
+                    <span class="text-sm font-semibold" style="color:#1d4ed8;">Servicio Administrativo</span>
+                </div>
+                <div class="flex justify-between text-xs text-gray-500">
+                    <span>Sin stock físico</span>
+                    <span>Sin stock mínimo/crítico</span>
+                </div>
+            @else
                 <div class="flex justify-between items-center">
                     <span class="text-gray-500">Stock actual</span>
                     @php $estado = $producto->estadoStock(); @endphp
@@ -52,12 +66,30 @@
                     <span>Stock mínimo: <strong>{{ $producto->stock_minimo }}</strong></span>
                     <span>Stock crítico: <strong>{{ $producto->stock_critico }}</strong></span>
                 </div>
+            @endif
             </div>
         </div>
     </div>
 
     {{-- Formulario de modificación --}}
     <div class="lg:col-span-2 bg-white rounded-xl shadow p-6">
+        @if($producto->es_servicio)
+        {{-- Servicios: sin stock físico — mostrar aviso informativo --}}
+        <div style="text-align:center; padding:2rem 1rem;">
+            <div style="width:2.75rem;height:2.75rem;border-radius:9999px;background:#dbeafe;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                <svg style="width:1.4rem;height:1.4rem;" fill="none" stroke="#1d4ed8" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+                </svg>
+            </div>
+            <p style="font-size:.9rem;font-weight:700;color:#1e3a5f;margin:0 0 .5rem;">Servicio Administrativo</p>
+            <p style="font-size:.78rem;color:#6b7280;line-height:1.65;margin:0;">
+                Este producto es un <strong>servicio administrativo</strong> y no maneja<br>
+                stock físico, entradas ni salidas de bodega.<br>
+                Los registros se generan a través de SICD, OC o Gastos Menores.
+            </p>
+        </div>
+        @else
         <h2 class="text-base font-semibold text-gray-700 mb-4 pb-2 border-b">Registrar Movimiento</h2>
 
         @if($errors->any())
@@ -75,24 +107,24 @@
                     Tipo de movimiento <span class="text-red-500">*</span>
                 </label>
                 <div class="grid grid-cols-2 gap-3">
-                    <label class="flex items-center gap-3 border-2 rounded-lg px-4 py-3 cursor-pointer transition
+                    <label class="tipo-mov-label tipo-entrada flex items-center gap-3 border-2 rounded-lg px-4 py-3 cursor-pointer transition
                                   has-[:checked]:border-green-500 has-[:checked]:bg-green-50 border-gray-200 hover:border-gray-300">
                         <input type="radio" name="tipo" value="entrada"
                                class="text-green-600"
                                {{ old('tipo', 'entrada') === 'entrada' ? 'checked' : '' }}>
                         <div>
-                            <p class="font-semibold text-gray-800 text-sm">↑ Entrada</p>
-                            <p class="text-xs text-gray-500">Suma al stock</p>
+                            <p class="tipo-mov-title font-semibold text-gray-800 text-sm">↑ Entrada</p>
+                            <p class="tipo-mov-sub text-xs text-gray-500">Suma al stock</p>
                         </div>
                     </label>
-                    <label class="flex items-center gap-3 border-2 rounded-lg px-4 py-3 cursor-pointer transition
+                    <label class="tipo-mov-label tipo-salida flex items-center gap-3 border-2 rounded-lg px-4 py-3 cursor-pointer transition
                                   has-[:checked]:border-orange-500 has-[:checked]:bg-orange-50 border-gray-200 hover:border-gray-300">
                         <input type="radio" name="tipo" value="salida"
                                class="text-orange-500"
                                {{ old('tipo') === 'salida' ? 'checked' : '' }}>
                         <div>
-                            <p class="font-semibold text-gray-800 text-sm">↓ Salida</p>
-                            <p class="text-xs text-gray-500">Resta del stock</p>
+                            <p class="tipo-mov-title font-semibold text-gray-800 text-sm">↓ Salida</p>
+                            <p class="tipo-mov-sub text-xs text-gray-500">Resta del stock</p>
                         </div>
                     </label>
                 </div>
@@ -102,9 +134,9 @@
             <div class="mb-5">
                 @if($producto->tienePresentacion())
                 {{-- Salida: info visual de stock --}}
-                <div id="salidaPkgInfo" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8;"
-                     class="mb-3 px-3 py-2 rounded-lg text-sm">
-                    <span style="color:#1d4ed8;">
+                <div id="salidaPkgInfo" style="display:none;"
+                     class="salida-pkg-info mb-3 px-3 py-2 rounded-lg text-sm">
+                    <span>
                         📦 Stock actual: <strong>{{ $producto->stock_actual }}</strong> unidades
                         &nbsp;= <strong>{{ $producto->cantidadVisual((int)$producto->stock_actual) }}</strong>
                     </span>
@@ -135,8 +167,8 @@
                            class="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
                            style="border:1px solid #60a5fa; focus-ring-color:#2563eb;"
                            placeholder="Ej: 3">
-                    <div id="pkgPreview" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8;"
-                         class="mt-2 px-3 py-2 rounded-lg text-sm font-medium"></div>
+                    <div id="pkgPreview" style="display:none;"
+                         class="salida-pkg-info mt-2 px-3 py-2 rounded-lg text-sm font-medium"></div>
                 </div>
                 @endif
 
@@ -191,6 +223,7 @@
                 </button>
             </div>
         </form>
+        @endif
     </div>
 </div>
 
@@ -309,6 +342,52 @@
     @keyframes modal-prod-in {
         from { opacity:0; transform:scale(.94); }
         to   { opacity:1; transform:scale(1); }
+    }
+
+    /* Stock info box (salida paquetes) */
+    .salida-pkg-info {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1d4ed8;
+    }
+    html.dark .salida-pkg-info {
+        background: rgba(37, 99, 235, 0.15);
+        border: 1px solid rgba(96, 165, 250, 0.3);
+        color: #93c5fd;
+    }
+
+    /* Dark mode — radio cards tipo movimiento */
+    html.dark .tipo-mov-label {
+        border-color: #374151;
+    }
+    html.dark .tipo-mov-label:hover {
+        border-color: #4b5563;
+    }
+    html.dark .tipo-mov-title {
+        color: #e5e7eb;
+    }
+    html.dark .tipo-mov-sub {
+        color: #9ca3af;
+    }
+    html.dark .tipo-entrada:has(input:checked) {
+        border-color: #16a34a !important;
+        background: rgba(22, 163, 74, 0.15) !important;
+    }
+    html.dark .tipo-entrada:has(input:checked) .tipo-mov-title {
+        color: #86efac;
+    }
+    html.dark .tipo-entrada:has(input:checked) .tipo-mov-sub {
+        color: #4ade80;
+    }
+    html.dark .tipo-salida:has(input:checked) {
+        border-color: #ea580c !important;
+        background: rgba(234, 88, 12, 0.15) !important;
+    }
+    html.dark .tipo-salida:has(input:checked) .tipo-mov-title {
+        color: #fdba74;
+    }
+    html.dark .tipo-salida:has(input:checked) .tipo-mov-sub {
+        color: #fb923c;
     }
 </style>
 @endpush

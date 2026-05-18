@@ -144,7 +144,6 @@ tbody tr.totales td { border-color:#2563eb; font-weight:bold; color:#fff; }
         <tr>
             <th style="text-align:left;">Fecha</th>
             <th>Tipo Mov.</th>
-            <th>Tipo Doc.</th>
             <th style="text-align:left;">N° Documento</th>
             <th>RUT Proveedor</th>
             <th style="text-align:left;">Proveedor</th>
@@ -173,7 +172,6 @@ tbody tr.totales td { border-color:#2563eb; font-weight:bold; color:#fff; }
             <td class="text-center">
                 <span class="badge {{ $esE ? 'badge-e' : ($esS ? 'badge-s' : 'badge-n') }}">{{ $fila['tipo_movimiento'] }}</span>
             </td>
-            <td class="text-center">{{ $fila['tipo_documento'] }}</td>
             <td class="mono text-indigo">{{ $fila['n_documento'] }}</td>
             <td class="text-center mono">{{ $fila['rut_proveedor'] }}</td>
             <td>{{ \Illuminate\Support\Str::limit($fila['proveedor'], 25) }}</td>

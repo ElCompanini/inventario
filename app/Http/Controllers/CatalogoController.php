@@ -16,7 +16,10 @@ class CatalogoController extends Controller
 {
     private function ccId(): ?int
     {
-        return auth()->user()->ccFiltro();
+        // Para visibilidad usamos ccFiltro(), pero para CREAR un producto
+        // usamos el CC real del usuario — así los productos creados por devs
+        // quedan asignados a su CC y son visibles para otros usuarios del mismo CC.
+        return auth()->user()->centro_costo_id ?? null;
     }
 
     public function index(Request $request)
@@ -41,7 +44,7 @@ class CatalogoController extends Controller
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get(['id', 'nombre']);
 
-        $unidades = UnidadMedida::orderBy('nombre')->get(['id', 'nombre', 'abreviacion']);
+        $unidades = UnidadMedida::noEsPresentacion()->orderBy('nombre')->get(['id', 'nombre', 'abreviacion']);
 
         $familiaActiva = (int) $request->get('familia', $familias->first()?->id ?? 0);
         $familiaActual = $familias->firstWhere('id', $familiaActiva);
@@ -253,7 +256,7 @@ class CatalogoController extends Controller
             $esServicio = true;
         } else {
             // Validate brand belongs to category (skip check for SIN MARCA)
-            $marcaId = $data['marca_id'] ?: $sinMarcaId;
+            $marcaId = ($data['marca_id'] ?? null) ?: $sinMarcaId;
             if ($marcaId && $marcaId !== $sinMarcaId) {
                 $marca = Marca::find($marcaId);
                 if (!$marca || (int) $marca->categoria_id !== (int) $data['categoria_id']) {

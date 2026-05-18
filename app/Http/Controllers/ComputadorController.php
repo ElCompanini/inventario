@@ -247,22 +247,28 @@ class ComputadorController extends Controller
                 'usuario_instalacion_id' => Auth::id(),
             ]);
 
+            $stockAntes = $producto->stock_actual;
             $producto->stock_actual -= $data['cantidad'];
             $producto->actualizarFechasStock();
             $producto->save();
 
             // BINCARD: SALIDA ARMAR EQUIPO
             HistorialCambio::create([
-                'producto_id'     => $producto->id,
-                'nombre_producto' => $producto->nombre,
-                'contenedor_id'   => $producto->contenedor,
-                'cantidad'        => $data['cantidad'],
-                'tipo'            => 'salida',
-                'motivo'          => "SALIDA ARMAR EQUIPO · {$computador->codigo} · {$categoriaLabel} · Motivo: {$motivoStr}",
-                'aprobado_por'    => Auth::user()->name,
-                'usuario_id'      => Auth::id(),
-                'origen'          => 'computador_armado',
-                'origen_id'       => $computador->id,
+                'producto_id'        => $producto->id,
+                'nombre_producto'    => $producto->nombre,
+                'contenedor_id'      => $producto->contenedor,
+                'cantidad'           => $data['cantidad'],
+                'tipo'               => 'salida',
+                'motivo'             => "SALIDA ARMAR EQUIPO · {$computador->codigo} · {$categoriaLabel} · Motivo: {$motivoStr}",
+                'aprobado_por'       => Auth::user()->name,
+                'usuario_id'         => Auth::id(),
+                'origen'             => 'computador_armado',
+                'origen_id'          => $computador->id,
+                'origen_tipo'        => 'computador_armado',
+                'doc_origen'         => 'COMP-' . str_pad($computador->id, 6, '0', STR_PAD_LEFT),
+                'stock_anterior'     => $stockAntes,
+                'stock_posterior'    => $producto->stock_actual,
+                'usuario_ejecutor_id'=> Auth::id(),
             ]);
         });
 
@@ -300,21 +306,27 @@ class ComputadorController extends Controller
 
             // Devolver al stock
             if ($producto) {
+                $stockAntes = $producto->stock_actual;
                 $producto->stock_actual += $componente->cantidad;
                 $producto->actualizarFechasStock();
                 $producto->save();
 
                 HistorialCambio::create([
-                    'producto_id'     => $producto->id,
-                    'nombre_producto' => $producto->nombre,
-                    'contenedor_id'   => $producto->contenedor,
-                    'cantidad'        => $componente->cantidad,
-                    'tipo'            => 'entrada',
-                    'motivo'          => "INGRESO DESMONTAJE · {$computador->codigo} · Retiro: " . strtoupper($motivoRetiro),
-                    'aprobado_por'    => Auth::user()->name,
-                    'usuario_id'      => Auth::id(),
-                    'origen'          => 'computador_armado',
-                    'origen_id'       => $computador->id,
+                    'producto_id'        => $producto->id,
+                    'nombre_producto'    => $producto->nombre,
+                    'contenedor_id'      => $producto->contenedor,
+                    'cantidad'           => $componente->cantidad,
+                    'tipo'               => 'entrada',
+                    'motivo'             => "INGRESO DESMONTAJE · {$computador->codigo} · Retiro: " . strtoupper($motivoRetiro),
+                    'aprobado_por'       => Auth::user()->name,
+                    'usuario_id'         => Auth::id(),
+                    'origen'             => 'computador_armado',
+                    'origen_id'          => $computador->id,
+                    'origen_tipo'        => 'computador_armado',
+                    'doc_origen'         => 'COMP-' . str_pad($computador->id, 6, '0', STR_PAD_LEFT),
+                    'stock_anterior'     => $stockAntes,
+                    'stock_posterior'    => $producto->stock_actual,
+                    'usuario_ejecutor_id'=> Auth::id(),
                 ]);
             }
         });
@@ -346,21 +358,27 @@ class ComputadorController extends Controller
 
                 $producto = $componente->producto;
                 if ($producto) {
+                    $stockAntes = $producto->stock_actual;
                     $producto->stock_actual += $componente->cantidad;
                     $producto->actualizarFechasStock();
                     $producto->save();
 
                     HistorialCambio::create([
-                        'producto_id'     => $producto->id,
-                        'nombre_producto' => $producto->nombre,
-                        'contenedor_id'   => $producto->contenedor,
-                        'cantidad'        => $componente->cantidad,
-                        'tipo'            => 'entrada',
-                        'motivo'          => "Desarmado completo del equipo {$computador->codigo}",
-                        'aprobado_por'    => Auth::user()->name,
-                        'usuario_id'      => Auth::id(),
-                        'origen'          => 'computador_armado',
-                        'origen_id'       => $computador->id,
+                        'producto_id'        => $producto->id,
+                        'nombre_producto'    => $producto->nombre,
+                        'contenedor_id'      => $producto->contenedor,
+                        'cantidad'           => $componente->cantidad,
+                        'tipo'               => 'entrada',
+                        'motivo'             => "Desarmado completo del equipo {$computador->codigo}",
+                        'aprobado_por'       => Auth::user()->name,
+                        'usuario_id'         => Auth::id(),
+                        'origen'             => 'computador_armado',
+                        'origen_id'          => $computador->id,
+                        'origen_tipo'        => 'computador_armado',
+                        'doc_origen'         => 'COMP-' . str_pad($computador->id, 6, '0', STR_PAD_LEFT),
+                        'stock_anterior'     => $stockAntes,
+                        'stock_posterior'    => $producto->stock_actual,
+                        'usuario_ejecutor_id'=> Auth::id(),
                     ]);
                 }
             }

@@ -50,6 +50,19 @@ class ReporteriaIndexController extends Controller
         return view('admin.reportes.historial', compact('reporterias', 'tipos', 'modulos'));
     }
 
+    public function showVp(int $id)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $r = ReporteriaIndexada::findOrFail($id);
+        abort_unless($r->tipo === 'VARIACION_PRESUPUESTARIA', 404);
+
+        $vpId = $r->filtros['vp_historial_id'] ?? null;
+        $vp   = $vpId ? \App\Models\VpHistorial::find($vpId) : null;
+
+        return view('admin.reportes.vp_detalle', compact('r', 'vp'));
+    }
+
     public function descargar(int $id)
     {
         abort_unless(auth()->user()->esAdmin(), 403);

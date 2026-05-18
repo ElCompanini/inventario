@@ -435,21 +435,27 @@ class SicdController extends Controller
                     $detalle->cantidad_recibida = $cantidad;
                     $detalle->save();
 
+                    $stockAntes = $detalle->producto->stock_actual;
                     $detalle->producto->stock_actual += $cantidad;
                     $detalle->producto->actualizarFechasStock();
                     $detalle->producto->save();
 
                     HistorialCambio::create([
-                        'producto_id'     => $detalle->producto_id,
-                        'nombre_producto' => $detalle->producto->nombre,
-                        'contenedor_id'   => $detalle->producto->contenedor,
-                        'cantidad'        => $cantidad,
-                        'tipo'            => 'entrada',
-                        'motivo'          => "Recepción directa – SICD {$sicd->codigo_sicd}",
-                        'aprobado_por' => Auth::user()->name,
-                        'usuario_id'   => Auth::id(),
-                        'origen'       => 'sicd',
-                        'origen_id'    => $sicd->id,
+                        'producto_id'        => $detalle->producto_id,
+                        'nombre_producto'    => $detalle->producto->nombre,
+                        'contenedor_id'      => $detalle->producto->contenedor,
+                        'cantidad'           => $cantidad,
+                        'tipo'               => 'entrada',
+                        'motivo'             => "Recepción directa – SICD {$sicd->codigo_sicd}",
+                        'aprobado_por'       => Auth::user()->name,
+                        'usuario_id'         => Auth::id(),
+                        'origen'             => 'sicd',
+                        'origen_id'          => $sicd->id,
+                        'origen_tipo'        => 'sicd',
+                        'doc_origen'         => 'SICD ' . $sicd->codigo_sicd,
+                        'stock_anterior'     => $stockAntes,
+                        'stock_posterior'    => $detalle->producto->stock_actual,
+                        'usuario_ejecutor_id'=> Auth::id(),
                     ]);
                 }
 
@@ -554,21 +560,27 @@ class SicdController extends Controller
                 if ($item['producto_id']) {
                     $producto = Producto::find($item['producto_id']);
                     if ($producto) {
+                        $stockAntes = $producto->stock_actual;
                         $producto->stock_actual += $cantidad;
                         $producto->actualizarFechasStock();
                         $producto->save();
 
                         HistorialCambio::create([
-                            'producto_id'     => $producto->id,
-                            'nombre_producto' => $producto->nombre,
-                            'contenedor_id'   => $producto->contenedor,
-                            'cantidad'        => $cantidad,
-                            'tipo'            => 'entrada',
-                            'motivo'          => "Recepción directa – SICD {$codigo}",
-                            'aprobado_por' => Auth::user()->name,
-                            'usuario_id'   => Auth::id(),
-                            'origen'       => 'sicd',
-                            'origen_id'    => $sicd->id,
+                            'producto_id'        => $producto->id,
+                            'nombre_producto'    => $producto->nombre,
+                            'contenedor_id'      => $producto->contenedor,
+                            'cantidad'           => $cantidad,
+                            'tipo'               => 'entrada',
+                            'motivo'             => "Recepción directa – SICD {$codigo}",
+                            'aprobado_por'       => Auth::user()->name,
+                            'usuario_id'         => Auth::id(),
+                            'origen'             => 'sicd',
+                            'origen_id'          => $sicd->id,
+                            'origen_tipo'        => 'sicd',
+                            'doc_origen'         => 'SICD ' . $codigo,
+                            'stock_anterior'     => $stockAntes,
+                            'stock_posterior'    => $producto->stock_actual,
+                            'usuario_ejecutor_id'=> Auth::id(),
                         ]);
                     }
                 }

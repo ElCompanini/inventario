@@ -99,6 +99,7 @@
                 <th class="px-4 py-3 font-semibold text-gray-600">Solicitante</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Aprobado por</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Origen</th>
+                <th class="px-4 py-3 font-semibold text-gray-600">Referencia</th>
             </tr>
         </thead>
         <tbody>
@@ -127,15 +128,37 @@
                 <td class="px-4 py-3 text-gray-400 text-xs">—</td>
                 <td class="px-4 py-3">
                     @if($primero->tipo === 'entrada')
-                        <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">↑ Entrada</span>
+                        <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                            <svg style="width:10px;height:10px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+                            </svg>
+                            Entrada
+                        </span>
                     @elseif($primero->tipo === 'salida')
-                        <span class="inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-semibold px-2.5 py-1 rounded-full">↓ Salida</span>
+                        <span class="inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                            <svg style="width:10px;height:10px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+                            </svg>
+                            Salida
+                        </span>
+                    @elseif($primero->tipo === 'devolucion')
+                        <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                            <svg style="width:10px;height:10px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/>
+                            </svg>
+                            Devolución
+                        </span>
+                    @elseif($primero->tipo === 'traslado')
+                        <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">Traslado</span>
                     @else
-                        <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">⇄ Traslado</span>
+                        <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-semibold px-2.5 py-1 rounded-full">{{ ucfirst($primero->tipo) }}</span>
                     @endif
                 </td>
-                <td class="px-4 py-3 font-bold {{ $primero->tipo === 'entrada' ? 'text-green-700' : 'text-orange-600' }}">
-                    {{ $primero->tipo === 'entrada' ? '+' : '−' }}{{ $total }}
+                @php
+                    $esPositivo = in_array($primero->tipo, ['entrada', 'devolucion', 'ajuste']);
+                @endphp
+                <td class="px-4 py-3 font-bold {{ $esPositivo ? 'text-green-700' : 'text-orange-600' }}">
+                    {{ $esPositivo ? '+' : '−' }}{{ abs($total) }}
                 </td>
                 <td class="px-4 py-3 text-gray-600 max-w-xs whitespace-normal break-words">
                     {{ $primero->motivo }}
@@ -188,6 +211,7 @@
                         <span class="text-gray-400 text-xs">—</span>
                     @endif
                 </td>
+                <td class="px-4 py-3 text-gray-400 text-xs">—</td>
             </tr>
 
             @else
@@ -198,8 +222,14 @@
                     {{ $registro->created_at->format('d/m/Y H:i') }}
                 </td>
                 <td class="px-4 py-3" style="max-width:200px;">
-                    @php $nombreP = $registro->producto?->nombre ?? $registro->nombre_producto ?? '—'; @endphp
+                    @php
+                        $nombreP   = $registro->producto?->nombre ?? $registro->nombre_producto ?? '—';
+                        $esServicio = (bool) ($registro->producto?->es_servicio);
+                    @endphp
                     <p class="font-medium text-gray-900 truncate" title="{{ $nombreP }}">{{ $nombreP }}</p>
+                    @if($esServicio)
+                    <span class="badge-servicio">SERVICIO</span>
+                    @endif
                 </td>
                 <td class="px-4 py-3">
                     @php
@@ -208,19 +238,44 @@
                     <span class="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{{ $cNombre }}</span>
                 </td>
                 <td class="px-4 py-3">
-                    @if($registro->tipo === 'entrada')
-                    <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">↑ Entrada</span>
-                    @elseif($registro->tipo === 'salida')
-                    <span class="inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-semibold px-2.5 py-1 rounded-full">↓ Salida</span>
-                    @else
-                    <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">⇄ Traslado</span>
-                    @endif
+                    @php
+                        [$tipoLabel, $tipoStyle] = match($registro->tipo) {
+                            'entrada'    => ['Entrada',    'bg-green-100 text-green-700'],
+                            'devolucion' => ['Devolución', 'bg-green-100 text-green-700'],
+                            'salida'     => ['Salida',     'bg-orange-100 text-orange-700'],
+                            'retiro'     => ['Retiro',     'bg-orange-100 text-orange-700'],
+                            'merma'      => ['Merma',      'bg-red-100 text-red-700'],
+                            'traslado'   => ['Traslado',   'bg-blue-100 text-blue-700'],
+                            'ajuste'     => ['Ajuste',     'bg-gray-100 text-gray-600'],
+                            default      => [ucfirst($registro->tipo), 'bg-gray-100 text-gray-600'],
+                        };
+                        $esPositivo = in_array($registro->tipo, ['entrada', 'devolucion']);
+                        $esNeutro   = $registro->tipo === 'traslado';
+                    @endphp
+                    <span class="inline-flex items-center gap-1 {{ $tipoStyle }} text-xs font-semibold px-2.5 py-1 rounded-full">
+                        @if($registro->tipo === 'entrada')
+                        <svg style="width:10px;height:10px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+                        </svg>
+                        @elseif($registro->tipo === 'salida' || $registro->tipo === 'retiro')
+                        <svg style="width:10px;height:10px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+                        </svg>
+                        @elseif($registro->tipo === 'devolucion')
+                        <svg style="width:10px;height:10px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/>
+                        </svg>
+                        @endif
+                        {{ $tipoLabel }}
+                    </span>
                 </td>
                 <td class="px-4 py-3 font-bold text-gray-800">
-                    @if($registro->tipo === 'traslado')
+                    @if($esNeutro)
                     <span class="text-blue-600">{{ $registro->cantidad }}</span>
+                    @elseif($esPositivo)
+                    <span class="text-green-600">+{{ $registro->cantidad }}</span>
                     @else
-                    {{ $registro->tipo === 'entrada' ? '+' : '−' }}{{ $registro->cantidad }}
+                    <span class="text-red-600">−{{ $registro->cantidad }}</span>
                     @endif
                 </td>
                 <td class="px-4 py-3 text-gray-600 max-w-xs whitespace-normal break-words">
@@ -228,52 +283,126 @@
                 </td>
                 <td class="px-4 py-3 text-gray-700">{{ $registro->usuario->name }}</td>
                 <td class="px-4 py-3 text-gray-700">{{ $registro->aprobado_por ?? '—' }}</td>
-                <td class="px-4 py-3">
-                    @if($registro->origen === 'sicd')
-                    @php
-                        $sicdCodigo = $registro->sicd?->codigo_sicd;
-                        if (!$sicdCodigo && $registro->motivo && str_contains($registro->motivo, 'SICD ')) {
-                            $after = trim(substr($registro->motivo, strpos($registro->motivo, 'SICD ') + 5));
-                            $pos   = strpos($after, ' (');
-                            $sicdCodigo = $pos !== false ? rtrim(substr($after, 0, $pos)) : $after;
-                        }
-                        $sicdCodigo = $sicdCodigo ? 'SICD ' . $sicdCodigo : ('SICD #' . $registro->origen_id);
-                    @endphp
-                    <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
-                    @if(auth()->user()->tienePermiso('sicd'))
-                    <a href="{{ route('admin.sicd.show', $registro->origen_id) }}"
-                        class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-indigo-200 transition">
-                        {{ $sicdCodigo }}
-                    </a>
-                    @else
-                    <span class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">
-                        {{ $sicdCodigo }}
-                    </span>
-                    @endif
-                    @if($registro->sicd?->boleta)
-                    <a href="{{ route('admin.sicd.descargar', $registro->origen_id) }}"
-                       class="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition whitespace-nowrap">
-                        Ver boleta
-                    </a>
-                    @endif
-                    </div>
-                    @elseif($registro->origen === 'solicitud')
-                    <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">
-                        Solicitud #{{ $registro->origen_id }}
-                    </span>
-                    @elseif($registro->origen === 'gasto_menor')
-                    @php $gmNum = $registro->gastoMenor?->id_gm ?? null; @endphp
-                    <a href="{{ route('admin.gastos-menores.index') }}{{ $gmNum ? '?gm=' . $gmNum : '' }}"
-                       class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full font-mono transition"
-                       style="background:#fef3c7; color:#b45309;"
-                       onmouseover="this.style.background='#fde68a'"
-                       onmouseout="this.style.background='#fef3c7'">
-                        {{ $gmNum ? 'GM-' . str_pad($gmNum, 4, '0', STR_PAD_LEFT) : 'Gasto Menor' }}
-                    </a>
-                    @else
-                    <span class="text-gray-400 text-xs">—</span>
-                    @endif
-                </td>
+                @php
+    $histRef    = null;
+    $origenTipo = $registro->origen_tipo ?: null;
+
+    // Pre-compute histRef from stored referencia fields (DB authoritative values)
+    if (!empty($registro->referencia_tipo) && !empty($registro->referencia_id)) {
+        $histRef = match($registro->referencia_tipo) {
+            'solicitud' => 'SOL-' . str_pad($registro->referencia_id, 6, '0', STR_PAD_LEFT),
+            default     => $registro->doc_referencia,
+        };
+    } elseif (!empty($registro->doc_referencia)) {
+        $histRef = $registro->doc_referencia;
+    }
+@endphp
+<td class="px-4 py-3">
+
+    {{-- 1. SOLICITUD APROBADA (nueva con origen_tipo, o legacy con origen_id) --}}
+    @if($origenTipo === 'solicitud' || ($origenTipo === null && $registro->origen === 'solicitud' && $registro->origen_id && $registro->tipo !== 'devolucion'))
+    @php $solCode = $registro->doc_origen ?: 'SOL-' . str_pad($registro->origen_id, 6, '0', STR_PAD_LEFT); @endphp
+    <span class="inline-flex items-center bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full font-mono">{{ $solCode }}</span>
+
+    {{-- 2. DEVOLUCIÓN --}}
+    @elseif($origenTipo === 'devolucion' || ($origenTipo === null && $registro->tipo === 'devolucion' && $registro->origen === 'solicitud' && $registro->origen_id))
+    @php
+        $devCode = $registro->doc_origen ?: ('DEV-' . str_pad($registro->id, 6, '0', STR_PAD_LEFT));
+        if (empty($histRef) && $registro->origen_id) {
+            $histRef = 'SOL-' . str_pad($registro->origen_id, 6, '0', STR_PAD_LEFT);
+        }
+    @endphp
+    <span class="inline-flex items-center bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full font-mono">{{ $devCode }}</span>
+
+    {{-- 3. RETIRO DIRECTO ADMINISTRATIVO (sin solicitud real) --}}
+    @elseif($origenTipo === 'retiro_directo')
+    @php $retCode = $registro->doc_origen ?: ('RET-' . str_pad($registro->id, 6, '0', STR_PAD_LEFT)); @endphp
+    <span class="inline-flex items-center bg-red-100 text-red-600 text-xs font-semibold px-2 py-0.5 rounded-full font-mono">{{ $retCode }}</span>
+
+    {{-- 4. SICD / ORDEN COMPRA --}}
+    @elseif($registro->origen === 'sicd' || $origenTipo === 'sicd' || $origenTipo === 'orden_compra')
+    @php
+        $sicdCodigo = $registro->sicd?->codigo_sicd;
+        if (!$sicdCodigo && $registro->motivo && str_contains($registro->motivo, 'SICD ')) {
+            $after = trim(substr($registro->motivo, strpos($registro->motivo, 'SICD ') + 5));
+            $pos   = strpos($after, ' (');
+            $sicdCodigo = $pos !== false ? rtrim(substr($after, 0, $pos)) : $after;
+        }
+        $sicdLabel = $sicdCodigo ? 'SICD ' . $sicdCodigo : ('SICD #' . $registro->origen_id);
+        $ocNumero  = $registro->ordenCompra?->numero_oc;
+        if (empty($histRef)) $histRef = $ocNumero ? $sicdLabel : null;
+    @endphp
+    @if($ocNumero)
+    <span class="inline-flex items-center bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-0.5 rounded-full font-mono">OC {{ $ocNumero }}</span>
+    @elseif(auth()->user()->tienePermiso('sicd'))
+    <a href="{{ route('admin.sicd.show', $registro->origen_id) }}"
+       class="inline-flex items-center bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-indigo-200 transition font-mono">
+        {{ $sicdLabel }}
+    </a>
+    @else
+    <span class="inline-flex items-center bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full font-mono">{{ $sicdLabel }}</span>
+    @endif
+    @if($registro->sicd?->boleta)
+    <a href="{{ route('admin.sicd.descargar', $registro->origen_id) }}"
+       class="text-xs font-medium text-gray-400 hover:text-gray-600 transition" style="display:block; margin-top:2px; font-size:.68rem;">
+        Ver boleta
+    </a>
+    @endif
+
+    {{-- 5. GASTO MENOR (COMPRA DIRECTA) --}}
+    @elseif($registro->origen === 'gasto_menor' || $origenTipo === 'gasto_menor')
+    @php $gmNum = $registro->gastoMenor?->id_gm ?? null; @endphp
+    <a href="{{ route('admin.gastos-menores.index') }}{{ $gmNum ? '?gm=' . $gmNum : '' }}"
+       class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full font-mono transition"
+       style="background:#fef3c7; color:#b45309;"
+       onmouseover="this.style.background='#fde68a'"
+       onmouseout="this.style.background='#fef3c7'">
+        {{ $gmNum ? 'GM-' . str_pad($gmNum, 4, '0', STR_PAD_LEFT) : 'Gasto Menor' }}
+    </a>
+
+    {{-- 6. COMPUTADOR ARMADO --}}
+    @elseif($registro->origen === 'computador_armado' || $origenTipo === 'computador_armado')
+    @php $compCode = $registro->doc_origen ?: ('COMP-' . str_pad($registro->origen_id, 6, '0', STR_PAD_LEFT)); @endphp
+    <span class="inline-flex items-center bg-cyan-100 text-cyan-700 text-xs font-semibold px-2 py-0.5 rounded-full font-mono">{{ $compCode }}</span>
+
+    {{-- 7. AJUSTE / ENTRADA MANUAL / MERMA --}}
+    @elseif(in_array($origenTipo, ['ajuste', 'entrada_manual', 'merma']) || (in_array($registro->tipo, ['ajuste', 'entrada']) && !$registro->origen))
+    @php $ajuCode = $registro->doc_origen ?: ('AJU-' . str_pad($registro->id, 6, '0', STR_PAD_LEFT)); @endphp
+    <span class="inline-flex items-center bg-gray-100 text-gray-500 text-xs font-semibold px-2 py-0.5 rounded-full font-mono">{{ $ajuCode }}</span>
+
+    {{-- 8. TRASLADO --}}
+    @elseif($origenTipo === 'traslado' || $registro->tipo === 'traslado')
+    @php $movCode = $registro->doc_origen ?: ('MOV-' . str_pad($registro->id, 6, '0', STR_PAD_LEFT)); @endphp
+    <span class="inline-flex items-center bg-blue-50 text-blue-600 text-xs font-semibold px-2 py-0.5 rounded-full font-mono">{{ $movCode }}</span>
+
+    {{-- 9. SALIDA / RETIRO SIN ORIGEN DEFINIDO (fallback legacy) --}}
+    @elseif(in_array($registro->tipo, ['salida', 'retiro', 'merma']) || ($registro->origen === 'solicitud' && !$registro->origen_id))
+    @php $retCode = $registro->doc_origen ?: ('RET-' . str_pad($registro->id, 6, '0', STR_PAD_LEFT)); @endphp
+    <span class="inline-flex items-center bg-red-100 text-red-600 text-xs font-semibold px-2 py-0.5 rounded-full font-mono">{{ $retCode }}</span>
+
+    @else
+    <span class="text-gray-400 text-xs">—</span>
+    @endif
+</td>
+@php
+    if (empty($histRef) && !empty($registro->doc_referencia)) {
+        $histRef = $registro->doc_referencia;
+    }
+@endphp
+<td class="px-4 py-3">
+    @if($histRef)
+    @if(($registro->origen === 'sicd' || $origenTipo === 'sicd') && auth()->user()->tienePermiso('sicd'))
+    <a href="{{ route('admin.sicd.show', $registro->origen_id) }}"
+       class="inline-flex items-center bg-indigo-50 text-indigo-500 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-indigo-100 transition font-mono">
+        {{ $histRef }}
+    </a>
+    @else
+    <span class="inline-flex items-center bg-gray-100 text-gray-500 text-xs font-semibold px-2 py-0.5 rounded-full font-mono">{{ $histRef }}</span>
+    @endif
+    @else
+    <span class="text-gray-300 text-xs">—</span>
+    @endif
+</td>
             </tr>
             @endif
 
@@ -297,6 +426,8 @@
     tr.fila-grupo.shown, tr.dt-hasChild { background:#eef2ff !important; }
 
     /* Dark mode — fila-grupo: light colors override to dark */
+    .badge-servicio { font-size:.6rem; font-weight:700; letter-spacing:.04em; background:#ede9fe; color:#5b21b6; padding:1px 6px; border-radius:9999px; display:inline-block; margin-top:2px; }
+    html.dark .badge-servicio { background:rgba(139,92,246,0.2); color:#c4b5fd; }
     html.dark tr.fila-grupo                      { background:#1a2540 !important; }
     html.dark tr.fila-grupo.shown,
     html.dark tr.dt-hasChild                     { background:rgba(99,102,241,.18) !important; }
@@ -330,7 +461,7 @@ $(document).ready(function() {
 
     function alinearSubtabla(childNode) {
         const ths = document.querySelectorAll('#tabla-historial thead th');
-        // Índices en la tabla padre: 0=Fecha,1=Producto,2=Contenedor,3=Tipo,4=Cantidad,5=Motivo,6=Solicitante,7=Aprobado,8=Origen
+        // Índices en la tabla padre: 0=Fecha,1=Producto,2=Contenedor,3=Tipo,4=Cantidad,5=Motivo,6=Solicitante,7=Aprobado,8=Origen,9=Referencia
         const fechaW     = ths[0] ? ths[0].offsetWidth : 0;
         const productoW  = ths[1] ? ths[1].offsetWidth : 200;
         const contenW    = ths[2] ? ths[2].offsetWidth : 120;

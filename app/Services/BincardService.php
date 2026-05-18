@@ -20,7 +20,7 @@ class BincardService
         // ── 1. Cargar movimientos ──────────────────────────────────────────
         $query = HistorialCambio::withTrashed()
             ->where('producto_id', $producto->id)
-            ->with(['usuario:id,name'])
+            ->with(['usuario:id,name', 'usuarioEjecutor:id,name'])
             ->orderBy('created_at')
             ->orderBy('id');
 
@@ -32,6 +32,15 @@ class BincardService
         }
         if (!empty($filtros['tipo'])) {
             $query->where('tipo', $filtros['tipo']);
+        }
+        if (!empty($filtros['origen'])) {
+            $query->where('origen', $filtros['origen']);
+        }
+        if (!empty($filtros['registrado_por'])) {
+            $query->where('aprobado_por', 'like', '%' . $filtros['registrado_por'] . '%');
+        }
+        if (!empty($filtros['usuario'])) {
+            $query->whereHas('usuario', fn($q) => $q->where('name', 'like', '%' . $filtros['usuario'] . '%'));
         }
 
         $movimientos = $query->get();
@@ -71,9 +80,6 @@ class BincardService
             return ($p->origen_tipo ?? '') . '|' . ($p->origen_id ?? '');
         });
 
-        // Alias para compatibilidad con código de GastoMenor más abajo
-        $precios = $preciosRaw;
-
         // ── 4. Construir filas BINCARD con saldo acumulado ────────────────
         $saldoAcum    = 0;
         $costoPromedio = 0.0;
@@ -82,25 +88,27 @@ class BincardService
 
         foreach ($movimientos as $mov) {
             // Determinar entrada / salida
-            $esEntrada = in_array($mov->tipo, ['entrada']);
+            // 'devolucion' suma stock → se muestra en columna Entrada del kardex
+            $esEntrada = in_array($mov->tipo, ['entrada', 'devolucion']);
             $esSalida  = in_array($mov->tipo, ['salida', 'retiro', 'merma']);
 
             $entrada = $esEntrada ? $mov->cantidad : null;
             $salida  = $esSalida  ? $mov->cantidad : null;
             $ajuste  = (!$esEntrada && !$esSalida) ? $mov->cantidad : null;
 
+            $saldoAntes = $saldoAcum; // capturar ANTES del movimiento para auditoría
             $saldoAcum += $esEntrada ? $mov->cantidad : ($esSalida ? -$mov->cantidad : 0);
 
             // ── Enriquecer con documento y proveedor ──────────────────────
             $tipoDoc    = '—';
             $nDoc       = '—';
+            $nRef       = null;  // documento padre / referencia
             $rutProv    = '—';
             $proveedor  = '—';
             $costoUnit  = null;
 
             if ($mov->origen === 'sicd' && isset($sicds[$mov->origen_id])) {
                 $sicd      = $sicds[$mov->origen_id];
-                $tipoDoc   = 'SICD';
                 $sicdLabel = 'SICD ' . $sicd->codigo_sicd;
 
                 // ── Granularidad: cada movimiento tiene su propia OC ──────
@@ -108,16 +116,16 @@ class BincardService
                 // Prioridad 2: fallback por motivo o todas las OC (registros históricos)
 
                 if ($mov->orden_compra_id && isset($ocsDirectas[$mov->orden_compra_id])) {
-                    // ✅ Link directo — muestra SOLO la OC que causó este ingreso
+                    // Origen directo = OC · Referencia = SICD
                     $ocDirecta = $ocsDirectas[$mov->orden_compra_id];
-                    $tipoDoc   = 'SICD / OC';
-                    $nDoc      = $sicdLabel . ' | OC ' . $ocDirecta->numero_oc;
+                    $tipoDoc   = 'OC';
+                    $nDoc      = 'OC ' . $ocDirecta->numero_oc;
+                    $nRef      = $sicdLabel;
                     $rutProv   = $ocDirecta->api_proveedor_rut   ?? '—';
                     $proveedor = $ocDirecta->api_proveedor_nombre ?? '—';
 
                 } else {
-                    // ⚠️ Fallback para registros históricos sin orden_compra_id:
-                    // Intentar parsear el motivo ("OC 2770-339-SE25 – SICD ...")
+                    // ⚠️ Fallback para registros históricos sin orden_compra_id
                     $ocFromMotivo = null;
                     if (preg_match('/OC\s+([\w\-\.]+)/i', $mov->motivo ?? '', $m)) {
                         $ocFromMotivo = $ocsPorSicd[$sicd->id]?->ordenesCompra
@@ -125,52 +133,78 @@ class BincardService
                     }
 
                     if ($ocFromMotivo) {
-                        $tipoDoc   = 'SICD / OC';
-                        $nDoc      = $sicdLabel . ' | OC ' . $ocFromMotivo->numero_oc;
+                        $tipoDoc   = 'OC';
+                        $nDoc      = 'OC ' . $ocFromMotivo->numero_oc;
+                        $nRef      = $sicdLabel;
                         $rutProv   = $ocFromMotivo->api_proveedor_rut   ?? '—';
                         $proveedor = $ocFromMotivo->api_proveedor_nombre ?? '—';
                     } else {
-                        // Último recurso: mostrar todas las OC (comportamiento antiguo)
+                        // Sin OC asociada: el documento directo es la SICD
                         $todasOcs = $ocsPorSicd[$sicd->id]?->ordenesCompra ?? collect();
-                        $ocNums   = $todasOcs->pluck('numero_oc')->filter()->values();
-                        $nDoc     = $ocNums->isNotEmpty()
-                            ? $sicdLabel . ' | OC: ' . $ocNums->join(' / ')
-                            : $sicdLabel;
+                        $tipoDoc  = $todasOcs->isNotEmpty() ? 'SICD / OC' : 'SICD';
+                        $nDoc     = $sicdLabel;
+                        if ($todasOcs->count() === 1) {
+                            $nRef = 'OC ' . $todasOcs->first()->numero_oc;
+                        } elseif ($todasOcs->count() > 1) {
+                            $nRef = 'OC: ' . $todasOcs->pluck('numero_oc')->filter()->join(' / ');
+                        }
                         $rutProv   = $todasOcs->pluck('api_proveedor_rut')->filter()->unique()->join(' / ') ?: '—';
                         $proveedor = $todasOcs->pluck('api_proveedor_nombre')->filter()->unique()->join(' / ') ?: ($sicd->proveedor_nombre ?? '—');
-                        if ($todasOcs->isNotEmpty()) $tipoDoc = 'SICD / OC';
                     }
                 }
 
-                // Si aún no hay proveedor (SICD sin OC, carga manual directa), usar datos del SICD
+                // Si aún no hay proveedor (SICD sin OC), usar datos del SICD
                 if ($proveedor === '—' && $sicd->proveedor_nombre) {
                     $proveedor = $sicd->proveedor_nombre;
                     $rutProv   = $sicd->rut_proveedor ?? $rutProv;
-                    if ($sicd->folio) $nDoc .= ' | Folio ' . $sicd->folio;
                 }
 
                 // Costo: lookup granular por SICD + OC específica (prioridad 1)
-                // → evita ambigüedad cuando múltiples OCs comparten una SICD
                 $precioKey = 'Sicd|' . $sicd->id . '|' . ($mov->orden_compra_id ?? '');
                 $precio = $preciosPorOrigenOc[$precioKey]
-                    // Fallback: primer precio con ese sicd_id (registros históricos)
                     ?? $preciosPorOrigen->get('Sicd|' . $sicd->id)?->first();
                 if ($precio) $costoUnit = round($precio->precio_neto * 1.19, 2);
 
             } elseif ($mov->origen === 'gasto_menor' && isset($gastos[$mov->origen_id])) {
-                $gasto   = $gastos[$mov->origen_id];
-                $tipoDoc = 'Boleta/Factura';
-                $nDoc      = $gasto->folio;
-                $rutProv   = $gasto->rut_proveedor;
-                $proveedor = $gasto->proveedor_nombre ?? '—';
+                $gasto        = $gastos[$mov->origen_id];
+                $tipoDoc      = 'Compra Directa';
+                $nDoc         = 'GM-' . str_pad($gasto->id_gm, 4, '0', STR_PAD_LEFT);
+                $nRef         = $gasto->folio ? 'Folio ' . $gasto->folio : null;
+                $rutProv      = $gasto->rut_proveedor;
+                $proveedor    = $gasto->proveedor_nombre ?? '—';
                 $precioNetaGM = $gasto->precio_neto ?: ($gasto->cantidad > 0 ? round($gasto->monto / $gasto->cantidad, 2) : null);
-                $costoUnit = $precioNetaGM !== null ? round($precioNetaGM * 1.19, 2) : null;
+                $costoUnit    = $precioNetaGM !== null ? round($precioNetaGM * 1.19, 2) : null;
 
+            } elseif ($mov->origen === 'solicitud' && $mov->origen_id) {
+                $solCode = 'SOL-' . str_pad($mov->origen_id, 6, '0', STR_PAD_LEFT);
+                if ($mov->tipo === 'devolucion') {
+                    $tipoDoc = 'Devolución';
+                    $nDoc    = 'DEV-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT);
+                    $nRef    = $solCode;
+                } else {
+                    $tipoDoc = 'Solicitud';
+                    $nDoc    = $solCode;
+                }
+            } elseif ($mov->tipo === 'ajuste') {
+                $tipoDoc = 'Ajuste Manual';
+                $nDoc    = 'AJU-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT);
+            } elseif ($mov->tipo === 'traslado') {
+                $tipoDoc = 'Traslado';
+                $nDoc    = 'MOV-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT);
             } elseif ($mov->tipo === 'entrada') {
-                $tipoDoc = 'Documento Interno';
+                $tipoDoc = 'Entrada Manual';
+                $nDoc    = 'AJU-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT);
+            } elseif ($mov->tipo === 'salida') {
+                $tipoDoc = 'Salida Manual';
+                $nDoc    = 'RET-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT);
             } else {
                 $tipoDoc = 'Movimiento Interno';
+                $nDoc    = 'AJU-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT);
             }
+
+            // ── Prefer stored traceability fields over computed values ────
+            if (!empty($mov->doc_origen))    $nDoc = $mov->doc_origen;
+            if (!empty($mov->doc_referencia)) $nRef = $mov->doc_referencia;
 
             // ── Calcular costo promedio ponderado (AVCO) ──────────────────
             if ($esEntrada && $costoUnit !== null && $costoUnit > 0) {
@@ -186,29 +220,79 @@ class BincardService
             $valorMov   = $costoUnit !== null ? round($costoUnit * $mov->cantidad, 2) : null;
             $valorSaldo = $costoPromedio > 0 ? round($costoPromedio * max(0, $saldoAcum), 2) : null;
 
+            // Etiqueta de origen: legacy match como base, luego origen_tipo tiene prioridad
+            $origenLabel = match(true) {
+                $mov->origen === 'sicd'              => 'Compra',
+                $mov->origen === 'gasto_menor'       => 'Compra',
+                $mov->origen === 'solicitud' && $mov->tipo === 'devolucion' => 'Devolución',
+                $mov->origen === 'solicitud'         => 'Solicitud',
+                $mov->origen === 'computador_armado' => 'Armado',
+                $mov->tipo   === 'traslado'          => 'Traslado',
+                $mov->tipo   === 'ajuste'            => 'Ajuste',
+                $mov->tipo   === 'merma'             => 'Ajuste',
+                default                              => 'Manual',
+            };
+
+            // origen_tipo siempre tiene prioridad sobre el match legacy
+            if (!empty($mov->origen_tipo)) {
+                $origenLabel = match($mov->origen_tipo) {
+                    'solicitud'         => 'Solicitud',
+                    'devolucion'        => 'Devolución',
+                    'retiro_directo'    => 'Manual',
+                    'sicd'             => 'Compra',
+                    'orden_compra'     => 'Compra',
+                    'gasto_menor'      => 'Compra',
+                    'computador_armado'=> 'Armado',
+                    'ajuste'           => 'Ajuste',
+                    'traslado'         => 'Traslado',
+                    'entrada_manual'   => 'Manual',
+                    'merma'            => 'Ajuste',
+                    default            => $origenLabel,
+                };
+            }
+
             $rows[] = [
-                'fecha'           => $mov->created_at->format('d/m/Y H:i'),
-                'tipo_movimiento' => ucfirst($mov->tipo),
-                'tipo_documento'  => $tipoDoc,
-                'n_documento'     => $nDoc,
-                'rut_proveedor'   => $rutProv,
-                'proveedor'       => $proveedor,
-                'entrada'         => $entrada,
-                'salida'          => $salida,
-                'ajuste'          => $ajuste,
-                'saldo'           => $saldoAcum,
-                'costo_unitario'  => $costoUnit,
-                'valor_movimiento'=> $valorMov,
-                'costo_promedio'  => round($costoPromedio, 2) ?: null,
-                'valor_saldo'     => $valorSaldo,
-                'usuario'         => $mov->usuario?->name ?? $mov->aprobado_por ?? '—',
-                'observaciones'   => $mov->motivo ?? '—',
-                '_origen'         => $mov->origen,
-                '_origen_id'      => $mov->origen_id,
+                'fecha'            => $mov->created_at->format('d/m/Y H:i'),
+                'tipo_movimiento'  => ucfirst($mov->tipo),
+                'origen_label'     => $origenLabel,
+                'tipo_documento'   => $tipoDoc,
+                'n_documento'      => $nDoc,
+                'n_referencia'     => $nRef,
+                'rut_proveedor'    => $rutProv,
+                'proveedor'        => $proveedor,
+                // Prefer DB-stored stock_anterior (ground truth) over computed running balance
+                'stock_anterior'   => $mov->stock_anterior ?? $saldoAntes,
+                'entrada'          => $entrada,
+                'salida'           => $salida,
+                'ajuste'           => $ajuste,
+                'saldo'            => $saldoAcum,
+                'costo_unitario'   => $costoUnit,
+                'valor_movimiento' => $valorMov,
+                'costo_promedio'   => round($costoPromedio, 2) ?: null,
+                'valor_saldo'      => $valorSaldo,
+                'usuario'          => $mov->usuario?->name ?? '—',
+                // Prefer FK executor over stored name string
+                'registrado_por'   => $mov->usuarioEjecutor?->name ?? $mov->aprobado_por ?? $mov->usuario?->name ?? '—',
+                'codigo_movimiento'=> $mov->codigo_movimiento,
+                'observaciones'    => $mov->motivo ?? '—',
+                '_origen'          => $mov->origen,
+                '_origen_id'       => $mov->origen_id,
+                '_mov_id'          => $mov->id,
+                'origen_tipo'      => $mov->origen_tipo,
             ];
         }
 
-        // ── 5. Estadísticas resumen ───────────────────────────────────────
+        // ── 5. Post-filtros sobre datos enriquecidos ─────────────────────
+        if (!empty($filtros['proveedor_filtro'])) {
+            $pf = mb_strtolower($filtros['proveedor_filtro']);
+            $rows = array_values(array_filter($rows, fn($r) => str_contains(mb_strtolower($r['proveedor']), $pf)));
+        }
+        if (!empty($filtros['n_documento_filtro'])) {
+            $nf = mb_strtolower($filtros['n_documento_filtro']);
+            $rows = array_values(array_filter($rows, fn($r) => str_contains(mb_strtolower($r['n_documento']), $nf)));
+        }
+
+        // ── 6. Estadísticas resumen ───────────────────────────────────────
         $totalEntradas = collect($rows)->sum('entrada');
         $totalSalidas  = collect($rows)->sum('salida');
         $ultimoCosto   = collect($rows)->whereNotNull('costo_unitario')->last()['costo_unitario'] ?? null;

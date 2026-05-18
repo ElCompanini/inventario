@@ -63,19 +63,20 @@ class ReporteriaService
     public static function tipos(): array
     {
         return [
-            'BINCARD_VISTA'      => 'BINCARD – Vista en pantalla',
-            'BINCARD_EXCEL'      => 'BINCARD – Excel',
-            'BINCARD_PDF'        => 'BINCARD – PDF',
-            'INVENTARIO_EXCEL'   => 'Inventario – Excel',
-            'INVENTARIO_PDF'     => 'Inventario – PDF',
-            'GASTOS_MENORES'     => 'Gastos Menores',
-            'SICD'               => 'SICD',
-            'ORDENES_COMPRA'     => 'Órdenes de Compra',
-            'HISTORIAL_STOCK'    => 'Historial de Stock',
-            'VALORIZACION'       => 'Valorización',
-            'AUDITORIA'          => 'Auditoría',
-            'ACTIVIDAD_EXCEL'    => 'Actividad Reciente – Excel',
-            'ACTIVIDAD_PDF'      => 'Actividad Reciente – PDF',
+            'BINCARD_VISTA'            => 'BINCARD – Vista en pantalla',
+            'BINCARD_EXCEL'            => 'BINCARD – Excel',
+            'BINCARD_PDF'              => 'BINCARD – PDF',
+            'INVENTARIO_EXCEL'         => 'Inventario – Excel',
+            'INVENTARIO_PDF'           => 'Inventario – PDF',
+            'GASTOS_MENORES'           => 'Gastos Menores',
+            'SICD'                     => 'SICD',
+            'ORDENES_COMPRA'           => 'Órdenes de Compra',
+            'HISTORIAL_STOCK'          => 'Historial de Stock',
+            'VALORIZACION'             => 'Valorización',
+            'AUDITORIA'                => 'Auditoría',
+            'ACTIVIDAD_EXCEL'          => 'Actividad Reciente – Excel',
+            'ACTIVIDAD_PDF'            => 'Actividad Reciente – PDF',
+            'VARIACION_PRESUPUESTARIA' => 'Variación Presupuestaria',
         ];
     }
 

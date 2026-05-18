@@ -6,6 +6,7 @@ use App\Models\Categoria;
 use App\Models\Familia;
 use App\Models\Marca;
 use App\Models\Solicitud;
+use App\Models\SolicitudDevolucion;
 use App\Models\Producto;
 use App\Models\Container;
 use App\Models\HistorialCambio;
@@ -37,12 +38,253 @@ class AdminController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        // Solicitudes de salida en proceso de devolución (sin límite de tiempo)
+        $solicitudesAprobadas = Solicitud::with([
+                'producto' => fn($q) => $q->withoutGlobalScopes(),
+                'usuario',
+            ])
+            ->whereIn('estado', ['aprobado', 'en_devolucion'])
+            ->where('tipo', 'salida')
+            ->whereHas('producto', fn($q) => $q->withoutGlobalScopes()
+                ->where('es_servicio', false)
+                ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId))
+            )
+            ->orderByDesc('created_at')
+            ->get();
+
+        // Total ya devuelto por solicitud
+        $devolucionesPorSolicitud = HistorialCambio::where('tipo', 'devolucion')
+            ->where('origen', 'solicitud')
+            ->whereIn('origen_id', $solicitudesAprobadas->pluck('id'))
+            ->selectRaw('origen_id, SUM(cantidad) as total_devuelto')
+            ->groupBy('origen_id')
+            ->pluck('total_devuelto', 'origen_id');
+
         $containers = Container::orderBy('nombre')
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get(['id', 'nombre']);
 
-        return view('admin.solicitudes', compact('solicitudes', 'containers'));
+        // Solicitudes de devolución de usuarios pendientes de aprobación
+        $solicitudesDevolucionPendientes = SolicitudDevolucion::with([
+                'solicitud',
+                'producto' => fn($q) => $q->withoutGlobalScopes(),
+                'usuario',
+            ])
+            ->where('estado', 'pendiente')
+            ->when($ccId, fn($q) => $q->whereHas('producto', fn($q2) => $q2->withoutGlobalScopes()
+                ->where('centro_costo_id', $ccId)))
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('admin.solicitudes', compact(
+            'solicitudes', 'containers',
+            'solicitudesAprobadas', 'devolucionesPorSolicitud',
+            'solicitudesDevolucionPendientes'
+        ));
     }
+
+    public function registrarDevolucion(int $id, Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
+
+        $solicitud = Solicitud::with('producto')->findOrFail($id);
+
+        if (!in_array($solicitud->estado, ['aprobado', 'en_devolucion']) || $solicitud->tipo !== 'salida') {
+            return back()->with('error', 'Solo se pueden registrar devoluciones para solicitudes de salida aprobadas o en proceso de devolución.');
+        }
+
+        $producto = $solicitud->producto;
+        if (!$producto || $producto->es_servicio) {
+            return back()->with('error', 'El producto no es válido para devoluciones de stock físico.');
+        }
+
+        // Calcular máximo devolvible
+        $yaDevuelto  = HistorialCambio::where('tipo', 'devolucion')
+            ->where('origen', 'solicitud')
+            ->where('origen_id', $solicitud->id)
+            ->sum('cantidad');
+        $maxDevolver = $solicitud->cantidad - (int) $yaDevuelto;
+
+        if ($maxDevolver <= 0) {
+            return back()->with('error', 'Ya se registró la devolución total de esta solicitud.');
+        }
+
+        $data = $request->validate([
+            'cantidad_devolucion' => ['required', 'integer', 'min:1', 'max:' . $maxDevolver],
+            'motivo_devolucion'   => ['required', 'string', 'min:5', 'max:500'],
+        ], [
+            'cantidad_devolucion.required' => 'La cantidad es obligatoria.',
+            'cantidad_devolucion.integer'  => 'La cantidad debe ser un número entero.',
+            'cantidad_devolucion.min'      => 'La cantidad mínima es 1.',
+            'cantidad_devolucion.max'      => "No puede devolver más de {$maxDevolver} unidad(es) (entregadas: {$solicitud->cantidad}, ya devueltas: {$yaDevuelto}).",
+            'motivo_devolucion.required'   => 'El motivo es obligatorio.',
+            'motivo_devolucion.min'        => 'El motivo debe tener al menos 5 caracteres.',
+        ]);
+
+        DB::transaction(function () use ($solicitud, $producto, $data) {
+            $cantidad   = (int) $data['cantidad_devolucion'];
+            $stockAntes = $producto->stock_actual;
+
+            $producto->stock_actual += $cantidad;
+            $producto->actualizarFechasStock();
+            $producto->save();
+
+            HistorialCambio::create([
+                'producto_id'        => $producto->id,
+                'nombre_producto'    => $producto->nombre,
+                'contenedor_id'      => $producto->contenedor,
+                'cantidad'           => $cantidad,
+                'tipo'               => 'devolucion',
+                'motivo'             => $data['motivo_devolucion'],
+                'aprobado_por'       => Auth::user()->name,
+                'usuario_id'         => $solicitud->usuario_id,
+                'origen'             => 'solicitud',
+                'origen_id'          => $solicitud->id,
+                'origen_tipo'        => 'devolucion',
+                'referencia_tipo'    => 'solicitud',
+                'referencia_id'      => $solicitud->id,
+                'doc_referencia'     => 'SOL-' . str_pad($solicitud->id, 6, '0', STR_PAD_LEFT),
+                'stock_anterior'     => $stockAntes,
+                'stock_posterior'    => $producto->stock_actual,
+                'usuario_ejecutor_id'=> Auth::id(),
+            ]);
+        });
+
+        $qty = (int) $data['cantidad_devolucion'];
+        return back()->with('success', "Devolución de {$qty} unidad(es) de «{$producto->nombre}» registrada. Stock actualizado.");
+    }
+
+    public function abrirDevolucion(int $id)
+    {
+        abort_unless(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
+
+        $solicitud = Solicitud::with('producto')->findOrFail($id);
+
+        if ($solicitud->estado !== 'aprobado') {
+            return back()->with('error', 'Solo se puede abrir el proceso de devolución en solicitudes con estado "Aprobado".');
+        }
+        if ($solicitud->tipo !== 'salida') {
+            return back()->with('error', 'Solo las solicitudes de salida pueden tener devoluciones.');
+        }
+
+        $solicitud->update(['estado' => 'en_devolucion']);
+
+        return back()->with('success', "Proceso de devolución abierto para «{$solicitud->producto?->nombre}». Ya puedes registrar unidades devueltas.");
+    }
+
+    public function cerrarDevolucion(int $id)
+    {
+        abort_unless(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
+
+        $solicitud = Solicitud::findOrFail($id);
+
+        if ($solicitud->estado !== 'en_devolucion') {
+            return back()->with('error', 'Solo se pueden cerrar solicitudes que estén en proceso de devolución.');
+        }
+
+        $solicitud->update(['estado' => 'cerrada']);
+
+        return back()->with('success', "Solicitud #{$id} cerrada correctamente. No se podrán registrar más devoluciones.");
+    }
+
+    public function aprobarDevolucion(int $id)
+    {
+        abort_unless(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
+
+        $solicitudDev = SolicitudDevolucion::with([
+            'solicitud',
+            'producto' => fn($q) => $q->withoutGlobalScopes(),
+        ])->findOrFail($id);
+
+        if ($solicitudDev->estado !== 'pendiente') {
+            return back()->with('error', 'Esta solicitud de devolución ya fue procesada.');
+        }
+
+        $producto = $solicitudDev->producto;
+        if (!$producto || $producto->es_servicio) {
+            return back()->with('error', 'Producto no válido para devolución de stock físico.');
+        }
+
+        // Recalcular máximo devolvible con aprobadas al momento de la acción
+        $solicitud     = $solicitudDev->solicitud;
+        $yaDevuelto    = SolicitudDevolucion::where('solicitud_id', $solicitudDev->solicitud_id)
+            ->where('estado', 'aprobada')
+            ->sum('cantidad');
+        $maxDevolvible = $solicitud->cantidad - (int)$yaDevuelto;
+
+        if ($solicitudDev->cantidad > $maxDevolvible) {
+            $solicitudDev->update([
+                'estado'         => 'rechazada',
+                'aprobado_por_id'=> Auth::id(),
+                'motivo_rechazo' => 'Excede el saldo devolvible al momento de la aprobación (ya se aprobaron otras devoluciones).',
+            ]);
+            return back()->with('error', 'La cantidad solicitada excede el saldo devolvible. La solicitud fue rechazada automáticamente.');
+        }
+
+        DB::transaction(function () use ($solicitudDev, $producto) {
+            $stockAntes = $producto->stock_actual;
+
+            $producto->stock_actual += $solicitudDev->cantidad;
+            $producto->actualizarFechasStock();
+            $producto->save();
+
+            HistorialCambio::create([
+                'producto_id'        => $producto->id,
+                'nombre_producto'    => $producto->nombre,
+                'contenedor_id'      => $producto->contenedor,
+                'cantidad'           => $solicitudDev->cantidad,
+                'tipo'               => 'devolucion',
+                'motivo'             => $solicitudDev->motivo,
+                'aprobado_por'       => Auth::user()->name,
+                'usuario_id'         => $solicitudDev->usuario_id,
+                'origen'             => 'solicitud',
+                'origen_id'          => $solicitudDev->solicitud_id,
+                'origen_tipo'        => 'devolucion',
+                'referencia_tipo'    => 'solicitud',
+                'referencia_id'      => $solicitudDev->solicitud_id,
+                'stock_anterior'     => $stockAntes,
+                'stock_posterior'    => $producto->stock_actual,
+                'usuario_ejecutor_id'=> Auth::id(),
+            ]);
+
+            $solicitudDev->update([
+                'estado'          => 'aprobada',
+                'aprobado_por_id' => Auth::id(),
+            ]);
+        });
+
+        $qty  = $solicitudDev->cantidad;
+        $nom  = $producto->nombre;
+        $docN = $solicitudDev->numeroDoc();
+        return back()->with('success', "Devolución {$docN} aprobada: {$qty} unidad(es) de «{$nom}» restituidas al stock.");
+    }
+
+    public function rechazarDevolucion(int $id, Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
+
+        $data = $request->validate([
+            'motivo_rechazo' => ['required', 'string', 'max:500'],
+        ], [
+            'motivo_rechazo.required' => 'El motivo de rechazo es obligatorio.',
+        ]);
+
+        $solicitudDev = SolicitudDevolucion::findOrFail($id);
+
+        if ($solicitudDev->estado !== 'pendiente') {
+            return back()->with('error', 'Esta solicitud de devolución ya fue procesada.');
+        }
+
+        $solicitudDev->update([
+            'estado'          => 'rechazada',
+            'aprobado_por_id' => Auth::id(),
+            'motivo_rechazo'  => $data['motivo_rechazo'],
+        ]);
+
+        $docN = $solicitudDev->numeroDoc();
+        return back()->with('success', "Solicitud {$docN} rechazada.");
+    }
+
 
     public function aprobar(int $id)
     {
@@ -69,6 +311,8 @@ class AdminController extends Controller
         }
 
         DB::transaction(function () use ($solicitud, $producto) {
+            $stockAntes = $producto->stock_actual;
+
             // Solo actualizar stock para productos físicos
             if (!$producto->es_servicio) {
                 if ($solicitud->tipo === 'entrada') {
@@ -86,14 +330,21 @@ class AdminController extends Controller
 
             // Registrar en historial
             HistorialCambio::create([
-                'producto_id'     => $solicitud->producto_id,
-                'nombre_producto' => $producto->nombre,
-                'contenedor_id'   => $producto->contenedor,
-                'cantidad'     => $solicitud->cantidad,
-                'tipo'         => $solicitud->tipo,
-                'motivo'       => $solicitud->motivo,
-                'aprobado_por' => Auth::user()->name,
-                'usuario_id'   => $solicitud->usuario_id,
+                'producto_id'        => $solicitud->producto_id,
+                'nombre_producto'    => $producto->nombre,
+                'contenedor_id'      => $producto->contenedor,
+                'cantidad'           => $solicitud->cantidad,
+                'tipo'               => $solicitud->tipo,
+                'motivo'             => $solicitud->motivo,
+                'aprobado_por'       => Auth::user()->name,
+                'usuario_id'         => $solicitud->usuario_id,
+                'origen'             => 'solicitud',
+                'origen_id'          => $solicitud->id,
+                'origen_tipo'        => 'solicitud',
+                'doc_origen'         => 'SOL-' . str_pad($solicitud->id, 6, '0', STR_PAD_LEFT),
+                'stock_anterior'     => $stockAntes,
+                'stock_posterior'    => $producto->stock_actual,
+                'usuario_ejecutor_id'=> Auth::id(),
             ]);
         });
 
@@ -156,9 +407,10 @@ class AdminController extends Controller
         abort_unless(auth()->user()->tienePermiso('historial'), 403);
         $user  = auth()->user();
         $query = HistorialCambio::with(['usuario', 'container',
-            'sicd'       => fn($q) => $q->withTrashed(),
-            'producto'   => fn($q) => $q->withoutGlobalScopes(),
-            'gastoMenor' => fn($q) => $q->select('id', 'id_gm'),
+            'sicd'        => fn($q) => $q->withTrashed(),
+            'producto'    => fn($q) => $q->withoutGlobalScopes(),
+            'gastoMenor'  => fn($q) => $q->select('id', 'id_gm'),
+            'ordenCompra' => fn($q) => $q->select('id', 'numero_oc'),
         ])
             ->orderByDesc('created_at');
 
@@ -176,11 +428,11 @@ class AdminController extends Controller
 
         $historial = $query->get();
 
-        // Clave de agrupación: origen+id cuando existe, sino motivo+usuario+minuto exacto
+        // Clave de agrupación: origen+id+tipo cuando existe, sino motivo+usuario+minuto exacto
         $lotes = $historial
             ->groupBy(function ($r) {
                 if ($r->origen && $r->origen_id) {
-                    return "origen:{$r->origen}-{$r->origen_id}";
+                    return "origen:{$r->origen}-{$r->origen_id}-{$r->tipo}";
                 }
                 // Agrupar registros sin origen por motivo + usuario + minuto
                 return "sinOrigen:{$r->usuario_id}:{$r->motivo}:{$r->created_at->format('Y-m-d H:i')}";
@@ -192,7 +444,7 @@ class AdminController extends Controller
         $vistos = [];
         foreach ($historial as $r) {
             if ($r->origen && $r->origen_id) {
-                $key = "origen:{$r->origen}-{$r->origen_id}";
+                $key = "origen:{$r->origen}-{$r->origen_id}-{$r->tipo}";
             } else {
                 $key = "sinOrigen:{$r->usuario_id}:{$r->motivo}:{$r->created_at->format('Y-m-d H:i')}";
             }
@@ -249,6 +501,8 @@ class AdminController extends Controller
         }
 
         DB::transaction(function () use ($producto, $data) {
+            $stockAntes = $producto->stock_actual;
+
             if ($data['tipo'] === 'entrada') {
                 $producto->stock_actual += $data['cantidad'];
             } else {
@@ -258,14 +512,18 @@ class AdminController extends Controller
             $producto->save();
 
             HistorialCambio::create([
-                'producto_id'     => $producto->id,
-                'nombre_producto' => $producto->nombre,
-                'contenedor_id'   => $producto->contenedor,
-                'cantidad'        => $data['cantidad'],
-                'tipo'            => $data['tipo'],
-                'motivo'          => $data['motivo'],
-                'aprobado_por' => Auth::user()->name,
-                'usuario_id'   => Auth::id(),
+                'producto_id'        => $producto->id,
+                'nombre_producto'    => $producto->nombre,
+                'contenedor_id'      => $producto->contenedor,
+                'cantidad'           => $data['cantidad'],
+                'tipo'               => $data['tipo'],
+                'motivo'             => $data['motivo'],
+                'aprobado_por'       => Auth::user()->name,
+                'usuario_id'         => Auth::id(),
+                'origen_tipo'        => 'ajuste',
+                'stock_anterior'     => $stockAntes,
+                'stock_posterior'    => $producto->stock_actual,
+                'usuario_ejecutor_id'=> Auth::id(),
             ]);
         });
 
@@ -300,18 +558,23 @@ class AdminController extends Controller
         $origenNombre = $containerOrigen?->nombre ?? 'Sin container';
 
         DB::transaction(function () use ($producto, $data, $origenNombre, $containerDestino) {
+            $stockActual = $producto->stock_actual;
             $producto->contenedor = $data['contenedor_destino'];
             $producto->save();
 
             HistorialCambio::create([
-                'producto_id'     => $producto->id,
-                'nombre_producto' => $producto->nombre,
-                'contenedor_id'   => $containerDestino->id,
-                'cantidad'        => $producto->stock_actual,
-                'tipo'            => 'traslado',
-                'motivo'          => "Traslado de {$origenNombre} a {$containerDestino->nombre}: {$data['motivo']}",
-                'aprobado_por' => Auth::user()->name,
-                'usuario_id'   => Auth::id(),
+                'producto_id'        => $producto->id,
+                'nombre_producto'    => $producto->nombre,
+                'contenedor_id'      => $containerDestino->id,
+                'cantidad'           => $stockActual,
+                'tipo'               => 'traslado',
+                'motivo'             => "Traslado de {$origenNombre} a {$containerDestino->nombre}: {$data['motivo']}",
+                'aprobado_por'       => Auth::user()->name,
+                'usuario_id'         => Auth::id(),
+                'origen_tipo'        => 'traslado',
+                'stock_anterior'     => $stockActual,
+                'stock_posterior'    => $stockActual,
+                'usuario_ejecutor_id'=> Auth::id(),
             ]);
         });
 
@@ -783,7 +1046,7 @@ class AdminController extends Controller
           ->get();
 
         $containers = Container::orderBy('nombre')->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))->get(['id', 'nombre']);
-        $unidades   = UnidadMedida::activas()->orderBy('abreviacion')->get(['id', 'abreviacion', 'nombre']);
+        $unidades   = UnidadMedida::activas()->noEsPresentacion()->orderBy('abreviacion')->get(['id', 'abreviacion', 'nombre']);
         // tipo column in familias drives SIN FAMILIA / PYP detection in JS (no hardcoded IDs)
         return view('admin.productos.resolver-carga-masiva',
             compact('pendiente', 'productos', 'familias', 'containers', 'unidades'));
@@ -1130,6 +1393,8 @@ class AdminController extends Controller
                     }
                 }
 
+                $stockAntes = $producto->stock_actual;
+
                 // Servicios: registrar en historial para costos/BINCARD, pero NO tocar stock_actual
                 if (!$producto->es_servicio) {
                     $producto->stock_actual += $cantidadReal;
@@ -1147,16 +1412,21 @@ class AdminController extends Controller
                 }
 
                 HistorialCambio::create([
-                    'producto_id'     => $producto->id,
-                    'nombre_producto' => $producto->nombre,
-                    'contenedor_id'   => $producto->contenedor,
-                    'cantidad'        => $cantidadReal,
-                    'tipo'            => 'entrada',
-                    'motivo'          => $sicd ? "Carga masiva – SICD {$sicd->codigo_sicd}" : $motivo,
-                    'aprobado_por' => Auth::user()->name,
-                    'usuario_id'   => Auth::id(),
-                    'origen'       => $sicd ? 'sicd' : null,
-                    'origen_id'    => $sicd ? $sicd->id : null,
+                    'producto_id'        => $producto->id,
+                    'nombre_producto'    => $producto->nombre,
+                    'contenedor_id'      => $producto->contenedor,
+                    'cantidad'           => $cantidadReal,
+                    'tipo'               => 'entrada',
+                    'motivo'             => $sicd ? "Carga masiva – SICD {$sicd->codigo_sicd}" : $motivo,
+                    'aprobado_por'       => Auth::user()->name,
+                    'usuario_id'         => Auth::id(),
+                    'origen'             => $sicd ? 'sicd' : null,
+                    'origen_id'          => $sicd ? $sicd->id : null,
+                    'origen_tipo'        => $sicd ? 'sicd' : 'entrada_manual',
+                    'doc_origen'         => $sicd ? 'SICD ' . $sicd->codigo_sicd : null,
+                    'stock_anterior'     => $stockAntes,
+                    'stock_posterior'    => $producto->stock_actual,
+                    'usuario_ejecutor_id'=> Auth::id(),
                 ]);
 
                 $actualizados++;
@@ -1313,21 +1583,27 @@ class AdminController extends Controller
                 }
 
                 if (!$vincularOc) {
+                    $stockAntes = $producto->stock_actual;
                     $producto->stock_actual += $cantidad;
                     $producto->actualizarFechasStock();
                     $producto->save();
 
                     HistorialCambio::create([
-                        'producto_id'     => $producto->id,
-                        'nombre_producto' => $producto->nombre,
-                        'contenedor_id'   => $producto->contenedor,
-                        'cantidad'        => $cantidad,
-                        'tipo'            => 'entrada',
-                        'motivo'          => $motivo,
-                        'aprobado_por' => Auth::user()->name,
-                        'usuario_id'   => Auth::id(),
-                        'origen'       => $sicd ? 'sicd' : null,
-                        'origen_id'    => $sicd ? $sicd->id : null,
+                        'producto_id'        => $producto->id,
+                        'nombre_producto'    => $producto->nombre,
+                        'contenedor_id'      => $producto->contenedor,
+                        'cantidad'           => $cantidad,
+                        'tipo'               => 'entrada',
+                        'motivo'             => $motivo,
+                        'aprobado_por'       => Auth::user()->name,
+                        'usuario_id'         => Auth::id(),
+                        'origen'             => $sicd ? 'sicd' : null,
+                        'origen_id'          => $sicd ? $sicd->id : null,
+                        'origen_tipo'        => $sicd ? 'sicd' : 'entrada_manual',
+                        'doc_origen'         => $sicd ? 'SICD ' . $sicd->codigo_sicd : null,
+                        'stock_anterior'     => $stockAntes,
+                        'stock_posterior'    => $producto->stock_actual,
+                        'usuario_ejecutor_id'=> Auth::id(),
                     ]);
                 } else {
                     $producto->save();

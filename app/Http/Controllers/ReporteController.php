@@ -64,9 +64,14 @@ class ReporteController extends Controller
         ])->findOrFail($request->producto_id);
 
         $filtros = array_filter([
-            'fecha_desde' => $request->fecha_desde,
-            'fecha_hasta' => $request->fecha_hasta,
-            'tipo'        => $request->tipo,
+            'fecha_desde'        => $request->fecha_desde,
+            'fecha_hasta'        => $request->fecha_hasta,
+            'tipo'               => $request->tipo,
+            'origen'             => $request->origen,
+            'registrado_por'     => $request->registrado_por,
+            'usuario'            => $request->usuario_filtro,
+            'proveedor_filtro'   => $request->proveedor_filtro,
+            'n_documento_filtro' => $request->n_documento_filtro,
         ]);
 
         $data = $this->bincard->generarBincard($producto, $filtros);
@@ -114,9 +119,14 @@ class ReporteController extends Controller
         ])->findOrFail($request->producto_id);
 
         $filtros = array_filter([
-            'fecha_desde' => $request->fecha_desde,
-            'fecha_hasta' => $request->fecha_hasta,
-            'tipo'        => $request->tipo,
+            'fecha_desde'        => $request->fecha_desde,
+            'fecha_hasta'        => $request->fecha_hasta,
+            'tipo'               => $request->tipo,
+            'origen'             => $request->origen,
+            'registrado_por'     => $request->registrado_por,
+            'usuario'            => $request->usuario_filtro,
+            'proveedor_filtro'   => $request->proveedor_filtro,
+            'n_documento_filtro' => $request->n_documento_filtro,
         ]);
 
         $data = $this->bincard->generarBincard($producto, $filtros);
@@ -157,9 +167,14 @@ class ReporteController extends Controller
         ])->findOrFail($request->producto_id);
 
         $filtros = array_filter([
-            'fecha_desde' => $request->fecha_desde,
-            'fecha_hasta' => $request->fecha_hasta,
-            'tipo'        => $request->tipo,
+            'fecha_desde'        => $request->fecha_desde,
+            'fecha_hasta'        => $request->fecha_hasta,
+            'tipo'               => $request->tipo,
+            'origen'             => $request->origen,
+            'registrado_por'     => $request->registrado_por,
+            'usuario'            => $request->usuario_filtro,
+            'proveedor_filtro'   => $request->proveedor_filtro,
+            'n_documento_filtro' => $request->n_documento_filtro,
         ]);
 
         $data = $this->bincard->generarBincard($producto, $filtros);

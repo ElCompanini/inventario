@@ -139,6 +139,7 @@ class DashboardController extends Controller
                 'productos.id', '=', 'cp.producto_id'
             )
             ->where('productos.activo', true)
+            ->where('productos.es_servicio', false)
             ->when($ccId, fn($q) => $q->where('productos.centro_costo_id', $ccId))
             ->sum(DB::raw('FLOOR(productos.stock_actual * cp.avg_neto)'));
 
@@ -217,6 +218,7 @@ class DashboardController extends Controller
         // ── Alertas ────────────────────────────────────────────────────────────
         $alertasStockCritico = Producto::where('stock_actual', '<=', DB::raw('stock_critico'))
             ->where('stock_critico', '>', 0)
+            ->where('es_servicio', false)
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->with('centroCosto:id,acronimo')
             ->orderBy('stock_actual')
@@ -248,11 +250,11 @@ class DashboardController extends Controller
 
         // ── Total utilizado — métricas de stock ───────────────────────────────
         $tuMasStock    = Producto::withoutGlobalScope('activo')
-            ->where('activo', true)->where('stock_actual', '>', 0)
+            ->where('activo', true)->where('stock_actual', '>', 0)->where('es_servicio', false)
             ->orderByDesc('stock_actual')->first(['nombre', 'stock_actual']);
 
         $tuMenosStock  = Producto::withoutGlobalScope('activo')
-            ->where('activo', true)->where('stock_actual', '>', 0)
+            ->where('activo', true)->where('stock_actual', '>', 0)->where('es_servicio', false)
             ->orderBy('stock_actual')->take(4)
             ->get(['nombre', 'stock_actual']);
 
@@ -480,21 +482,35 @@ class DashboardController extends Controller
             ->take(12)
             ->get();
 
-        $origenLabel = [
-            'gasto_menor'       => 'Gasto Menor',
-            'orden_compra'      => 'OC',
-            'sicd'              => 'SICD',
-            'solicitud'         => 'Solicitud',
-            'retiro'            => 'Retiro',
-            'computador_armado' => 'Armado Equipo',
-        ];
+        $moduloLabel = function ($mov): string {
+            return match(true) {
+                $mov->origen_tipo === 'solicitud'          => 'Solicitud',
+                $mov->origen_tipo === 'devolucion'         => 'Devolución',
+                $mov->origen_tipo === 'retiro_directo'     => 'Retiro',
+                $mov->origen_tipo === 'sicd'               => 'SICD',
+                $mov->origen_tipo === 'orden_compra'       => 'OC',
+                $mov->origen_tipo === 'gasto_menor'        => 'Gasto Menor',
+                $mov->origen_tipo === 'computador_armado'  => 'Armado',
+                $mov->origen_tipo === 'ajuste'             => 'Ajuste',
+                $mov->origen_tipo === 'traslado'           => 'Traslado',
+                $mov->origen_tipo === 'entrada_manual'     => 'Manual',
+                $mov->origen_tipo === 'merma'              => 'Merma',
+                $mov->origen === 'gasto_menor'             => 'Gasto Menor',
+                $mov->origen === 'orden_compra'            => 'OC',
+                $mov->origen === 'sicd'                    => 'SICD',
+                $mov->origen === 'solicitud'               => 'Solicitud',
+                $mov->origen === 'retiro'                  => 'Retiro',
+                $mov->origen === 'computador_armado'       => 'Armado',
+                default                                    => 'Manual',
+            };
+        };
 
         return response()->json([
             'actividad' => $actividad->map(fn($mov) => [
                 'tipo'        => $mov->tipo,
                 'nombre'      => $mov->nombre_producto,
                 'cantidad'    => (int) abs($mov->cantidad),
-                'origen'      => $origenLabel[$mov->origen] ?? 'Manual',
+                'origen'      => $moduloLabel($mov),
                 'usuario'     => $mov->usuario?->name ?? '—',
                 'fecha'       => $mov->created_at->format('d/m H:i'),
                 'es_servicio' => $mov->producto?->es_servicio || $mov->producto?->categoria?->familia?->tipo === 'servicios',
@@ -559,6 +575,118 @@ class DashboardController extends Controller
                 'fecha'       => $eq->created_at->format('d/m/Y'),
                 'url'         => route('admin.computadores.show', $eq->id),
             ]),
+        ]);
+    }
+
+    public function variacionPresupuestaria(Request $request)
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $desde = \Carbon\Carbon::parse($request->input('desde', now()->startOfMonth()))->startOfDay();
+        $hasta = \Carbon\Carbon::parse($request->input('hasta', now()))->endOfDay();
+
+        // Filtros opcionales
+        $estadoSicd = $request->input('estado_sicd');
+        $proveedor  = $request->input('proveedor');
+
+        // Cargar SICDs en rango con sus OCs (sin temporales, con trashed para histórico)
+        $sicds = \App\Models\Sicd::withTrashed()
+            ->withoutGlobalScope('sin_temporales')
+            ->where('es_temporal', false)
+            ->with([
+                'detalles',
+                'ordenesCompra' => fn($q) => $q->withTrashed()->select('ordenes_compra.id','api_total','api_impuestos','numero_oc','api_proveedor_nombre','api_proveedor_rut','estado'),
+            ])
+            ->whereBetween('created_at', [$desde, $hasta])
+            ->when($estadoSicd, fn($q) => $q->where('estado', $estadoSicd))
+            ->when($proveedor,  fn($q) => $q->where('proveedor_nombre', 'like', "%{$proveedor}%"))
+            ->get();
+
+        $filas = [];
+        $totalSicdGlobal = 0;
+        $totalOcGlobal   = 0;
+        $nOcsGlobal      = 0;
+
+        foreach ($sicds as $sicd) {
+            $sicdTotal = round($sicd->montoTotal(), 2);   // neto × 1.19
+
+            $ocs        = $sicd->ordenesCompra;
+            $ocTotal    = $ocs->sum(fn($oc) => (float)($oc->api_total ?? 0));
+            $variacion  = round($ocTotal - $sicdTotal, 2);
+
+            $totalSicdGlobal += $sicdTotal;
+            $totalOcGlobal   += $ocTotal;
+            $nOcsGlobal      += $ocs->count();
+
+            $filas[] = [
+                'sicd_id'    => $sicd->id,
+                'codigo'     => $sicd->codigo,
+                'estado'     => $sicd->estado,
+                'proveedor'  => $sicd->proveedor_nombre ?? ($ocs->first()?->api_proveedor_nombre ?? '—'),
+                'fecha'      => $sicd->created_at?->format('d/m/Y'),
+                'sicd_total' => $sicdTotal,
+                'oc_total'   => $ocTotal,
+                'variacion'  => $variacion,
+                'n_ocs'      => $ocs->count(),
+                'ocs'        => $ocs->map(fn($oc) => [
+                    'numero'    => $oc->numero_oc,
+                    'total'     => (float)($oc->api_total ?? 0),
+                    'proveedor' => $oc->api_proveedor_nombre ?? '—',
+                    'estado'    => $oc->estado,
+                ])->values()->toArray(),
+            ];
+        }
+
+        $variacionGlobal = round($totalOcGlobal - $totalSicdGlobal, 2);
+
+        // Guardar en historial VP específico (con detalle completo de filas)
+        $estadoVar = $variacionGlobal > 0 ? 'sobre' : ($variacionGlobal < 0 ? 'bajo' : 'igual');
+        $nSicds    = count($filas);
+
+        $vpRecord = \App\Models\VpHistorial::create([
+            'usuario_id'  => auth()->id(),
+            'fecha_desde' => $desde->toDateString(),
+            'fecha_hasta' => $hasta->toDateString(),
+            'filtros'     => $request->only(['estado_sicd','proveedor']),
+            'total_sicd'  => $totalSicdGlobal,
+            'total_oc'    => $totalOcGlobal,
+            'variacion'   => $variacionGlobal,
+            'n_sicds'     => $nSicds,
+            'n_ocs'       => $nOcsGlobal,
+            'detalle'     => $filas,
+        ]);
+
+        // Registrar en Historial Reporterías centralizado (con link al detalle VP)
+        (new ReporteriaService())->registrar(
+            tipo:    'VARIACION_PRESUPUESTARIA',
+            nombre:  'Variación Presupuestaria – ' . $desde->format('d/m/Y') . ' → ' . $hasta->format('d/m/Y'),
+            modulo:  'dashboard',
+            formato: 'HTML',
+            filtros: array_filter([
+                'fecha_desde'      => $desde->toDateString(),
+                'fecha_hasta'      => $hasta->toDateString(),
+                'estado_sicd'      => $estadoSicd,
+                'proveedor'        => $proveedor,
+                'n_sicds'          => $nSicds,
+                'n_ocs'            => $nOcsGlobal,
+                'total_sicd'       => $totalSicdGlobal,
+                'total_oc'         => $totalOcGlobal,
+                'variacion'        => $variacionGlobal,
+                'estado_variacion' => $estadoVar,
+                'vp_historial_id'  => $vpRecord->id,
+            ], fn($v) => $v !== null && $v !== ''),
+            notas: $nSicds . ' SICD(s) · ' . $nOcsGlobal . ' OC(s) · ' .
+                   ($variacionGlobal > 0 ? '+' : '') . '$' . number_format(abs($variacionGlobal), 0, ',', '.'),
+        );
+
+        return response()->json([
+            'filas'      => $filas,
+            'total_sicd' => $totalSicdGlobal,
+            'total_oc'   => $totalOcGlobal,
+            'variacion'  => $variacionGlobal,
+            'n_sicds'    => count($filas),
+            'n_ocs'      => $nOcsGlobal,
+            'periodo'    => $desde->format('d/m/Y').' → '.$hasta->format('d/m/Y'),
         ]);
     }
 

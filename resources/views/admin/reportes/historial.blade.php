@@ -48,6 +48,7 @@
                 <option value="EXCEL" {{ request('formato') === 'EXCEL' ? 'selected' : '' }}>Excel</option>
                 <option value="PDF"   {{ request('formato') === 'PDF'   ? 'selected' : '' }}>PDF</option>
                 <option value="CSV"   {{ request('formato') === 'CSV'   ? 'selected' : '' }}>CSV</option>
+                <option value="HTML"  {{ request('formato') === 'HTML'  ? 'selected' : '' }}>Consulta web</option>
             </select>
         </div>
 
@@ -124,7 +125,12 @@
                         'EXCEL' => 'bg-green-100 text-green-700',
                         'PDF'   => 'bg-red-100 text-red-700',
                         'CSV'   => 'bg-blue-100 text-blue-700',
+                        'HTML'  => 'bg-violet-100 text-violet-700',
                         default => 'bg-gray-100 text-gray-600',
+                    };
+                    $fmtLabel = match($r->formato) {
+                        'HTML'  => 'CONSULTA',
+                        default => $r->formato,
                     };
                 @endphp
                 <tr class="hover:bg-gray-50 transition">
@@ -146,9 +152,25 @@
                         {{ $r->usuario_nombre ?? '—' }}
                     </td>
 
-                    {{-- Producto --}}
+                    {{-- Producto / Resumen --}}
                     <td class="px-4 py-3 text-sm text-gray-600" style="max-width:220px;">
-                        @if($prodNombre)
+                        @if($r->tipo === 'VARIACION_PRESUPUESTARIA')
+                            @php
+                                $vpNS  = $r->filtros['n_sicds'] ?? 0;
+                                $vpNO  = $r->filtros['n_ocs'] ?? 0;
+                                $vpVar = (float)($r->filtros['variacion'] ?? 0);
+                                $vpEst = $r->filtros['estado_variacion'] ?? 'igual';
+                                $vpColor = match($vpEst) {
+                                    'sobre' => 'color:#dc2626',
+                                    'bajo'  => 'color:#16a34a',
+                                    default => 'color:#6b7280',
+                                };
+                            @endphp
+                            <span class="text-xs text-gray-500">{{ $vpNS }} SICD · {{ $vpNO }} OC</span><br>
+                            <span class="text-xs font-semibold" style="{{ $vpColor }}">
+                                Var. {{ $vpVar > 0 ? '+' : '' }}${{ number_format(abs($vpVar), 0, ',', '.') }}
+                            </span>
+                        @elseif($prodNombre)
                             <span class="truncate block" title="{{ $prodNombre }}">{{ $prodNombre }}</span>
                         @else
                             <span class="text-gray-300">—</span>
@@ -168,7 +190,7 @@
                     {{-- Formato --}}
                     <td class="px-4 py-3 text-center">
                         <span class="inline-block text-xs font-bold px-2.5 py-1 rounded-full {{ $fmtClass }}">
-                            {{ $r->formato }}
+                            {{ $fmtLabel }}
                         </span>
                     </td>
 
@@ -180,6 +202,17 @@
                     {{-- Acciones --}}
                     <td class="px-4 py-3">
                         <div class="flex items-center justify-end gap-1.5">
+
+                            @if($r->tipo === 'VARIACION_PRESUPUESTARIA')
+                                <a href="{{ route('admin.reportes.historial.vp', $r->id) }}"
+                                   title="Ver detalle"
+                                   class="p-2 rounded-lg text-indigo-600 border border-indigo-200 hover:bg-indigo-50 transition">
+                                    <svg style="width:1.125rem;height:1.125rem" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </a>
+                            @endif
 
                             @if($prodId)
                                 {{-- Ver --}}

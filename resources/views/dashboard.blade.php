@@ -387,17 +387,6 @@
                         {{ $estado === 'critico' ? 'text-red-700' : ($estado === 'minimo' ? 'text-yellow-700' : 'text-gray-400') }}">
                     @if($esServicio)
                         —
-                    @elseif($producto->tienePresentacion())
-                        @php $sv = $producto->stockVisual(); @endphp
-                        <span title="{{ $producto->stock_actual }} {{ strtolower($sv['unidad_base']) }}(s) en total"
-                              style="cursor:default; display:inline-flex; flex-direction:column; align-items:center; gap:1px;">
-                            @if($sv['cajas'] > 0)
-                            <span>{{ $sv['cajas'] }} {{ $sv['tipo'] }}</span>
-                            @endif
-                            @if($sv['resto'] > 0 || $sv['cajas'] === 0)
-                            <span style="font-weight:400; color:inherit; opacity:0.8;">{{ $sv['resto'] }} {{ $sv['unidad_base'] }}</span>
-                            @endif
-                        </span>
                     @else
                         {{ $producto->stock_actual }}
                     @endif
@@ -472,38 +461,43 @@
                 </td>
                 @endif
                 <td class="px-1.5 py-2 text-center">
-                    <div class="flex items-center justify-center gap-1">
+                    <div class="flex items-center justify-center gap-1.5">
                         @if(auth()->user()->esAdmin())
+                        {{-- Ver detalle --}}
                         <a href="{{ route('admin.productos.show', $producto->id) }}"
                            title="Ver detalle"
-                           class="btn-accion-indigo inline-flex items-center justify-center text-white rounded-lg p-1.5">
+                           class="p-act p-act-ver">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                             </svg>
                         </a>
+                        {{-- Modificar stock --}}
                         <a href="{{ route('admin.productos.editar', $producto->id) }}"
                            title="Modificar stock"
-                           class="btn-accion-indigo inline-flex items-center justify-center text-white rounded-lg p-1.5">
+                           class="p-act p-act-edit">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                             </svg>
                         </a>
+                        {{-- Trasladar container --}}
                         <button type="button"
-                            title="Trasladar"
+                            title="Trasladar container"
                             onclick="abrirModalTrasladar({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', {{ $producto->contenedor }})"
-                            class="btn-accion-blue inline-flex items-center justify-center text-white rounded-lg p-1.5">
+                            class="p-act p-act-move">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
                             </svg>
                         </button>
                         @else
+                        {{-- Solicitar salida --}}
                         <button type="button"
                             title="{{ $esServicio ? 'Servicio — sin stock físico' : 'Solicitar salida' }}"
                             @if(!$esServicio) onclick="abrirModal({{ $producto->id }}, '{{ addslashes($producto->nombre) }}', 'salida', {{ $producto->stock_actual }}, {{ $producto->solicitudes->sum('cantidad') }}, '{{ addslashes($producto->unidadMedida?->abreviacion ?? $producto->unidad ?? 'u.') }}', '{{ $producto->tienePresentacion() ? addslashes($producto->cantidadVisual($producto->stock_actual)) : '' }}')" @endif
-                            class="btn-accion-orange inline-flex items-center justify-center text-white rounded-lg p-1.5"
+                            class="p-act p-act-out"
                             {{ ($esServicio || $producto->stock_actual <= 0) ? 'disabled' : '' }}>
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7 7m0 0l7-7m-7 7V3"/>
                             </svg>
                         </button>
                         @endif
@@ -691,8 +685,7 @@
         document.getElementById('modal-tipo').value = tipo;
         document.getElementById('modal-cantidad').value = '';
         document.getElementById('modal-motivo').value = '';
-        // Show visual stock if product has presentation; fallback to raw number
-        document.getElementById('modal-stock').textContent = visualStock || stockActual;
+        document.getElementById('modal-stock').textContent = stockActual + ' ' + unidad;
         ocultarErrorModal();
 
         var aviso = document.getElementById('modal-aviso-pendiente');
@@ -1712,12 +1705,16 @@ function escHtmlGm(str) {
     html.dark .btn-agregar-inv { background:#3b82f6; }
     html.dark .btn-agregar-inv:hover { background:#2563eb; }
 
-    /* Dark mode — btn-accion hover: en light usan colores claros "glow",
-       en dark deben ser colores sólidos más oscuros/saturados */
-    html.dark .btn-accion-indigo:hover { background:#4f46e5 !important; box-shadow:0 0 14px 4px rgba(99,102,241,0.4) !important; }
-    html.dark .btn-accion-blue:hover   { background:#2563eb !important; box-shadow:0 0 14px 4px rgba(37,99,235,0.4) !important; }
-    html.dark .btn-accion-green:hover  { background:#16a34a !important; box-shadow:0 0 14px 4px rgba(22,163,74,0.4) !important; }
-    html.dark .btn-accion-orange:hover { background:#ea580c !important; box-shadow:0 0 14px 4px rgba(234,88,12,0.4) !important; }
+    /* Dark mode — p-act */
+    html.dark .p-act-ver  { color:#a5b4fc; border-color:rgba(99,102,241,.3); }
+    html.dark .p-act-ver:hover  { background:rgba(99,102,241,.18); border-color:#6366f1; }
+    html.dark .p-act-edit { color:#fcd34d; border-color:rgba(217,119,6,.3); }
+    html.dark .p-act-edit:hover { background:rgba(217,119,6,.18); border-color:#f59e0b; }
+    html.dark .p-act-move { color:#93c5fd; border-color:rgba(37,99,235,.3); }
+    html.dark .p-act-move:hover { background:rgba(37,99,235,.18); border-color:#3b82f6; }
+    html.dark .p-act-out  { color:#fb923c; border-color:rgba(234,88,12,.3); }
+    html.dark .p-act-out:hover  { background:rgba(234,88,12,.18); border-color:#ea580c; }
+    html.dark .p-act-out:disabled { opacity:.3; }
 
     html.dark .ai-toast-err { background:#450a0a !important; border-color:#7f1d1d !important; color:#fca5a5 !important; }
 </style>
@@ -1993,15 +1990,27 @@ function escHtmlGm(str) {
 
 @push('head')
 <style>
-    .btn-accion-indigo { background:#4f46e5; transition: background .25s, box-shadow .25s, transform .25s; }
-    .btn-accion-indigo:hover { background:#a5b4fc; box-shadow:0 0 14px 4px rgba(165,180,252,0.75); transform:scale(1.05); }
-    .btn-accion-blue { background:#2563eb; transition: background .25s, box-shadow .25s, transform .25s; }
-    .btn-accion-blue:hover { background:#93c5fd; box-shadow:0 0 14px 4px rgba(147,197,253,0.75); transform:scale(1.05); }
-    .btn-accion-green { background:#16a34a; transition: background .25s, box-shadow .25s, transform .25s; }
-    .btn-accion-green:hover { background:#86efac; box-shadow:0 0 14px 4px rgba(134,239,172,0.75); transform:scale(1.05); }
-    .btn-accion-orange { background:#f97316; transition: background .25s, box-shadow .25s, transform .25s; }
-    .btn-accion-orange:hover { background:#fdba74; box-shadow:0 0 14px 4px rgba(253,186,116,0.75); transform:scale(1.05); }
-    .btn-accion-orange:disabled { opacity:0.5; cursor:not-allowed; transform:none; box-shadow:none; }
+    /* ── Botones de acción en tabla de productos ─────────────────── */
+    .p-act {
+        display:inline-flex; align-items:center; justify-content:center;
+        width:2rem; height:2rem; border-radius:.5rem; border:1px solid;
+        transition:background .18s, border-color .18s, color .18s, transform .15s;
+        cursor:pointer; background:transparent;
+    }
+    .p-act:hover { transform:scale(1.1); }
+    /* Ver — violeta */
+    .p-act-ver  { color:#6366f1; border-color:#c7d2fe; }
+    .p-act-ver:hover  { background:#eef2ff; border-color:#818cf8; }
+    /* Editar — ámbar */
+    .p-act-edit { color:#d97706; border-color:#fde68a; }
+    .p-act-edit:hover { background:#fffbeb; border-color:#f59e0b; }
+    /* Trasladar — azul */
+    .p-act-move { color:#2563eb; border-color:#bfdbfe; }
+    .p-act-move:hover { background:#eff6ff; border-color:#60a5fa; }
+    /* Solicitar salida — naranja */
+    .p-act-out  { color:#ea580c; border-color:#fed7aa; }
+    .p-act-out:hover  { background:#fff7ed; border-color:#fb923c; }
+    .p-act-out:disabled { opacity:.35; cursor:not-allowed; transform:none; }
     @keyframes pulso-critico { 0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,.5); } 50% { box-shadow:0 0 0 6px rgba(239,68,68,0); } }
     @keyframes pulso-minimo  { 0%,100% { box-shadow:0 0 0 0 rgba(234,179,8,.5); } 50% { box-shadow:0 0 0 6px rgba(234,179,8,0); } }
     .estado-pulso-critico { animation: pulso-critico 1.5s ease-in-out infinite; }

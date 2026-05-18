@@ -8,6 +8,9 @@
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .stat-card { background:#fff; border-radius:.75rem; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:1.25rem 1.5rem; }
+.prod-avatar { background:#ede9fe; }
+html.dark .prod-avatar { background:rgba(109,40,217,.2); }
+html.dark .prod-avatar svg { color:#a78bfa !important; }
 </style>
 @endpush
 
@@ -25,7 +28,7 @@
     <div class="px-6 py-5 flex items-start justify-between gap-4">
         <div class="flex items-start gap-4">
             {{-- Avatar --}}
-            <div style="width:3.5rem;height:3.5rem;border-radius:.75rem;background:#ede9fe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <div class="prod-avatar" style="width:3.5rem;height:3.5rem;border-radius:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <svg style="width:1.75rem;height:1.75rem;color:#7c3aed;" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                 </svg>
