@@ -90,6 +90,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/productos/{id}/stock', [AdminController::class, 'modificarStock'])->name('productos.stock');
     Route::post('/productos/{id}/trasladar', [AdminController::class, 'trasladarContainer'])->name('productos.trasladar');
     Route::patch('/productos/{id}/deshabilitar', [AdminController::class, 'deshabilitarProducto'])->name('productos.deshabilitar');
+    Route::post('/productos/{id}/gestionar-estado', [ProductoController::class, 'gestionarEstado'])->name('productos.gestionar-estado');
 
     // SICD
     Route::get('/sicd/validar', [SicdController::class, 'validarCodigo'])->name('sicd.validar');
@@ -161,10 +162,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/catalogo/unidades/listar',            [UnidadMedidaController::class, 'listar'])->name('catalogo.unidades.listar');
 
     // Reportería BINCARD
-    Route::get('/reportes',              [ReporteController::class, 'index'])->name('reportes.index');
-    Route::get('/reportes/bincard',      [ReporteController::class, 'bincard'])->name('reportes.bincard');
-    Route::get('/reportes/bincard/excel',[ReporteController::class, 'exportExcel'])->name('reportes.bincard.excel');
-    Route::get('/reportes/bincard/pdf',  [ReporteController::class, 'exportPdf'])->name('reportes.bincard.pdf');
+    Route::get('/reportes',                    [ReporteController::class, 'index'])->name('reportes.index');
+    Route::get('/reportes/bincard',            [ReporteController::class, 'bincard'])->name('reportes.bincard');
+    Route::get('/reportes/bincard/excel',      [ReporteController::class, 'exportExcel'])->name('reportes.bincard.excel');
+    Route::get('/reportes/bincard/pdf',        [ReporteController::class, 'exportPdf'])->name('reportes.bincard.pdf');
+    Route::get('/reportes/bincard-servicio',   [ReporteController::class, 'bincardServicio'])->name('reportes.bincard.servicio');
 
     // Armado de Computadoras
     Route::get('/computadores',                                                  [ComputadorController::class, 'index'])->name('computadores.index');

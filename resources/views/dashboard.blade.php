@@ -6,15 +6,11 @@
 
 <div class="mb-6 flex items-center justify-between gap-4 flex-wrap">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800">Inventario de Productos</h1>
-        @php
-            $cntFisicos   = $productos->where('es_servicio', false)->count();
-            $cntServicios = $productos->where('es_servicio', true)->count();
-        @endphp
+        <h1 class="text-2xl font-bold text-gray-800">Productos</h1>
         <p class="text-sm text-gray-500 mt-1">
-            {{ $cntFisicos }} producto(s) físico(s)
-            @if($cntServicios > 0)
-            · <span class="text-violet-600 font-medium">{{ $cntServicios }} servicio(s)</span>
+            {{ $productos->count() }} producto(s) físico(s)
+            @if($servicios->count() > 0)
+            · <span class="text-violet-600 font-medium">{{ $servicios->count() }} servicio(s)</span>
             @endif
         </p>
     </div>
@@ -109,12 +105,42 @@
     </div>
 </div>
 
+{{-- ═══ SELECTOR PRODUCTOS / SERVICIOS ══════════════════════════════════ --}}
+@php $cntServsTab = $servicios->count(); @endphp
+<div class="mb-5 flex items-center gap-1" id="tab-bar-prod-serv">
+    <button type="button" id="tab-btn-productos"
+            onclick="switchTab('productos')"
+            class="tab-ps-btn tab-ps-active flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+        </svg>
+        Productos
+        @if($productos->count() > 0)
+        <span class="tab-ps-cnt bg-white/30 text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{{ $productos->count() }}</span>
+        @endif
+    </button>
+    <button type="button" id="tab-btn-servicios"
+            onclick="switchTab('servicios')"
+            class="tab-ps-btn flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/>
+        </svg>
+        Servicios
+        @if($cntServsTab > 0)
+        <span class="tab-ps-cnt text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{{ $cntServsTab }}</span>
+        @endif
+    </button>
+</div>
+
 {{-- Errores de validación del formulario de solicitud --}}
 @if($errors->any())
 <div class="mb-4 bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm">
     {{ $errors->first() }}
 </div>
 @endif
+
+{{-- ═══ PANEL: PRODUCTOS ══════════════════════════════════════════════════ --}}
+<div id="tab-panel-productos">
 
 @php
     $fFamilias = $productos->groupBy('nombre')->sortKeys();
@@ -509,6 +535,239 @@
     </table>
     </div>
 </div>
+
+</div>{{-- /tab-panel-productos --}}
+
+{{-- ═══ PANEL: SERVICIOS ══════════════════════════════════════════════════ --}}
+<div id="tab-panel-servicios" style="display:none;">
+@php
+    use App\Models\ServicioEstado as SE;
+    $estadoOrden = ['pendiente','aprobado','en_proceso','ejecutado','validado','cerrado','cancelado'];
+@endphp
+
+{{-- Barra de búsqueda servicios --}}
+<div class="mb-3 flex items-center gap-2">
+    <input id="buscador-servicios" type="text" placeholder="🔍  Buscar por nombre, categoría, estado..."
+           class="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
+                  focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 bg-white">
+</div>
+
+{{-- Estado vacío --}}
+@if($servicios->isEmpty())
+<div class="bg-white rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center gap-5 mb-6"
+     style="min-height:300px; padding:3rem 2rem;">
+    <svg class="w-14 h-14 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/>
+    </svg>
+    <div class="max-w-sm">
+        <p class="text-lg font-semibold text-gray-700">No hay servicios registrados</p>
+        <p class="text-sm text-gray-400 mt-2 leading-relaxed">
+            Los servicios se crean desde el Catálogo seleccionando la familia <strong>SERVICIOS</strong>.
+        </p>
+    </div>
+</div>
+@else
+
+<div class="bg-white rounded-xl shadow overflow-hidden" @if($servicios->isEmpty()) style="display:none" @endif>
+<div class="overflow-x-auto">
+<table id="tabla-servicios" class="w-full text-sm">
+    <thead class="bg-gray-50 text-left">
+        <tr>
+            <th class="px-3 py-2 font-semibold text-gray-600 text-xs">Servicio</th>
+            <th class="px-2 py-2 font-semibold text-gray-600 text-xs">Categoría</th>
+            @if(auth()->user()->esDev())
+            <th class="px-2 py-2 font-semibold text-gray-600 text-xs">CC</th>
+            @endif
+            <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-center" style="min-width:130px;">Estado operacional</th>
+            <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-center" style="min-width:120px;">Avance</th>
+            <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Responsable</th>
+            <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-center whitespace-nowrap">Actualizado</th>
+            <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-center">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($servicios as $serv)
+        @php
+            $ultimoSE    = $serv->servicioEstados->last();
+            $estadoActual = $ultimoSE?->estado ?? 'pendiente';
+            $progreso    = SE::progreso($estadoActual);
+            $colores     = SE::colores($estadoActual);
+            $label       = SE::label($estadoActual);
+            $siguiente   = SE::flujoSiguiente($estadoActual);
+            $timeline    = $serv->servicioEstados->map(fn($s) => [
+                'estado'   => $s->estado,
+                'label'    => SE::label($s->estado),
+                'usuario'  => $s->usuario?->name ?? '—',
+                'obs'      => $s->observacion,
+                'fecha'    => $s->created_at->format('d/m/Y H:i'),
+                'colores'  => SE::colores($s->estado),
+            ])->values()->toArray();
+        @endphp
+        <tr class="border-b border-gray-100 hover:bg-violet-50/30 transition"
+            data-nombre="{{ strtolower($serv->nombre) }}"
+            data-categoria="{{ strtolower($serv->categoria?->nombre ?? '') }}"
+            data-estado="{{ $estadoActual }}">
+            <td class="px-3 py-2.5 font-medium text-gray-900">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
+                        SERV.
+                    </span>
+                    <span>{{ $serv->nombre }}</span>
+                </div>
+            </td>
+            <td class="px-2 py-2.5 text-xs text-gray-500">
+                <div>{{ $serv->categoria?->familia?->nombre ?? '—' }}</div>
+                <div class="text-gray-400">{{ $serv->categoria?->nombre ?? '—' }}</div>
+            </td>
+            @if(auth()->user()->esDev())
+            <td class="px-2 py-2.5 text-center">
+                <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {{ $serv->centroCosto?->acronimo ?? '—' }}
+                </span>
+            </td>
+            @endif
+            <td class="px-2 py-2.5 text-center">
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                      style="background:{{ $colores['bg'] }}; color:{{ $colores['text'] }};">
+                    <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:{{ $colores['dot'] }};"></span>
+                    {{ $label }}
+                </span>
+            </td>
+            <td class="px-2 py-2.5">
+                <div class="flex flex-col gap-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold" style="color:{{ $colores['text'] }};">{{ $progreso }}%</span>
+                    </div>
+                    <div class="h-1.5 rounded-full bg-gray-200 overflow-hidden" style="min-width:90px;">
+                        <div class="h-full rounded-full transition-all"
+                             style="width:{{ $progreso }}%; background:{{ $colores['barra'] }};"></div>
+                    </div>
+                </div>
+            </td>
+            <td class="px-2 py-2.5 text-center text-xs text-gray-500">
+                {{ $ultimoSE?->usuario?->name ?? '—' }}
+            </td>
+            <td class="px-2 py-2.5 text-center text-xs text-gray-400 whitespace-nowrap">
+                {{ $ultimoSE?->created_at?->format('d/m/Y') ?? $serv->created_at->format('d/m/Y') }}
+            </td>
+            <td class="px-2 py-2.5 text-center">
+                <div class="flex items-center justify-center gap-1.5">
+                    @if(auth()->user()->esAdmin() && $estadoActual !== 'cerrado' && $estadoActual !== 'cancelado')
+                    <button type="button"
+                            title="Gestionar Estado"
+                            onclick="abrirModalServicio({{ $serv->id }}, {{ json_encode($serv->nombre) }}, {{ json_encode($estadoActual) }}, {{ json_encode($siguiente) }}, {{ json_encode($timeline) }})"
+                            class="p-act p-act-move" style="width:auto; padding:0.25rem 0.6rem; gap:0.3rem; font-size:0.7rem; font-weight:600; white-space:nowrap;">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                        </svg>
+                        Estado
+                    </button>
+                    @elseif(auth()->user()->esAdmin())
+                    <span class="text-xs text-gray-400 italic">{{ $estadoActual === 'cerrado' ? 'Cerrado' : 'Cancelado' }}</span>
+                    @endif
+                    <a href="{{ route('admin.reportes.bincard', $serv->id) }}"
+                       title="BINCARD Operacional"
+                       class="p-act p-act-ver">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                    </a>
+                </div>
+            </td>
+        </tr>
+        @endforeach
+    </tbody>
+</table>
+</div>
+</div>
+@endif
+
+</div>{{-- /tab-panel-servicios --}}
+
+{{-- ═══ MODAL: GESTIONAR ESTADO SERVICIO ═════════════════════════════════ --}}
+@if(auth()->user()->esAdmin())
+<div id="modal-gestionar-estado"
+     style="display:none; position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 64px rgba(0,0,0,.3); width:100%; max-width:520px; max-height:90vh; overflow-y:auto; position:relative;">
+
+        {{-- Header --}}
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem; border-bottom:1px solid #f3f4f6; position:sticky; top:0; background:#fff; z-index:1;">
+            <div>
+                <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.25rem;">
+                    <span style="display:inline-flex; align-items:center; gap:0.3rem; background:#f3e8ff; color:#7c3aed; font-size:0.7rem; font-weight:700; padding:0.15rem 0.6rem; border-radius:9999px;">
+                        <svg style="width:10px;height:10px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
+                        SERVICIO
+                    </span>
+                </div>
+                <h3 id="ge-titulo" style="font-size:1rem; font-weight:700; color:#1f2937; margin:0; word-break:break-word;"></h3>
+            </div>
+            <button type="button" onclick="cerrarModalServicio()" style="flex-shrink:0; color:#9ca3af; background:none; border:none; cursor:pointer; font-size:1.25rem; line-height:1; padding:0.1rem;">✕</button>
+        </div>
+
+        <div style="padding:1.25rem 1.5rem;">
+
+            {{-- Estado actual + progreso --}}
+            <div style="margin-bottom:1rem; padding:0.75rem; background:#f8fafc; border-radius:0.6rem; border:1px solid #e2e8f0;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem;">
+                    <span style="font-size:0.75rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.04em;">Estado actual</span>
+                    <span id="ge-badge-estado" style="font-size:0.8rem; font-weight:700; padding:0.25rem 0.75rem; border-radius:9999px; display:inline-flex; align-items:center; gap:0.4rem;"></span>
+                </div>
+                <div style="background:#e2e8f0; border-radius:9999px; height:6px; overflow:hidden;">
+                    <div id="ge-barra" style="height:100%; border-radius:9999px; transition:width .4s ease;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:0.3rem;">
+                    <span id="ge-pct" style="font-size:0.7rem; color:#64748b; font-weight:600;"></span>
+                    <span style="font-size:0.7rem; color:#9ca3af;">Completado</span>
+                </div>
+            </div>
+
+            {{-- Timeline --}}
+            <div style="margin-bottom:1rem;">
+                <p style="font-size:0.75rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.04em; margin-bottom:0.6rem;">Historial operacional</p>
+                <div id="ge-timeline" style="display:flex; flex-direction:column; gap:0;">
+                    {{-- filled by JS --}}
+                </div>
+            </div>
+
+            {{-- Formulario avanzar estado --}}
+            <div style="border-top:1px solid #f1f5f9; padding-top:1rem;">
+                <p style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:0.75rem;">Avanzar estado</p>
+                <form id="form-gestionar-estado" method="POST" action="">
+                    @csrf
+                    <input type="hidden" name="estado" id="ge-estado-input">
+
+                    {{-- Botones de transición --}}
+                    <div id="ge-opciones-estado" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;"></div>
+
+                    {{-- Observación --}}
+                    <div style="margin-bottom:0.75rem;">
+                        <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.35rem;">
+                            Observación <span style="font-size:0.72rem; color:#9ca3af; font-weight:400;">(opcional)</span>
+                        </label>
+                        <textarea name="observacion" id="ge-observacion" rows="3" maxlength="500"
+                                  style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.45rem 0.65rem; font-size:0.8rem; box-sizing:border-box; resize:vertical; outline:none;"
+                                  placeholder="Describe el avance, resultado u observación relevante..."></textarea>
+                    </div>
+
+                    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                        <button type="button" onclick="cerrarModalServicio()"
+                                style="padding:0.45rem 1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:0.5rem; cursor:pointer;">
+                            Cancelar
+                        </button>
+                        <button type="submit" id="ge-btn-submit"
+                                style="padding:0.45rem 1.25rem; font-size:0.875rem; font-weight:600; color:#fff; background:#7c3aed; border:none; border-radius:0.5rem; cursor:pointer; display:none;">
+                            Confirmar cambio
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+@endif
 
 {{-- Modal solicitud (solo usuarios) --}}
 @if(!auth()->user()->esAdmin())
@@ -2161,6 +2420,205 @@ function escHtmlGm(str) {
 </div>
 
 @endsection
+
+@push('head')
+<style>
+/* ── Tabs Productos / Servicios ─────────────────────────────────────── */
+.tab-ps-btn {
+    color: #6b7280;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+.tab-ps-btn:hover { background:#f3f4f6; color:#374151; }
+.tab-ps-active { background:#7c3aed !important; color:#fff !important; }
+.tab-ps-active .tab-ps-cnt { background:rgba(255,255,255,0.25); color:#fff; }
+.tab-ps-btn:not(.tab-ps-active) .tab-ps-cnt { background:#e9d5ff; color:#7c3aed; }
+html.dark .tab-ps-btn { color:#94a3b8; }
+html.dark .tab-ps-btn:hover { background:#1e293b; color:#e2e8f0; }
+html.dark .tab-ps-active { background:#7c3aed !important; color:#fff !important; }
+
+/* ── Tabla servicios ────────────────────────────────────────────────── */
+#tab-panel-servicios .bg-white { background:#fff; }
+html.dark #tab-panel-servicios .bg-white { background:#1e293b; }
+html.dark #tabla-servicios thead { background:#0f172a; }
+html.dark #tabla-servicios thead th { color:#94a3b8; }
+html.dark #tabla-servicios tbody tr { border-color:#334155; }
+html.dark #tabla-servicios tbody tr:hover { background:rgba(124,58,237,.08) !important; }
+
+/* ── Modal gestionar estado ─────────────────────────────────────────── */
+html.dark #modal-gestionar-estado > div { background:#1e293b !important; }
+html.dark #modal-gestionar-estado h3 { color:#f1f5f9 !important; }
+html.dark #modal-gestionar-estado .sticky { background:#1e293b !important; border-color:#334155 !important; }
+html.dark #modal-gestionar-estado [style*="background:#f8fafc"] { background:#0f172a !important; border-color:#334155 !important; }
+html.dark #modal-gestionar-estado [style*="background:#f1f5f9"] { border-color:#334155 !important; }
+html.dark #ge-observacion { background:#0f172a; color:#e2e8f0; border-color:#334155; }
+
+/* Botón estado en tabla servicios */
+.ge-opcion-btn {
+    display:inline-flex; align-items:center; gap:0.35rem;
+    padding:0.4rem 0.85rem; border-radius:0.5rem; font-size:0.8rem; font-weight:600;
+    cursor:pointer; border:2px solid; transition:opacity .15s, transform .1s;
+}
+.ge-opcion-btn:hover { opacity:.85; transform:scale(1.02); }
+.ge-opcion-cancelar { border-color:#ef4444 !important; color:#ef4444 !important; background:transparent !important; }
+.ge-opcion-cancelar:hover { background:#fef2f2 !important; }
+</style>
+@endpush
+
+@push('scripts')
+<script>
+// ── Tab switching ────────────────────────────────────────────────────
+function switchTab(tab) {
+    var isProd = tab === 'productos';
+    document.getElementById('tab-panel-productos').style.display = isProd ? '' : 'none';
+    document.getElementById('tab-panel-servicios').style.display = isProd ? 'none' : '';
+    document.getElementById('tab-btn-productos').classList.toggle('tab-ps-active', isProd);
+    document.getElementById('tab-btn-servicios').classList.toggle('tab-ps-active', !isProd);
+}
+
+// ── Buscador servicios ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    var buscServ = document.getElementById('buscador-servicios');
+    if (!buscServ) return;
+    buscServ.addEventListener('input', function() {
+        var q = this.value.toLowerCase().trim();
+        document.querySelectorAll('#tabla-servicios tbody tr').forEach(function(tr) {
+            if (!q) { tr.style.display = ''; return; }
+            var nombre = (tr.dataset.nombre || '');
+            var cat    = (tr.dataset.categoria || '');
+            var est    = (tr.dataset.estado || '');
+            tr.style.display = (nombre.includes(q) || cat.includes(q) || est.includes(q)) ? '' : 'none';
+        });
+    });
+});
+
+// ── Estado config (debe coincidir con ServicioEstado::colores/label) ─
+var SE_COLORES = {
+    pendiente:  { bg:'#f3f4f6', text:'#6b7280', dot:'#9ca3af', barra:'#9ca3af' },
+    aprobado:   { bg:'#eff6ff', text:'#1d4ed8', dot:'#3b82f6', barra:'#3b82f6' },
+    en_proceso: { bg:'#fefce8', text:'#a16207', dot:'#eab308', barra:'#eab308' },
+    ejecutado:  { bg:'#f0fdf4', text:'#15803d', dot:'#22c55e', barra:'#22c55e' },
+    validado:   { bg:'#f0fdf4', text:'#166534', dot:'#16a34a', barra:'#16a34a' },
+    cerrado:    { bg:'#1e293b', text:'#f8fafc', dot:'#94a3b8', barra:'#1e293b' },
+    cancelado:  { bg:'#fef2f2', text:'#dc2626', dot:'#ef4444', barra:'#ef4444' },
+};
+var SE_LABELS = {
+    pendiente:'Pendiente', aprobado:'Aprobado', en_proceso:'En proceso',
+    ejecutado:'Ejecutado', validado:'Validado', cerrado:'Cerrado', cancelado:'Cancelado'
+};
+var SE_PROGRESO = { pendiente:0, aprobado:20, en_proceso:50, ejecutado:80, validado:90, cerrado:100, cancelado:0 };
+var SE_FLUJO    = { pendiente:'aprobado', aprobado:'en_proceso', en_proceso:'ejecutado', ejecutado:'validado', validado:'cerrado' };
+
+// ── Modal gestionar estado ───────────────────────────────────────────
+var _geServicioId   = null;
+var _geEstadoActual = null;
+var _geSiguiente    = null;
+var _geEstadoElegido = null;
+
+function abrirModalServicio(id, nombre, estadoActual, siguiente, timeline) {
+    _geServicioId   = id;
+    _geEstadoActual = estadoActual;
+    _geSiguiente    = siguiente;
+    _geEstadoElegido = null;
+
+    document.getElementById('ge-titulo').textContent = nombre;
+    document.getElementById('form-gestionar-estado').action = '/admin/productos/' + id + '/gestionar-estado';
+    document.getElementById('ge-estado-input').value = '';
+    document.getElementById('ge-observacion').value = '';
+    document.getElementById('ge-btn-submit').style.display = 'none';
+
+    // Badge estado actual
+    var c = SE_COLORES[estadoActual] || SE_COLORES.pendiente;
+    var badge = document.getElementById('ge-badge-estado');
+    badge.style.background = c.bg;
+    badge.style.color = c.text;
+    badge.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + c.dot + ';display:inline-block;"></span> ' + (SE_LABELS[estadoActual] || estadoActual);
+
+    // Barra progreso
+    var pct = SE_PROGRESO[estadoActual] || 0;
+    document.getElementById('ge-barra').style.width = pct + '%';
+    document.getElementById('ge-barra').style.background = c.barra;
+    document.getElementById('ge-pct').textContent = pct + '%';
+
+    // Timeline
+    var tl = document.getElementById('ge-timeline');
+    if (!timeline || timeline.length === 0) {
+        tl.innerHTML = '<div style="text-align:center; padding:0.75rem; color:#9ca3af; font-size:0.8rem; font-style:italic;">Sin movimientos registrados — estado inicial: Pendiente</div>';
+    } else {
+        tl.innerHTML = '';
+        timeline.forEach(function(s, i) {
+            var tc = s.colores || SE_COLORES[s.estado] || SE_COLORES.pendiente;
+            var isLast = (i === timeline.length - 1);
+            var div = document.createElement('div');
+            div.style.cssText = 'display:flex; gap:0.75rem; padding:0.5rem 0; position:relative;';
+            div.innerHTML =
+                '<div style="display:flex; flex-direction:column; align-items:center; flex-shrink:0;">' +
+                    '<div style="width:10px;height:10px;border-radius:50%;background:' + tc.dot + ';margin-top:3px;flex-shrink:0;"></div>' +
+                    (!isLast ? '<div style="width:2px;flex:1;background:#e2e8f0;margin-top:3px;min-height:20px;"></div>' : '') +
+                '</div>' +
+                '<div style="flex:1; padding-bottom:' + (!isLast ? '0.4rem' : '0') + ';">' +
+                    '<div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">' +
+                        '<span style="font-size:0.78rem; font-weight:700; color:' + tc.text + '; background:' + tc.bg + '; padding:0.15rem 0.5rem; border-radius:9999px;">' + s.label + '</span>' +
+                        '<span style="font-size:0.7rem; color:#94a3b8;">' + s.fecha + '</span>' +
+                    '</div>' +
+                    '<div style="font-size:0.72rem; color:#64748b; margin-top:0.2rem;">' + escH(s.usuario) + '</div>' +
+                    (s.obs ? '<div style="font-size:0.72rem; color:#94a3b8; margin-top:0.15rem; font-style:italic;">' + escH(s.obs) + '</div>' : '') +
+                '</div>';
+            tl.appendChild(div);
+        });
+    }
+
+    // Opciones de estado
+    var opts = document.getElementById('ge-opciones-estado');
+    opts.innerHTML = '';
+    if (siguiente) {
+        var cs = SE_COLORES[siguiente] || SE_COLORES.pendiente;
+        var btnSig = document.createElement('button');
+        btnSig.type = 'button';
+        btnSig.className = 'ge-opcion-btn';
+        btnSig.style.cssText = 'border-color:' + cs.dot + '; color:' + cs.text + '; background:' + cs.bg + ';';
+        btnSig.innerHTML = '<svg style="width:12px;height:12px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>' + (SE_LABELS[siguiente] || siguiente);
+        btnSig.addEventListener('click', function() { elegirEstado(siguiente, this); });
+        opts.appendChild(btnSig);
+    }
+    // Botón Cancelar servicio (rojo, siempre disponible si no está cerrado)
+    var btnCancel = document.createElement('button');
+    btnCancel.type = 'button';
+    btnCancel.className = 'ge-opcion-btn ge-opcion-cancelar';
+    btnCancel.innerHTML = '<svg style="width:12px;height:12px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>Cancelar servicio';
+    btnCancel.addEventListener('click', function() { elegirEstado('cancelado', this); });
+    opts.appendChild(btnCancel);
+
+    if (!siguiente && estadoActual !== 'cancelado') {
+        opts.innerHTML = '<p style="font-size:0.8rem; color:#94a3b8; font-style:italic;">No hay transición disponible desde este estado.</p>';
+    }
+
+    document.getElementById('modal-gestionar-estado').style.display = 'flex';
+}
+
+function elegirEstado(estado, btn) {
+    _geEstadoElegido = estado;
+    document.getElementById('ge-estado-input').value = estado;
+    document.querySelectorAll('.ge-opcion-btn').forEach(function(b) { b.style.outline = ''; });
+    btn.style.outline = '2px solid #7c3aed';
+    var submitBtn = document.getElementById('ge-btn-submit');
+    submitBtn.style.display = 'inline-flex';
+    var c = SE_COLORES[estado] || SE_COLORES.pendiente;
+    submitBtn.style.background = estado === 'cancelado' ? '#ef4444' : '#7c3aed';
+    submitBtn.textContent = 'Confirmar → ' + (SE_LABELS[estado] || estado);
+}
+
+function cerrarModalServicio() {
+    document.getElementById('modal-gestionar-estado').style.display = 'none';
+    _geServicioId = null; _geEstadoElegido = null;
+}
+
+function escH(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+@endpush
 
 @push('scripts')
 @php

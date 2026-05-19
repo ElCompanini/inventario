@@ -68,6 +68,16 @@ html.dark .bc-orig-manual { background:rgba(51,65,85,0.4);    color:#94a3b8; }
 .bc-saldo-cero     { color:#fcd34d !important; }
 .bc-saldo-negativo { color:#fca5a5 !important; }
 html.dark .bc-saldo-cell { background:linear-gradient(135deg,#1e1b4b,#1e3a5f) !important; }
+
+/* Tabs reportes Productos / Servicios */
+.rpt-tab-btn { display:inline-flex; align-items:center; gap:.5rem; padding:.45rem 1.1rem; font-size:.82rem; font-weight:700; border:none; border-radius:.5rem; cursor:pointer; transition:background .15s,color .15s; background:transparent; color:#6b7280; }
+.rpt-tab-btn:hover { background:#f3f4f6; color:#374151; }
+.rpt-tab-active { background:#7c3aed !important; color:#fff !important; }
+.rpt-tab-active .rpt-tab-cnt { background:rgba(255,255,255,0.25) !important; color:#fff !important; }
+.rpt-tab-btn:not(.rpt-tab-active) .rpt-tab-cnt { background:#e9d5ff; color:#7c3aed; }
+html.dark .rpt-tab-btn { color:#94a3b8; }
+html.dark .rpt-tab-btn:hover { background:#1e293b; color:#e2e8f0; }
+html.dark .rpt-tab-active { background:#7c3aed !important; color:#fff !important; }
 </style>
 @endpush
 
@@ -77,6 +87,32 @@ html.dark .bc-saldo-cell { background:linear-gradient(135deg,#1e1b4b,#1e3a5f) !i
     <h1 class="text-2xl font-bold text-gray-800">Reportes</h1>
     <p class="text-sm text-gray-500 mt-1">Reportería BINCARD — Trazabilidad y control de inventario</p>
 </div>
+
+{{-- Tab selector Productos / Servicios --}}
+<div class="mb-6 flex items-center gap-2">
+    <button type="button" id="tab-btn-rpt-productos" onclick="switchRptTab('productos')"
+            class="rpt-tab-btn {{ isset($dataServicio) ? '' : 'rpt-tab-active' }}">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+        </svg>
+        Productos
+        @if(($productos ?? collect())->count() > 0)
+        <span class="rpt-tab-cnt text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{{ ($productos ?? collect())->count() }}</span>
+        @endif
+    </button>
+    <button type="button" id="tab-btn-rpt-servicios" onclick="switchRptTab('servicios')"
+            class="rpt-tab-btn {{ isset($dataServicio) ? 'rpt-tab-active' : '' }}">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/>
+        </svg>
+        Servicios
+        @if(($serviciosF ?? collect())->count() > 0)
+        <span class="rpt-tab-cnt text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{{ ($serviciosF ?? collect())->count() }}</span>
+        @endif
+    </button>
+</div>
+
+<div id="tab-panel-rpt-productos" style="{{ isset($dataServicio) ? 'display:none' : '' }}">
 
 {{-- ══ FILTROS ══════════════════════════════════════════════════════════ --}}
 <form method="GET" action="{{ route('admin.reportes.bincard') }}" id="form-bincard">
@@ -649,6 +685,264 @@ function confirmarGenerarBincard() {
 document.getElementById('modal-bincard-existente').addEventListener('click', function(e) {
     if (e.target === e.currentTarget) cerrarModalBincardExistente();
 });
+</script>
+@endpush
+
+</div>{{-- #tab-panel-rpt-productos --}}
+
+{{-- ══ TAB SERVICIOS ══════════════════════════════════════════════════════ --}}
+<div id="tab-panel-rpt-servicios" style="{{ isset($dataServicio) ? '' : 'display:none' }}">
+
+<form method="GET" action="{{ route('admin.reportes.bincard.servicio') }}" id="form-bincard-svc">
+<div class="bg-white rounded-xl shadow p-5 mb-6">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        Filtros del BINCARD Operacional
+    </h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="lg:col-span-2">
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Servicio <span class="text-red-500">*</span></label>
+            <select name="producto_id" required
+                    style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.8rem; background:#fff;">
+                <option value="">— Selecciona un servicio —</option>
+                @foreach($serviciosF ?? [] as $s)
+                    <option value="{{ $s->id }}" {{ (request('producto_id') == $s->id || (isset($dataServicio) && $dataServicio['producto']->id == $s->id)) ? 'selected' : '' }}>
+                        {{ $s->nombre }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Desde</label>
+            <input type="date" name="fecha_desde"
+                   value="{{ request('fecha_desde', isset($dataServicio) ? ($dataServicio['filtros']['fecha_desde'] ?? '') : '') }}"
+                   style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.8rem;">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Hasta</label>
+            <input type="date" name="fecha_hasta"
+                   value="{{ request('fecha_hasta', isset($dataServicio) ? ($dataServicio['filtros']['fecha_hasta'] ?? '') : '') }}"
+                   style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.8rem;">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Estado</label>
+            <select name="estado"
+                    style="width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.45rem .65rem; font-size:.8rem; background:#fff;">
+                <option value="">— Todos —</option>
+                @foreach(['pendiente','aprobado','en_proceso','ejecutado','validado','cerrado','cancelado'] as $est)
+                    <option value="{{ $est }}" {{ (request('estado', isset($dataServicio) ? ($dataServicio['filtros']['estado'] ?? '') : '') === $est) ? 'selected' : '' }}>
+                        {{ \App\Models\ServicioEstado::label($est) }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+    </div>
+    <div class="mt-4 flex items-center gap-3">
+        <button type="submit"
+                style="padding:.45rem 1.25rem; font-size:.82rem; font-weight:700; color:#fff; background:#7c3aed; border:none; border-radius:.5rem; cursor:pointer; display:inline-flex; align-items:center; gap:.4rem;"
+                onmouseover="this.style.background='#6d28d9'" onmouseout="this.style.background='#7c3aed'">
+            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            Generar BINCARD Operacional
+        </button>
+        <a href="{{ route('admin.reportes.index') }}"
+           style="padding:.45rem .9rem; font-size:.82rem; font-weight:600; color:#6b7280; background:#f3f4f6; border:none; border-radius:.5rem; text-decoration:none;">
+            Limpiar
+        </a>
+    </div>
+</div>
+</form>
+
+@if(!isset($dataServicio))
+<div class="bg-white rounded-xl shadow py-24 text-center text-gray-400">
+    <svg class="w-14 h-14 mx-auto mb-4 text-gray-200" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+    </svg>
+    <p class="text-base font-semibold text-gray-500">Selecciona un servicio y genera el BINCARD operacional</p>
+    <p class="text-sm mt-1 text-gray-400">Historial de transiciones · Estados · Responsables · Documentos</p>
+</div>
+
+@else
+{{-- ══ ENCABEZADO SERVICIO ════════════════════════════════════════════ --}}
+@php
+    $svcProd     = $dataServicio['producto'];
+    $svcColores  = \App\Models\ServicioEstado::colores($dataServicio['estado_actual']);
+    $svcProgreso = \App\Models\ServicioEstado::progreso($dataServicio['estado_actual']);
+    $svcLabel    = \App\Models\ServicioEstado::label($dataServicio['estado_actual']);
+    $svcFiltros  = $dataServicio['filtros'];
+    $filasSvc    = $dataServicio['filas'];
+    $svcUltima   = count($filasSvc) ? $filasSvc[count($filasSvc)-1]['fecha'] : '—';
+@endphp
+
+<div class="bg-white rounded-xl shadow overflow-hidden mb-5 print:shadow-none">
+    <div style="background:#1e3a5f; color:#fff; padding:1rem 1.5rem;">
+        <div class="flex items-center justify-between">
+            <div>
+                <p style="font-size:0.7rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; opacity:.7; margin:0;">Sistema de Gestión de Inventario</p>
+                <h2 style="font-size:1.25rem; font-weight:800; margin:.1rem 0 0;">BINCARD OPERACIONAL — SERVICIO</h2>
+            </div>
+            <div style="text-align:right; font-size:0.72rem; opacity:.8;">
+                <p style="margin:0;">Emitido: {{ $dataServicio['generado_at'] }}</p>
+                <p style="margin:.1rem 0 0;">Por: <strong>{{ $dataServicio['generado_por'] }}</strong></p>
+            </div>
+        </div>
+    </div>
+    <div style="padding:1rem 1.5rem; background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+            <div>
+                <p style="font-size:.65rem; font-weight:700; text-transform:uppercase; color:#64748b; letter-spacing:.06em;">Servicio</p>
+                <p style="font-size:.95rem; font-weight:800; color:#1e293b; margin:.1rem 0 0;">{{ $svcProd->nombre }}</p>
+            </div>
+            <div>
+                <p style="font-size:.65rem; font-weight:700; text-transform:uppercase; color:#64748b; letter-spacing:.06em;">Categoría / Familia</p>
+                <p style="font-size:.85rem; font-weight:600; color:#374151; margin:.1rem 0 0;">
+                    {{ $svcProd->categoria?->nombre ?? '—' }} / {{ $svcProd->categoria?->familia?->nombre ?? '—' }}
+                </p>
+            </div>
+            <div>
+                <p style="font-size:.65rem; font-weight:700; text-transform:uppercase; color:#64748b; letter-spacing:.06em;">Centro de Costo</p>
+                <p style="font-size:.85rem; font-weight:600; color:#374151; margin:.1rem 0 0;">
+                    {{ $svcProd->centroCosto?->nombre_completo ?? '—' }}
+                </p>
+            </div>
+            <div>
+                <p style="font-size:.65rem; font-weight:700; text-transform:uppercase; color:#64748b; letter-spacing:.06em;">Período</p>
+                <p style="font-size:.8rem; color:#6b7280; margin:.1rem 0 0;">
+                    {{ isset($svcFiltros['fecha_desde']) ? 'Desde '.$svcFiltros['fecha_desde'] : 'Sin rango' }}{{ isset($svcFiltros['fecha_hasta']) ? ' — '.$svcFiltros['fecha_hasta'] : '' }}
+                </p>
+            </div>
+        </div>
+    </div>
+    <div style="padding:.75rem 1.5rem; background:#fff; border-bottom:1px solid #e2e8f0;">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div style="text-align:center; padding:.5rem; background:#f8fafc; border-radius:.5rem; border:1px solid #e2e8f0;">
+                <p style="font-size:.65rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin:0;">Estado Actual</p>
+                <p style="margin:.3rem 0 0;">
+                    <span style="font-size:.78rem; font-weight:700; padding:3px 10px; border-radius:9999px; background:{{ $svcColores['bg'] }}; color:{{ $svcColores['text'] }};">
+                        {{ $svcLabel }}
+                    </span>
+                </p>
+            </div>
+            <div style="text-align:center; padding:.5rem; background:#f8fafc; border-radius:.5rem; border:1px solid #e2e8f0;">
+                <p style="font-size:.65rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin:0;">Total Transiciones</p>
+                <p style="font-size:1.3rem; font-weight:800; color:#4f46e5; margin:.1rem 0 0;">{{ $dataServicio['total_transiciones'] }}</p>
+            </div>
+            <div style="text-align:center; padding:.5rem; background:#f8fafc; border-radius:.5rem; border:1px solid #e2e8f0;">
+                <p style="font-size:.65rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin:0;">Progreso</p>
+                <p style="font-size:1.3rem; font-weight:800; color:{{ $svcColores['barra'] }}; margin:.1rem 0 0;">{{ $svcProgreso }}%</p>
+            </div>
+            <div style="text-align:center; padding:.5rem; background:#f8fafc; border-radius:.5rem; border:1px solid #e2e8f0;">
+                <p style="font-size:.65rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin:0;">Última Fecha</p>
+                <p style="font-size:.9rem; font-weight:700; color:#374151; margin:.1rem 0 0;">{{ $svcUltima }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- ══ TABLA OPERACIONAL ════════════════════════════════════════════ --}}
+<div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-gray-700">Historial de Transiciones Operacionales</h3>
+        <span class="text-xs text-gray-400">{{ $dataServicio['total_transiciones'] }} transición(es)</span>
+    </div>
+    <div class="overflow-x-auto">
+    <table style="width:100%; border-collapse:collapse; font-size:.75rem;">
+        <thead>
+            <tr>
+                <th class="bincard-th" style="text-align:left;">Fecha</th>
+                <th class="bincard-th">Movimiento</th>
+                <th class="bincard-th">Estado anterior</th>
+                <th class="bincard-th">Estado nuevo</th>
+                <th class="bincard-th" style="text-align:left;">Responsable</th>
+                <th class="bincard-th" style="min-width:110px;">Avance</th>
+                <th class="bincard-th" style="text-align:left;">Doc. referencia</th>
+                <th class="bincard-th" style="text-align:left; min-width:180px;">Observación</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($filasSvc as $idx => $fila)
+            @php
+                $rowBg  = $idx % 2 === 0 ? 'bincard-neutral' : 'bincard-alt';
+                $colNvo = \App\Models\ServicioEstado::colores($fila['estado_nuevo']);
+                $colAnt = \App\Models\ServicioEstado::colores($fila['estado_anterior']);
+            @endphp
+            <tr class="{{ $rowBg }}">
+                <td class="bincard-td whitespace-nowrap">{{ $fila['fecha'] }}</td>
+                <td class="bincard-td text-center">
+                    <span style="font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:9999px; white-space:nowrap; display:inline-block; background:{{ $colNvo['bg'] }}; color:{{ $colNvo['text'] }};">
+                        {{ $fila['movimiento'] }}
+                    </span>
+                </td>
+                <td class="bincard-td text-center">
+                    <span style="font-size:.67rem; font-weight:600; padding:2px 7px; border-radius:9999px; white-space:nowrap; display:inline-block; background:{{ $colAnt['bg'] }}; color:{{ $colAnt['text'] }};">
+                        {{ $fila['estado_label_ant'] }}
+                    </span>
+                </td>
+                <td class="bincard-td text-center">
+                    <span style="font-size:.67rem; font-weight:700; padding:2px 7px; border-radius:9999px; white-space:nowrap; display:inline-block; background:{{ $colNvo['bg'] }}; color:{{ $colNvo['text'] }};">
+                        {{ $fila['estado_label_nvo'] }}
+                    </span>
+                </td>
+                <td class="bincard-td text-gray-600 whitespace-nowrap">{{ $fila['responsable'] }}</td>
+                <td class="bincard-td">
+                    <div style="display:flex; align-items:center; gap:.4rem;">
+                        <div style="flex:1; height:6px; background:#e2e8f0; border-radius:9999px; overflow:hidden;">
+                            <div style="height:100%; border-radius:9999px; background:{{ $colNvo['barra'] }}; width:{{ $fila['progreso'] }}%;"></div>
+                        </div>
+                        <span style="font-size:.7rem; font-weight:700; color:{{ $colNvo['text'] }}; white-space:nowrap;">{{ $fila['progreso'] }}%</span>
+                    </div>
+                </td>
+                <td class="bincard-td font-mono" style="color:#4f46e5; font-size:.72rem;">{{ $fila['documento_referencia'] }}</td>
+                <td class="bincard-td text-gray-500" style="font-size:.72rem; max-width:200px;">{{ $fila['observacion'] }}</td>
+            </tr>
+            @empty
+            <tr>
+                <td colspan="8" style="text-align:center; padding:2rem; color:#9ca3af; font-size:.82rem;">
+                    No hay transiciones para los filtros seleccionados.
+                </td>
+            </tr>
+            @endforelse
+            @if($dataServicio['total_transiciones'] > 0)
+            <tr style="background:#1e3a5f; color:#fff; font-weight:700;">
+                <td class="bincard-td" colspan="5" style="color:#bfdbfe; border-color:#2563eb; text-align:right; font-size:.8rem;">
+                    TOTAL DE TRANSICIONES
+                </td>
+                <td class="bincard-td text-center" style="color:#a5b4fc; font-size:.9rem; border-color:#2563eb;" colspan="3">
+                    {{ $dataServicio['total_transiciones'] }}
+                </td>
+            </tr>
+            @endif
+        </tbody>
+    </table>
+    </div>
+</div>
+@endif
+
+</div>{{-- #tab-panel-rpt-servicios --}}
+
+@push('scripts')
+<script>
+function switchRptTab(tab) {
+    var panelProd = document.getElementById('tab-panel-rpt-productos');
+    var panelSvc  = document.getElementById('tab-panel-rpt-servicios');
+    var btnProd   = document.getElementById('tab-btn-rpt-productos');
+    var btnSvc    = document.getElementById('tab-btn-rpt-servicios');
+    if (tab === 'servicios') {
+        panelProd.style.display = 'none';
+        panelSvc.style.display  = '';
+        btnProd.classList.remove('rpt-tab-active');
+        btnSvc.classList.add('rpt-tab-active');
+    } else {
+        panelSvc.style.display  = 'none';
+        panelProd.style.display = '';
+        btnSvc.classList.remove('rpt-tab-active');
+        btnProd.classList.add('rpt-tab-active');
+    }
+}
 </script>
 @endpush
 

@@ -11,7 +11,9 @@ use App\Models\Marca;
 use App\Models\OrdenCompra;
 use App\Models\Precio;
 use App\Models\Producto;
+use App\Models\ServicioEstado;
 use App\Models\Sicd;
+use Illuminate\Http\Request;
 
 class ProductoController extends Controller
 {
@@ -52,8 +54,50 @@ class ProductoController extends Controller
             ? CentroCosto::orderBy('nombre_completo')->get(['id', 'nombre_completo'])
             : collect();
 
+        $servicios = Producto::with([
+            'categoria.familia',
+            'centroCosto:id,acronimo',
+            'servicioEstados' => fn($q) => $q->with('usuario:id,name'),
+        ])->where('es_servicio', true)
+            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+            ->orderBy('nombre')->get();
+
         // tipo column drives SIN FAMILIA / PYP detection in JS (no hardcoded IDs needed)
-        return view('dashboard', compact('productos', 'containers', 'familias', 'centrosCostoConProductos'));
+        return view('dashboard', compact('productos', 'containers', 'familias', 'centrosCostoConProductos', 'servicios'));
+    }
+
+    public function gestionarEstado(Request $request, int $id): \Illuminate\Http\RedirectResponse
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $producto = Producto::withoutGlobalScopes()->where('es_servicio', true)->findOrFail($id);
+
+        $nuevoEstado = $request->input('estado');
+        $observacion = $request->input('observacion');
+
+        $estadosValidos = ['aprobado', 'en_proceso', 'ejecutado', 'validado', 'cerrado', 'cancelado'];
+        if (!in_array($nuevoEstado, $estadosValidos)) {
+            return back()->with('error', 'Estado no válido.');
+        }
+
+        $ultimoEstado = ServicioEstado::where('producto_id', $id)
+            ->latest()->value('estado') ?? 'pendiente';
+
+        $flujoSiguiente = ServicioEstado::flujoSiguiente($ultimoEstado);
+        if ($nuevoEstado !== 'cancelado' && $nuevoEstado !== $flujoSiguiente) {
+            return back()->with('error', 'Transición no permitida. El servicio debe avanzar de forma cronológica.');
+        }
+
+        ServicioEstado::create([
+            'producto_id'          => $producto->id,
+            'estado'               => $nuevoEstado,
+            'estado_anterior'      => $ultimoEstado,
+            'usuario_id'           => auth()->id(),
+            'observacion'          => $observacion ?: null,
+            'documento_referencia' => $request->input('documento_referencia') ?: null,
+        ]);
+
+        return back()->with('success', 'Estado del servicio actualizado a "' . ServicioEstado::label($nuevoEstado) . '".');
     }
 
     public function apiSeleccion(\Illuminate\Http\Request $request)

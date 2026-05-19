@@ -96,6 +96,11 @@ class Producto extends Model
         return $this->hasMany(Precio::class);
     }
 
+    public function servicioEstados()
+    {
+        return $this->hasMany(ServicioEstado::class)->orderBy('created_at');
+    }
+
     public function ultimoPrecio(): ?Precio
     {
         return $this->precios()->latest()->first();

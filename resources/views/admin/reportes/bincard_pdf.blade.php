@@ -144,6 +144,7 @@ tbody tr.totales td { border-color:#2563eb; font-weight:bold; color:#fff; }
         <tr>
             <th style="text-align:left;">Fecha</th>
             <th>Tipo Mov.</th>
+            <th>Origen</th>
             <th style="text-align:left;">N° Documento</th>
             <th>RUT Proveedor</th>
             <th style="text-align:left;">Proveedor</th>
@@ -172,7 +173,13 @@ tbody tr.totales td { border-color:#2563eb; font-weight:bold; color:#fff; }
             <td class="text-center">
                 <span class="badge {{ $esE ? 'badge-e' : ($esS ? 'badge-s' : 'badge-n') }}">{{ $fila['tipo_movimiento'] }}</span>
             </td>
-            <td class="mono text-indigo">{{ $fila['n_documento'] }}</td>
+            <td class="text-center" style="font-size:6.5pt; color:#64748b;">{{ $fila['origen_label'] ?? '—' }}</td>
+            <td class="mono text-indigo">
+                {{ $fila['n_documento'] }}
+                @if(!empty($fila['n_referencia']))
+                <br><span style="font-size:5.5pt; color:#6b7280; font-weight:400;">ref. {{ $fila['n_referencia'] }}</span>
+                @endif
+            </td>
             <td class="text-center mono">{{ $fila['rut_proveedor'] }}</td>
             <td>{{ \Illuminate\Support\Str::limit($fila['proveedor'], 25) }}</td>
             <td class="text-center text-green" style="font-weight:bold;">{{ $fila['entrada'] ?? '' }}</td>
@@ -188,12 +195,12 @@ tbody tr.totales td { border-color:#2563eb; font-weight:bold; color:#fff; }
             <td>{{ \Illuminate\Support\Str::limit($fila['observaciones'], 40) }}</td>
         </tr>
         @empty
-        <tr><td colspan="15" style="text-align:center; padding:12px; color:#9ca3af;">Sin movimientos para los filtros seleccionados.</td></tr>
+        <tr><td colspan="16" style="text-align:center; padding:12px; color:#9ca3af;">Sin movimientos para los filtros seleccionados.</td></tr>
         @endforelse
 
         @if(count($data['filas']) > 0)
         <tr class="totales">
-            <td colspan="{{ $mostrarCostos ? 6 : 6 }}" style="text-align:right; padding:4px 8px;">TOTALES Y SALDO FINAL</td>
+            <td colspan="7" style="text-align:right; padding:4px 8px;">TOTALES Y SALDO FINAL</td>
             <td class="text-center" style="color:#86efac;">{{ $data['total_entradas'] ?: '—' }}</td>
             <td class="text-center" style="color:#fca5a5;">{{ $data['total_salidas'] ?: '—' }}</td>
             <td class="text-center" style="color:#a5b4fc;">{{ $data['saldo_final'] }}</td>

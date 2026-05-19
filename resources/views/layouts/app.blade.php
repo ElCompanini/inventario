@@ -434,13 +434,13 @@
                 Gestión de Stock
             </p>
 
-            <a href="{{ route('dashboard') }}" data-tip="Productos"
+            <a href="{{ route('dashboard') }}" data-tip="Productos y Servicios"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                       {{ request()->routeIs('dashboard') ? 'bg-indigo-600 text-white' : 'text-slate-300 text-slate-300' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/>
                 </svg>
-                <span class="sb-label">Productos</span>
+                <span class="sb-label">Productos y Servicios</span>
             </a>
 
             <a href="{{ route('retiro.form') }}" data-tip="Retiro de Piezas"
