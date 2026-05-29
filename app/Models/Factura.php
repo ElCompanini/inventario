@@ -15,6 +15,8 @@ class Factura extends Model
         'orden_compra_id',
         'nombre_original',
         'ruta',
+        'documento_estado',
+        'documento_error',
         'subido_por',
         'usuario_id',
     ];

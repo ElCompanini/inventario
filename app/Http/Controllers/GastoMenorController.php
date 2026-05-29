@@ -91,10 +91,13 @@ class GastoMenorController extends Controller
 
         DB::transaction(function () use ($request, $folio, $rutaDoc) {
             foreach ($request->items as $itemData) {
-                $gasto = GastoMenor::findOrFail($itemData['id']);
+                $gasto = GastoMenor::whereKey($itemData['id'])
+                    ->where('folio', $folio)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
                 // Revertir stock anterior y aplicar el nuevo
-                $producto = $gasto->producto;
+                $producto = Producto::withoutGlobalScopes()->whereKey($gasto->producto_id)->lockForUpdate()->firstOrFail();
                 $producto->stock_actual = $producto->stock_actual - $gasto->cantidad + (int) $itemData['cantidad'];
                 $producto->actualizarFechasStock();
                 $producto->save();
@@ -132,7 +135,15 @@ class GastoMenorController extends Controller
     public function descargarBoleta(int $id)
     {
         abort_unless(auth()->user()->tienePermiso('gastos_menores'), 403);
-        $gasto = GastoMenor::findOrFail($id);
+
+        // SEC-03: verificar que el gasto pertenece al centro de costo del usuario
+        $query = GastoMenor::where('id', $id);
+        $ccId  = auth()->user()->ccFiltro();
+        if ($ccId) {
+            $query->whereHas('user', fn($q) => $q->where('centro_costo_id', $ccId));
+        }
+        $gasto = $query->firstOrFail();
+
         abort_unless($gasto->documento_path && Storage::disk('local')->exists($gasto->documento_path), 404);
         return response()->file(
             Storage::disk('local')->path($gasto->documento_path),
@@ -181,12 +192,12 @@ class GastoMenorController extends Controller
             $rutaDoc   = $request->file('documento')->storeAs('gastos_menores', $nombre, 'local');
         }
 
-        // Un único número por boleta (folio), calculado antes del loop
-        $nextNumero = (GastoMenor::max('id_gm') ?? 0) + 1;
-
-        DB::transaction(function () use ($request, $rutaDoc, $nextNumero) {
+        DB::transaction(function () use ($request, $rutaDoc) {
+            // SEC-06: calcular correlativo dentro de la transacción con lock para evitar race condition
+            DB::table('gastos_menores')->lockForUpdate()->orderByDesc('id_gm')->limit(1)->get(['id_gm']);
+            $nextNumero = (GastoMenor::max('id_gm') ?? 0) + 1;
             foreach ($request->items as $item) {
-                $producto     = Producto::findOrFail($item['producto_id']);
+                $producto     = Producto::whereKey($item['producto_id'])->lockForUpdate()->firstOrFail();
                 $contenedorId = !empty($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
 
                 // Si el usuario seleccionó un container diferente al actual,
@@ -196,6 +207,7 @@ class GastoMenorController extends Controller
                     $enDestino = Producto::withoutGlobalScopes()
                         ->where('nombre', $producto->nombre)
                         ->where('contenedor', $contenedorId)
+                        ->lockForUpdate()
                         ->first();
                     if ($enDestino) {
                         $producto = $enDestino;

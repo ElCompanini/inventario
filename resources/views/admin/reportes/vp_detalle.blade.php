@@ -176,6 +176,7 @@ html.dark .meta-bar { background:#0f172a; border-color:#334155; color:#94a3b8; }
                     <th class="num">Total OC</th>
                     <th class="num" title="N° Órdenes de Compra">OCs</th>
                     <th class="num">Variación</th>
+                    <th>Tipo doc.</th>
                     <th>Estado Var.</th>
                     <th>OC(s)</th>
                 </tr>
@@ -189,6 +190,11 @@ html.dark .meta-bar { background:#0f172a; border-color:#334155; color:#94a3b8; }
                         ? '+$' . number_format($v2, 0, ',', '.')
                         : ($v2 < 0 ? '-$' . number_format(abs($v2), 0, ',', '.') : '$0');
                     $estadoSicdCls = 'badge-' . ($fila['estado'] ?? 'igual');
+                    $tiposDoc = collect($fila['ocs'] ?? [])->map(function($o) {
+                        $label = $o['tipo_adquisicion_label'] ?? 'Indeterminado';
+                        $origen = $o['tipo_adquisicion_origen'] ?? 'Manual';
+                        return ($o['numero'] ?? 'OC') . ': ' . $label . ' · ' . $origen;
+                    })->join(' | ') ?: '—';
                     $ocsStr = collect($fila['ocs'] ?? [])->map(fn($o) => $o['numero'] ? 'OC-'.$o['numero'] : '—')->join(', ') ?: '—';
                 @endphp
                 <tr>
@@ -210,6 +216,19 @@ html.dark .meta-bar { background:#0f172a; border-color:#334155; color:#94a3b8; }
                     <td class="num font-bold" style="color:{{ $estFila === 'sobre' ? '#dc2626' : ($estFila === 'bajo' ? '#16a34a' : '#64748b') }};">
                         {{ $varFilaStr }}
                     </td>
+                    <td class="text-xs text-gray-500 dark:text-slate-400" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ $tiposDoc }}">
+                        @foreach(($fila['ocs'] ?? []) as $ocMeta)
+                            @php
+                                $tipo = $ocMeta['tipo_adquisicion'] ?? 'indeterminado';
+                                $cls = $tipo === 'compra_agil'
+                                    ? 'bg-green-100 text-green-700'
+                                    : ($tipo === 'licitacion' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600');
+                            @endphp
+                            <span class="inline-block text-xs font-bold px-2 py-0.5 rounded-full {{ $cls }}">
+                                {{ $ocMeta['tipo_adquisicion_label'] ?? 'Indeterminado' }}
+                            </span>
+                        @endforeach
+                    </td>
                     <td>
                         <span class="inline-block text-xs font-bold px-2.5 py-0.5 rounded-full badge-{{ $estFila }}">
                             {{ $estFila === 'sobre' ? 'Sobre ppto.' : ($estFila === 'bajo' ? 'Bajo ppto.' : 'Sin variación') }}
@@ -228,7 +247,7 @@ html.dark .meta-bar { background:#0f172a; border-color:#334155; color:#94a3b8; }
                     <td class="num font-bold text-sm" style="padding:.5rem .75rem;color:#93c5fd;">${{ number_format($totalOc, 0, ',', '.') }}</td>
                     <td class="num font-bold text-sm" style="padding:.5rem .75rem;color:#cbd5e1;">{{ $nOcs }}</td>
                     <td class="num font-bold text-sm" style="padding:.5rem .75rem;color:{{ $estVar === 'sobre' ? '#fca5a5' : ($estVar === 'bajo' ? '#86efac' : '#94a3b8') }};">{{ $varStr }}</td>
-                    <td colspan="2" style="padding:.5rem .75rem;"></td>
+                    <td colspan="3" style="padding:.5rem .75rem;"></td>
                 </tr>
             </tfoot>
         </table>

@@ -177,7 +177,10 @@ tbody tr.totales td { border-color:#2563eb; font-weight:bold; color:#fff; }
             <td class="mono text-indigo">
                 {{ $fila['n_documento'] }}
                 @if(!empty($fila['n_referencia']))
-                <br><span style="font-size:5.5pt; color:#6b7280; font-weight:400;">ref. {{ $fila['n_referencia'] }}</span>
+                <br><span style="font-size:5.5pt; color:#6b7280; font-weight:400;">Ref: {{ $fila['n_referencia'] }}</span>
+                @endif
+                @if(!empty($fila['metadata_documental']))
+                <br><span style="font-size:5.5pt; color:#64748b; font-weight:400;">Tipo adquisicion: {{ $fila['metadata_documental'] }}</span>
                 @endif
             </td>
             <td class="text-center mono">{{ $fila['rut_proveedor'] }}</td>

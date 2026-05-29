@@ -25,6 +25,7 @@ class Producto extends Model
         'stock_critico_desde',
         'activo',
         'es_servicio',
+        'tipo_item',
         'maneja_presentacion',
         'tipo_presentacion',
         'cantidad_presentacion',
@@ -34,6 +35,23 @@ class Producto extends Model
     protected static function booted(): void
     {
         static::addGlobalScope('activo', fn($q) => $q->where('productos.activo', true));
+
+        static::saving(function (Producto $producto) {
+            $tipo = $producto->tipo_item ?: ((bool) $producto->es_servicio ? 'servicio' : 'producto');
+            if (!in_array($tipo, ['producto', 'servicio', 'mantencion', 'arriendo'], true)) {
+                $tipo = 'producto';
+            }
+
+            $producto->tipo_item = $tipo;
+            $producto->es_servicio = $tipo === 'servicio';
+
+            if ($tipo !== 'producto') {
+                $producto->maneja_presentacion = false;
+                $producto->tipo_presentacion = null;
+                $producto->cantidad_presentacion = null;
+                $producto->unidad_base = null;
+            }
+        });
     }
 
     protected $casts = [
@@ -101,6 +119,11 @@ class Producto extends Model
         return $this->hasMany(ServicioEstado::class)->orderBy('created_at');
     }
 
+    public function arriendoMovimientos()
+    {
+        return $this->hasMany(ArriendoMovimiento::class)->orderBy('created_at');
+    }
+
     public function ultimoPrecio(): ?Precio
     {
         return $this->precios()->latest()->first();
@@ -108,7 +131,30 @@ class Producto extends Model
 
     public function esServicio(): bool
     {
-        return (bool) $this->es_servicio;
+        return ($this->tipo_item ?? null) === 'servicio' || (bool) $this->es_servicio;
+    }
+
+    public function isProducto(): bool
+    {
+        return ($this->tipo_item ?? 'producto') === 'producto'
+            && !$this->esServicio()
+            && !$this->isMantencion()
+            && !$this->isArriendo();
+    }
+
+    public function isServicio(): bool
+    {
+        return $this->esServicio();
+    }
+
+    public function isArriendo(): bool
+    {
+        return ($this->tipo_item ?? 'producto') === 'arriendo';
+    }
+
+    public function isMantencion(): bool
+    {
+        return ($this->tipo_item ?? 'producto') === 'mantencion';
     }
 
     /** True if the product tracks a multi-unit presentation (box, bag, etc.) */
@@ -170,19 +216,36 @@ class Producto extends Model
 
     public function scopeSoloFisicos($query)
     {
-        return $query->where('es_servicio', false);
+        return $query->where('es_servicio', false)
+            ->where(fn($q) => $q->whereNull('tipo_item')->orWhere('tipo_item', 'producto'));
     }
 
     public function scopeSoloServicios($query)
     {
-        return $query->where('es_servicio', true);
+        return $query->where(fn($q) => $q->where('es_servicio', true)->orWhere('tipo_item', 'servicio'));
+    }
+
+    public function scopeSoloArriendos($query)
+    {
+        return $query->where('tipo_item', 'arriendo');
+    }
+
+    public function scopeSoloMantenciones($query)
+    {
+        return $query->where('tipo_item', 'mantencion');
     }
 
     public function estadoStock(): string
     {
         // Servicios no tienen stock físico — siempre neutral
-        if ($this->es_servicio) {
+        if ($this->esServicio()) {
             return 'servicio';
+        }
+        if ($this->isArriendo()) {
+            return 'arriendo';
+        }
+        if ($this->isMantencion()) {
+            return 'mantencion';
         }
         if ($this->stock_actual <= $this->stock_critico) {
             return 'critico';

@@ -55,13 +55,13 @@ class BincardService
 
         // OCs directamente vinculadas a cada movimiento (link granular)
         $ocsDirectas = OrdenCompra::whereIn('id', $ocIds)
-            ->select('id', 'numero_oc', 'api_proveedor_nombre', 'api_proveedor_rut')
+            ->select('id', 'numero_oc', 'api_proveedor_nombre', 'api_proveedor_rut', 'tipo_adquisicion', 'tipo_adquisicion_origen', 'tipo_adquisicion_confianza')
             ->get()
             ->keyBy('id');
 
         // Fallback: OCs por SICD (para registros históricos sin orden_compra_id)
         $ocsPorSicd = Sicd::withTrashed()->whereIn('id', $sicdIds)
-            ->with(['ordenesCompra' => fn($q) => $q->select('ordenes_compra.id', 'numero_oc', 'api_proveedor_nombre', 'api_proveedor_rut')])
+            ->with(['ordenesCompra' => fn($q) => $q->select('ordenes_compra.id', 'numero_oc', 'api_proveedor_nombre', 'api_proveedor_rut', 'tipo_adquisicion', 'tipo_adquisicion_origen', 'tipo_adquisicion_confianza')])
             ->get()
             ->keyBy('id');
 
@@ -107,6 +107,8 @@ class BincardService
             $proveedor  = '—';
             $costoUnit  = null;
 
+            $tipoAdqDoc = null;
+
             if ($mov->origen === 'sicd' && isset($sicds[$mov->origen_id])) {
                 $sicd      = $sicds[$mov->origen_id];
                 $sicdLabel = 'SICD ' . $sicd->codigo_sicd;
@@ -119,10 +121,11 @@ class BincardService
                     // Origen directo = OC · Referencia = SICD
                     $ocDirecta = $ocsDirectas[$mov->orden_compra_id];
                     $tipoDoc   = 'OC';
-                    $nDoc      = 'OC ' . $ocDirecta->numero_oc;
+                    $nDoc      = 'OC-' . $ocDirecta->numero_oc;
                     $nRef      = $sicdLabel;
                     $rutProv   = $ocDirecta->api_proveedor_rut   ?? '—';
                     $proveedor = $ocDirecta->api_proveedor_nombre ?? '—';
+                    $tipoAdqDoc = $ocDirecta->tipoAdquisicionLabel();
 
                 } else {
                     // ⚠️ Fallback para registros históricos sin orden_compra_id
@@ -134,10 +137,11 @@ class BincardService
 
                     if ($ocFromMotivo) {
                         $tipoDoc   = 'OC';
-                        $nDoc      = 'OC ' . $ocFromMotivo->numero_oc;
+                        $nDoc      = 'OC-' . $ocFromMotivo->numero_oc;
                         $nRef      = $sicdLabel;
                         $rutProv   = $ocFromMotivo->api_proveedor_rut   ?? '—';
                         $proveedor = $ocFromMotivo->api_proveedor_nombre ?? '—';
+                        $tipoAdqDoc = $ocFromMotivo->tipoAdquisicionLabel();
                     } else {
                         // Sin OC asociada: el documento directo es la SICD
                         $todasOcs = $ocsPorSicd[$sicd->id]?->ordenesCompra ?? collect();
@@ -150,6 +154,7 @@ class BincardService
                         }
                         $rutProv   = $todasOcs->pluck('api_proveedor_rut')->filter()->unique()->join(' / ') ?: '—';
                         $proveedor = $todasOcs->pluck('api_proveedor_nombre')->filter()->unique()->join(' / ') ?: ($sicd->proveedor_nombre ?? '—');
+                        $tipoAdqDoc = $todasOcs->map(fn($oc) => $oc->numero_oc . ': ' . $oc->tipoAdquisicionLabel())->filter()->join(' | ') ?: null;
                     }
                 }
 
@@ -185,6 +190,10 @@ class BincardService
                     $tipoDoc = 'Solicitud';
                     $nDoc    = $solCode;
                 }
+            } elseif ($mov->origen === 'computador_armado') {
+                $tipoDoc = $mov->tipo === 'entrada' ? 'Desmontaje Equipo' : 'Armado Equipos';
+                $nDoc    = 'ARM-' . str_pad($mov->origen_id ?? 0, 6, '0', STR_PAD_LEFT);
+                $nRef    = $mov->doc_referencia; // e.g. "PC-001"
             } elseif ($mov->tipo === 'ajuste') {
                 $tipoDoc = 'Ajuste Manual';
                 $nDoc    = 'AJU-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT);
@@ -274,6 +283,7 @@ class BincardService
                 // Prefer FK executor over stored name string
                 'registrado_por'   => $mov->usuarioEjecutor?->name ?? $mov->aprobado_por ?? $mov->usuario?->name ?? '—',
                 'codigo_movimiento'=> $mov->codigo_movimiento,
+                'metadata_documental' => $tipoAdqDoc,
                 'observaciones'    => $mov->motivo ?? '—',
                 '_origen'          => $mov->origen,
                 '_origen_id'       => $mov->origen_id,

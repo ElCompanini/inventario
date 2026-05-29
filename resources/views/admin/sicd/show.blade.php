@@ -39,9 +39,20 @@
                 </div>
             </div>
 
-            @if($sicd->documento_blob)
+            @if($sicd->tieneDocumentoPersistido())
             {{-- PDF externo enlazado --}}
             <div class="px-5 py-4">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <span class="inline-flex items-center text-xs font-semibold rounded-full px-2.5 py-1"
+                          style="background:#dcfce7;color:#166534;">
+                        Documento adjuntado
+                    </span>
+                    @if($sicd->documento_adjuntado_at)
+                        <span class="text-xs text-gray-400">
+                            {{ $sicd->documento_nombre ?: 'SICD PDF' }} · {{ $sicd->documento_adjuntado_at->format('d/m/Y H:i') }}
+                        </span>
+                    @endif
+                </div>
                 <iframe src="{{ route('admin.sicd.ver-documento', $sicd->id) }}"
                         class="w-full rounded border border-gray-200"
                         style="height:540px;"
@@ -50,11 +61,18 @@
             </div>
             @else
             <div class="px-5 py-4 flex items-center gap-4">
-                <p class="text-sm text-gray-400 italic">Sin documento SICD enlazado.</p>
+                <div class="flex-1">
+                    <p class="text-sm text-gray-400 italic">Sin documento SICD enlazado.</p>
+                    @if(in_array($sicd->documento_estado, ['error', 'reintento_pendiente'], true) && $sicd->documento_error)
+                        <p class="mt-1 text-xs text-red-500">{{ $sicd->documento_error }}</p>
+                    @elseif($sicd->documento_estado)
+                        <p class="mt-1 text-xs text-gray-400">Estado documental: {{ str_replace('_', ' ', $sicd->documento_estado) }}</p>
+                    @endif
+                </div>
                 <button id="btn-enlazar-show"
                         onclick="enlazarDesdeShow()"
                         class="text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-lg transition">
-                    Enlazar PDF SICD
+                    {{ $sicd->documento_estado === 'reintento_pendiente' ? 'Reintentar PDF SICD' : 'Enlazar PDF SICD' }}
                 </button>
                 <span id="enlazar-show-msg" class="text-xs hidden"></span>
             </div>
@@ -77,20 +95,15 @@
         </div>
 
 {{-- Tabla de productos (del Excel) --}}
-        <div class="bg-white rounded-xl shadow overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div id="det-card" class="bg-white rounded-xl shadow overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between" id="det-card-header">
                 <div>
-                    <h2 class="text-base font-semibold text-gray-700">Detalle de productos</h2>
+                    <h2 class="text-base font-semibold text-gray-700" id="det-card-title">Detalle de productos</h2>
                     <p class="text-xs text-gray-400 mt-0.5">Leídos desde el Excel adjunto al crear el SICD</p>
                 </div>
                 <div class="flex gap-2" id="det-botones">
                     <button id="btn-editar-det" onclick="detEditarOn()"
-                            class="det-btn-edit inline-flex items-center gap-1.5 text-xs font-semibold border px-3 py-1.5 rounded-lg shadow-sm"
-                            style="background:#fff; color:#4f46e5; border-color:#a5b4fc; transition:background .15s, border-color .15s, transform .1s, box-shadow .15s;"
-                            onmouseover="this.style.background='#eef2ff'; this.style.borderColor='#6366f1'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(99,102,241,.2)';"
-                            onmouseout="this.style.background='#fff'; this.style.borderColor='#a5b4fc'; this.style.transform=''; this.style.boxShadow='0 1px 2px rgba(0,0,0,.05)';"
-                            onmousedown="this.style.transform='scale(.97)';"
-                            onmouseup="this.style.transform='translateY(-1px)';">
+                            class="det-btn-edit inline-flex items-center gap-1.5 text-xs font-semibold border px-3 py-1.5 rounded-lg shadow-sm">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         Editar SICD
                     </button>
@@ -199,7 +212,90 @@
             </table>
             </div>
         </div>
+
+        {{-- Ítems pendientes de clasificación --}}
+        @php $pendientesDet = $sicd->detalles->where('clasificacion_pendiente', true); @endphp
+        @if($pendientesDet->isNotEmpty())
+        <div id="pend-card" class="rounded-xl shadow overflow-hidden" style="background:#fffbeb; border:1.5px solid #fcd34d;">
+            <div class="px-5 py-4 border-b flex items-center justify-between" style="border-color:#fde68a;">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#d97706" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    <h2 class="text-sm font-semibold" style="color:#92400e;">Ítems pendientes de clasificación</h2>
+                </div>
+                <span style="font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:9999px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;">
+                    {{ $pendientesDet->count() }} pendiente{{ $pendientesDet->count() > 1 ? 's' : '' }}
+                </span>
+            </div>
+
+            <div class="divide-y" style="border-color:#fde68a;">
+                @foreach($pendientesDet as $pdet)
+                <div class="px-5 py-3 flex items-center justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium truncate" style="color:#78350f;">{{ $pdet->nombre_producto_excel }}</p>
+                        <p class="text-xs mt-0.5" style="color:#b45309;">
+                            {{ $pdet->cantidad_solicitada }} {{ $pdet->unidad ?: 'ud.' }}
+                            · Por {{ $pdet->pendienteUser?->name ?? '—' }}
+                            el {{ $pdet->pendiente_at?->format('d/m/Y') }}
+                        </p>
+                    </div>
+                    <button type="button"
+                            onclick="abrirResolverPend({{ $pdet->id }}, {!! json_encode($pdet->nombre_producto_excel, JSON_HEX_TAG | JSON_HEX_AMP) !!})"
+                            style="flex-shrink:0;padding:0.3rem 0.85rem;font-size:0.75rem;font-weight:700;color:#92400e;background:#fef3c7;border:1.5px solid #fcd34d;border-radius:0.5rem;cursor:pointer;transition:background .15s,border-color .15s;"
+                            onmouseover="this.style.background='#fde68a';this.style.borderColor='#f59e0b';"
+                            onmouseout="this.style.background='#fef3c7';this.style.borderColor='#fcd34d';">
+                        Resolver →
+                    </button>
+                </div>
+                @endforeach
+            </div>
+
+            <div class="px-5 py-3" style="background:#fef3c7; border-top:1px solid #fde68a;">
+                <p class="text-xs" style="color:#92400e;">
+                    ⚠ No se puede crear una Orden de Compra con este SICD hasta resolver todos los ítems pendientes.
+                </p>
+            </div>
+        </div>
+        @endif
+
     </div>
+
+{{-- Modal: resolver ítem pendiente --}}
+<div id="pend-modal" style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:1rem;box-shadow:0 24px 60px rgba(0,0,0,.25);width:100%;max-width:480px;animation:picker-in .2s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="padding:1.2rem 1.25rem 0.9rem;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <p style="font-size:0.95rem;font-weight:700;color:#1e293b;margin:0;">Resolver ítem pendiente</p>
+                <p id="pend-modal-desc" style="font-size:0.75rem;color:#92400e;margin:0.15rem 0 0;font-weight:600;"></p>
+            </div>
+            <button onclick="cerrarResolverPend()" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:1.3rem;line-height:1;">&#x2715;</button>
+        </div>
+        <div style="padding:1rem 1.25rem;">
+            <label style="display:block;font-size:0.75rem;font-weight:600;color:#374151;margin-bottom:0.4rem;">Buscar producto del catálogo:</label>
+            <input id="pend-search" type="text" placeholder="Escribir nombre del producto..."
+                   oninput="pendBuscar(this.value)"
+                   style="width:100%;border:1.5px solid #d1d5db;border-radius:0.5rem;padding:0.45rem 0.85rem;font-size:0.85rem;outline:none;box-sizing:border-box;">
+            <div id="pend-results" style="margin-top:0.5rem;max-height:240px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:0.5rem;"></div>
+            <p id="pend-modal-msg" style="display:none;font-size:0.75rem;margin-top:0.5rem;"></p>
+        </div>
+        <form id="pend-form" method="POST" action="{{ route('admin.sicd.resolver-detalle-pendiente', $sicd->id) }}">
+            @csrf
+            <input type="hidden" id="pend-detalle-id" name="sicd_detalle_id">
+            <input type="hidden" id="pend-producto-id" name="producto_id">
+            <div style="padding:0 1.25rem 1.25rem;display:flex;justify-content:flex-end;gap:0.5rem;">
+                <button type="button" onclick="cerrarResolverPend()"
+                        style="padding:0.45rem 1rem;font-size:0.82rem;font-weight:600;background:#f3f4f6;color:#374151;border:none;border-radius:0.5rem;cursor:pointer;">
+                    Cancelar
+                </button>
+                <button type="submit" id="pend-submit-btn" disabled
+                        style="padding:0.45rem 1.1rem;font-size:0.82rem;font-weight:700;color:#fff;background:#9ca3af;border:none;border-radius:0.5rem;cursor:not-allowed;transition:background .15s;">
+                    Enlazar producto
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 {{-- Modal picker de productos --}}
 <div id="det-modal-picker" style="display:none; position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,.5); align-items:flex-start; justify-content:center; padding-top:5vh; overflow-y:auto;">
@@ -361,6 +457,91 @@
 .det-row-new {
     animation: det-row-in .22s ease both;
 }
+
+/* ── Edit button (replaces inline style) ─────── */
+.det-btn-edit {
+    background: #fff;
+    color: #4f46e5;
+    border-color: #a5b4fc;
+    transition: background .15s, border-color .15s, transform .1s, box-shadow .15s;
+    box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+.det-btn-edit:hover {
+    background: #eef2ff;
+    border-color: #6366f1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99,102,241,.2);
+}
+.det-btn-edit:active { transform: scale(.97); }
+
+/* ── Dark mode: card container ───────────────── */
+html.dark #det-card { background: #1e293b; }
+html.dark #det-card-header { border-color: #334155; }
+html.dark #det-card-title { color: #e2e8f0; }
+
+/* ── Dark mode: table header ─────────────────── */
+html.dark #det-tabla thead { background: #0f172a; border-color: #334155; }
+html.dark #det-tabla thead th { color: #94a3b8; border-color: #334155; }
+
+/* ── Dark mode: table body ───────────────────── */
+html.dark #det-tbody { border-color: #334155 !important; }
+html.dark #det-tbody tr { border-color: #334155 !important; }
+html.dark #det-tbody .det-row:hover { background: #1e3a5f !important; }
+html.dark #det-tabla.editing tbody tr.det-row { background: #162032 !important; }
+html.dark #det-tabla.editing tbody tr.det-row:hover { background: #1e3a5f !important; }
+
+/* ── Dark mode: cell text ────────────────────── */
+html.dark #det-tbody td { color: #cbd5e1; }
+html.dark #det-tbody .det-view { color: #cbd5e1; }
+html.dark #det-tbody .text-indigo-600 { color: #818cf8; }
+html.dark #det-tbody .font-semibold { color: #e2e8f0; }
+
+/* ── Dark mode: edit inputs ──────────────────── */
+html.dark .det-inp-text,
+html.dark .det-inp-sm,
+html.dark .det-inp-num {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-color: #475569;
+}
+html.dark .det-inp-text:focus,
+html.dark .det-inp-sm:focus,
+html.dark .det-inp-num:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,.2);
+}
+
+/* ── Dark mode: tfoot ────────────────────────── */
+html.dark #det-tabla tfoot tr.bg-gray-50 { background: #0f172a; border-color: #334155; }
+html.dark #det-tabla tfoot .text-gray-500 { color: #94a3b8; }
+html.dark #det-tabla tfoot .text-gray-400 { color: #64748b; }
+html.dark #det-tabla tfoot .text-gray-700 { color: #cbd5e1; }
+html.dark #det-tabla tfoot tr.bg-indigo-50 { background: #1e1b4b; border-color: #3730a3; }
+html.dark #det-tabla tfoot .text-indigo-700 { color: #a5b4fc; }
+html.dark #det-tabla tfoot .text-indigo-900 { color: #c7d2fe; }
+html.dark #det-row-agregar td { background: rgba(30,27,75,.6); border-color: #3730a3; }
+
+/* ── Dark mode: delete row button ────────────── */
+html.dark .det-row button.text-gray-400 { color: #64748b; }
+html.dark .det-row button:hover { color: #f87171; background: rgba(239,68,68,.1); }
+
+/* ── Dark mode: pending card ─────────────────── */
+html.dark #pend-card { background: #451a03 !important; border-color: #d97706 !important; }
+html.dark #pend-card .border-b { border-color: #b45309 !important; }
+html.dark #pend-card p, html.dark #pend-card h2 { color: #fcd34d !important; }
+html.dark #pend-card .divide-y > div { border-color: #92400e !important; }
+
+/* ── Dark mode: edit button ──────────────────── */
+html.dark .det-btn-edit {
+    background: #0f172a;
+    color: #a5b4fc;
+    border-color: #6366f1;
+}
+html.dark .det-btn-edit:hover {
+    background: #1e1b4b;
+    border-color: #818cf8;
+    box-shadow: 0 4px 12px rgba(99,102,241,.25);
+}
 </style>
 @endpush
 
@@ -380,10 +561,21 @@
                 <div class="px-5 py-4">
                     <p class="text-sm text-gray-400">Aún no asignado a ninguna OC.</p>
                     @if($sicd->estado === 'pendiente')
-                        <a href="{{ route('admin.ordenes.create') }}"
-                           class="mt-3 inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline font-medium">
-                            Crear OC y agrupar →
-                        </a>
+                        @if($sicd->tieneDocumentoPersistido())
+                            <a href="{{ route('admin.ordenes.create') }}"
+                               class="mt-3 inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline font-medium">
+                                Crear OC y agrupar →
+                            </a>
+                        @else
+                            <div class="mt-3 flex items-start gap-2 rounded-lg px-3 py-2.5" style="background:#fef3c7; border:1px solid #fcd34d;">
+                                <svg style="width:0.875rem;height:0.875rem;flex-shrink:0;margin-top:0.1rem;color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                                </svg>
+                                <p style="font-size:0.75rem; color:#92400e; margin:0; line-height:1.4;">
+                                    Debes enlazar el PDF del SICD antes de poder crear una Orden de Compra.
+                                </p>
+                            </div>
+                        @endif
                     @endif
                 </div>
             @else
@@ -407,6 +599,10 @@
                                 @if($oc->api_proveedor_nombre)
                                     <span class="text-xs text-gray-500 truncate">{{ $oc->api_proveedor_nombre }}</span>
                                 @endif
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $oc->tipoAdquisicionBadgeClasses() }}"
+                                      title="{{ $oc->tipoAdquisicionMetadata() }}">
+                                    {{ $oc->tipoAdquisicionLabel() }}
+                                </span>
                             </div>
                             @if($oc->api_total)
                                 <p class="text-xs text-gray-400 mt-0.5">
@@ -423,17 +619,23 @@
                 </div>
 
                 @if($sicd->permite_mas_oc)
-                <div class="px-5 py-3 border-t border-gray-100 bg-green-50">
+                <div class="px-5 py-3 border-t border-gray-100 {{ $sicd->tieneDocumentoPersistido() ? 'bg-green-50' : 'bg-amber-50' }}">
                     <div class="flex items-center gap-2">
                         <span style="font-size:.65rem; font-weight:700; padding:1px 7px; border-radius:9999px; background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;">
                             + OC habilitado
                         </span>
                         <span class="text-xs text-green-700">Se pueden asociar más órdenes de compra.</span>
                     </div>
-                    <a href="{{ route('admin.ordenes.create') }}"
-                       class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline">
-                        Crear nueva OC asociada →
-                    </a>
+                    @if($sicd->tieneDocumentoPersistido())
+                        <a href="{{ route('admin.ordenes.create') }}"
+                           class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline">
+                            Crear nueva OC asociada →
+                        </a>
+                    @else
+                        <p style="font-size:0.73rem; color:#92400e; margin:0.4rem 0 0; line-height:1.4;">
+                            ⚠ Enlaza el PDF del SICD antes de crear una nueva OC.
+                        </p>
+                    @endif
                 </div>
                 @endif
             @endif
@@ -513,6 +715,20 @@
                 </div>
 
                 {{-- Diferencia (homogénea: SICD total vs OC total) --}}
+                @if($sicd->ordenesCompra->isNotEmpty())
+                <div class="pt-2 border-t border-gray-100">
+                    <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Metadata documental OC</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        @foreach($sicd->ordenesCompra as $oc)
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $oc->tipoAdquisicionBadgeClasses() }}"
+                                  title="{{ $oc->numero_oc }} · {{ $oc->tipoAdquisicionMetadata() }}">
+                                {{ $oc->numero_oc }} · {{ $oc->tipoAdquisicionLabel() }}
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
                 @if($hayOcConTotal && $sicdTotalRef > 0)
                 <div class="pt-2 border-t border-gray-100">
                     <div class="flex items-center justify-between gap-2">
@@ -551,8 +767,8 @@ function enlazarDesdeShow() {
     if (!btn) return;
 
     btn.disabled = true;
-    btn.textContent = 'Enlazando...';
-    if (msg) { msg.className = 'text-xs text-gray-400'; msg.textContent = ''; msg.classList.remove('hidden'); }
+    btn.textContent = 'Procesando PDF...';
+    if (msg) { msg.className = 'text-xs text-gray-400'; msg.textContent = 'Conectando con SICD externa y guardando documento...'; msg.classList.remove('hidden'); }
 
     fetch('{{ route("admin.sicd.enlazar-pdf", $sicd->id) }}', {
         method: 'POST',
@@ -573,15 +789,16 @@ function enlazarDesdeShow() {
             btn.textContent = '✓ Listo';
             btn.disabled = true;
             btn.className = 'text-xs font-semibold bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg';
+            setTimeout(function () { window.location.reload(); }, 650);
         } else {
             btn.disabled = false;
-            btn.textContent = 'Enlazar PDF SICD';
+            btn.textContent = 'Reintentar PDF SICD';
             if (msg) { msg.className = 'text-xs text-red-500'; msg.textContent = res.msg || 'Error desconocido'; }
         }
     })
     .catch(function(e) {
         btn.disabled = false;
-        btn.textContent = 'Enlazar PDF SICD';
+        btn.textContent = 'Reintentar PDF SICD';
         if (msg) { msg.className = 'text-xs text-red-500'; msg.textContent = e.message || 'Error de conexión'; }
     });
 }
@@ -797,6 +1014,82 @@ function detMostrarMsg(msg, ok) {
 }
 function detOcultarMsg() { var el = document.getElementById('det-msg'); if (el) el.style.display = 'none'; }
 
+// ── Resolver ítem pendiente ────────────────────────────────────────────────
+var _pendDetalleId = null;
+
+function abrirResolverPend(detalleId, desc) {
+    _pendDetalleId = detalleId;
+    document.getElementById('pend-detalle-id').value = detalleId;
+    document.getElementById('pend-producto-id').value = '';
+    document.getElementById('pend-modal-desc').textContent = desc;
+    document.getElementById('pend-search').value = '';
+    document.getElementById('pend-results').innerHTML = '<p style="padding:1rem;font-size:0.78rem;color:#9ca3af;text-align:center;">Escribe para buscar…</p>';
+    document.getElementById('pend-submit-btn').disabled = true;
+    document.getElementById('pend-submit-btn').style.background = '#9ca3af';
+    document.getElementById('pend-submit-btn').style.cursor = 'not-allowed';
+    var msg = document.getElementById('pend-modal-msg');
+    if (msg) msg.style.display = 'none';
+    document.getElementById('pend-modal').style.display = 'flex';
+    setTimeout(function() { document.getElementById('pend-search').focus(); }, 60);
+}
+
+function cerrarResolverPend() {
+    document.getElementById('pend-modal').style.display = 'none';
+    _pendDetalleId = null;
+}
+
+function pendBuscar(q) {
+    q = q.trim().toLowerCase();
+    var cont = document.getElementById('pend-results');
+    if (!q) {
+        cont.innerHTML = '<p style="padding:1rem;font-size:0.78rem;color:#9ca3af;text-align:center;">Escribe para buscar…</p>';
+        return;
+    }
+    if (!_detCatalogo.length) {
+        var raw = document.getElementById('det-familias-data');
+        if (raw) _detCatalogo = JSON.parse(raw.textContent);
+    }
+    var all = _detCatalogo.flatMap(function(f) {
+        return f.categorias.flatMap(function(c) {
+            return c.productos.map(function(p) { return { id: p.id, nombre: p.nombre, unidad: p.unidad }; });
+        });
+    });
+    var matches = all.filter(function(p) { return p.nombre.toLowerCase().includes(q); }).slice(0, 30);
+    if (!matches.length) {
+        cont.innerHTML = '<p style="padding:1rem;font-size:0.78rem;color:#9ca3af;text-align:center;">Sin resultados.</p>';
+        return;
+    }
+    cont.innerHTML = matches.map(function(p) {
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.5rem 0.75rem;border-bottom:1px solid #f3f4f6;cursor:pointer;"'
+             + ' onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'\'">'
+             + '<div style="flex:1;min-width:0;">'
+             + '<p style="font-size:0.82rem;font-weight:500;color:#1f2937;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escDetHtml(p.nombre) + '</p>'
+             + (p.unidad ? '<span style="font-size:0.68rem;color:#6366f1;font-weight:600;">' + escDetHtml(p.unidad) + '</span>' : '')
+             + '</div>'
+             + '<button type="button" onclick="pendSeleccionar(' + p.id + ', ' + JSON.stringify(p.nombre) + ')"'
+             + ' style="flex-shrink:0;padding:0.25rem 0.7rem;font-size:0.72rem;font-weight:700;color:#4f46e5;background:#eef2ff;border:1px solid #c7d2fe;border-radius:0.4rem;cursor:pointer;">'
+             + 'Seleccionar</button>'
+             + '</div>';
+    }).join('');
+}
+
+function pendSeleccionar(productoId, nombreProducto) {
+    document.getElementById('pend-producto-id').value = productoId;
+    var submitBtn = document.getElementById('pend-submit-btn');
+    submitBtn.disabled = false;
+    submitBtn.style.background = '#16a34a';
+    submitBtn.style.cursor = 'pointer';
+    submitBtn.textContent = '✓ Enlazar: ' + nombreProducto.substring(0, 30) + (nombreProducto.length > 30 ? '…' : '');
+    document.getElementById('pend-results').innerHTML = '';
+    document.getElementById('pend-search').value = nombreProducto;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var pendOverlay = document.getElementById('pend-modal');
+    if (pendOverlay) pendOverlay.addEventListener('click', function(e) { if (e.target === pendOverlay) cerrarResolverPend(); });
+});
+
+// ── Guardar detalles SICD ─────────────────────────────────────────────────
 function detGuardar() {
     var detalles = [];
     document.querySelectorAll('#det-tbody .det-row').forEach(function(row) {

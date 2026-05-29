@@ -47,13 +47,13 @@
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 <option value="0" {{ old('rol', '0') == '0' ? 'selected' : '' }}>Usuario</option>
                 <option value="1" {{ old('rol') == '1' ? 'selected' : '' }}>Admin</option>
-                <option value="2" {{ old('rol') == '2' ? 'selected' : '' }}>Dev</option>
+                <option value="2" {{ old('rol') == '2' ? 'selected' : '' }}>Super Administrador</option>
             </select>
             @error('rol') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
             @else
             <input type="hidden" name="rol" value="0">
             <div class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-400 select-none">
-                Usuario <span class="text-xs">(solo dev puede asignar roles)</span>
+                Usuario <span class="text-xs">(solo Super Administrador puede asignar roles)</span>
             </div>
             @endif
         </div>

@@ -16,6 +16,13 @@ class OrdenCompra extends Model
         'archivo_nombre',
         'archivo_ruta',
         'estado',
+        'tipo_adquisicion',
+        'tipo_adquisicion_origen',
+        'tipo_adquisicion_confianza',
+        'tipo_adquisicion_observacion',
+        'factura_pendiente',
+        'factura_pendiente_at',
+        'factura_pendiente_por',
         'procesado_por',
         'procesado_at',
         'usuario_id',
@@ -37,15 +44,20 @@ class OrdenCompra extends Model
         'api_validado_at',
         'api_error',
         'api_intentos',
+        'mp_estado_proceso',
+        'mp_error_at',
     ];
 
     protected $casts = [
-        'procesado_at'    => 'datetime',
-        'api_validado_at' => 'datetime',
-        'api_total'       => 'integer',
-        'api_impuestos'   => 'integer',
-        'api_intentos'    => 'integer',
-        'api_items'       => 'array',
+        'procesado_at'         => 'datetime',
+        'factura_pendiente'    => 'boolean',
+        'factura_pendiente_at' => 'datetime',
+        'api_validado_at'      => 'datetime',
+        'api_total'            => 'integer',
+        'api_impuestos'        => 'integer',
+        'api_intentos'         => 'integer',
+        'api_items'            => 'array',
+        'mp_error_at'          => 'datetime',
     ];
 
     public function estaValidada(): bool
@@ -87,6 +99,42 @@ class OrdenCompra extends Model
         return '$' . number_format($this->api_total, 0, ',', '.');
     }
 
+    public function tipoAdquisicionLabel(): string
+    {
+        return match ($this->tipo_adquisicion ?? 'indeterminado') {
+            'compra_agil' => 'Compra Agil',
+            'licitacion' => 'Licitacion',
+            default => 'Indeterminado',
+        };
+    }
+
+    public function tipoAdquisicionOrigenLabel(): string
+    {
+        return match ($this->tipo_adquisicion_origen ?? 'manual') {
+            'api_mp' => 'API MP',
+            'codigo_mp' => 'Codigo MP',
+            'utm_estimado' => 'UTM estimado',
+            'manual' => 'Manual',
+            default => 'Manual',
+        };
+    }
+
+    public function tipoAdquisicionBadgeClasses(): string
+    {
+        return match ($this->tipo_adquisicion ?? 'indeterminado') {
+            'compra_agil' => 'bg-green-100 text-green-700',
+            'licitacion' => 'bg-indigo-100 text-indigo-700',
+            default => 'bg-gray-100 text-gray-600',
+        };
+    }
+
+    public function tipoAdquisicionMetadata(): string
+    {
+        return $this->tipoAdquisicionLabel()
+            . ' · ' . $this->tipoAdquisicionOrigenLabel()
+            . ' · confianza ' . ($this->tipo_adquisicion_confianza ?? 'baja');
+    }
+
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');
@@ -118,6 +166,17 @@ class OrdenCompra extends Model
     }
 
     /** Productos asignados explícitamente a esta OC */
+    public function facturaPendiente(): bool
+    {
+        return !$this->tieneFactura()
+            && !in_array($this->estado, ['recibido', 'cerrado', 'cancelado', 'anulado'], true);
+    }
+
+    public function usuarioFacturaPendiente()
+    {
+        return $this->belongsTo(User::class, 'factura_pendiente_por');
+    }
+
     public function detalles()
     {
         return $this->hasMany(OrdenCompraDetalle::class);

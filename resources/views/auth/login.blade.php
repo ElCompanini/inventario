@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ config('app.name') }} — Iniciar sesión</title>
+    <title>
+    @if(config('app.name'))
+        {{ config('app.name') }} —
+    @endif
+    @yield('title', 'Inicio')
+    </title>
     <link rel="icon" type="image/jpeg" href="{{ asset('images/hospital.jpg') }}">
     <script>if(localStorage.getItem('darkMode')==='1')document.documentElement.classList.add('dark');</script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -104,6 +109,11 @@
                                text-white font-semibold py-2.5 rounded-lg transition-colors duration-200 text-sm">
                     Entrar
                 </button>
+
+                <a href="{{ route('password.forgot') }}"
+                   class="block text-center mt-4 text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                    Olvidaste tu contrasena?
+                </a>
             </form>
         </div>
 

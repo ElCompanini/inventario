@@ -64,17 +64,18 @@ return [
 
         'sicd_externa' => [
             'driver'    => 'mysql',
-            'host'      => env('DB_SICD_HOST', '10.5.212.137'),
+            'host'      => env('DB_SICD_HOST'),
             'port'      => env('DB_SICD_PORT', '3306'),
-            'database'  => env('DB_SICD_DATABASE', 'solicitudes'),
-            'username'  => env('DB_SICD_USERNAME', 'testing'),
-            'password'  => env('DB_SICD_PASSWORD', '123456'),
+            'database'  => env('DB_SICD_DATABASE'),
+            'username'  => env('DB_SICD_USERNAME'),
+            'password'  => env('DB_SICD_PASSWORD'),
             'charset'   => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
             'prefix'    => '',
             'strict'    => false,
             'options'   => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::ATTR_TIMEOUT => (int) env('DB_SICD_TIMEOUT', 8),
             ]) : [],
         ],
 

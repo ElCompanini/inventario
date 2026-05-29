@@ -11,7 +11,7 @@ class Marca extends Model
 
     protected $table = 'marcas';
 
-    protected $fillable = ['nombre', 'categoria_id', 'activo', 'protegido'];
+    protected $fillable = ['nombre', 'categoria_id', 'tipo_item', 'activo', 'protegido'];
 
     protected $casts = ['activo' => 'boolean', 'protegido' => 'boolean'];
 
@@ -19,6 +19,9 @@ class Marca extends Model
     {
         static::saving(function (self $m) {
             $m->nombre = strtoupper(trim($m->nombre));
+            if (!$m->tipo_item && $m->categoria_id) {
+                $m->tipo_item = $m->categoria?->tipo_item ?? 'producto';
+            }
             if ($m->protegido && $m->isDirty('activo') && !$m->activo) {
                 $m->activo = true;
             }

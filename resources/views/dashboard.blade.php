@@ -12,6 +12,12 @@
             @if($servicios->count() > 0)
             · <span class="text-violet-600 font-medium">{{ $servicios->count() }} servicio(s)</span>
             @endif
+            @if(($mantenciones ?? collect())->count() > 0)
+            · <span class="text-amber-600 font-medium">{{ $mantenciones->count() }} mantención(es)</span>
+            @endif
+            @if(($arriendos ?? collect())->count() > 0)
+            - <span class="text-orange-600 font-medium">{{ $arriendos->count() }} arriendo(s)</span>
+            @endif
         </p>
     </div>
 
@@ -98,7 +104,7 @@
                 Stock mínimo
             </span>
             <span class="flex items-center gap-1.5">
-                <span class="inline-block w-4 h-4 rounded bg-white border border-gray-200"></span>
+                <span class="inline-block w-4 h-4 rounded bg-green-50 border border-green-300"></span>
                 Normal
             </span>
         </div>
@@ -106,7 +112,11 @@
 </div>
 
 {{-- ═══ SELECTOR PRODUCTOS / SERVICIOS ══════════════════════════════════ --}}
-@php $cntServsTab = $servicios->count(); @endphp
+@php
+    $cntServsTab = $servicios->count();
+    $cntMantencionesTab = ($mantenciones ?? collect())->count();
+    $cntArriendosTab = ($arriendos ?? collect())->count();
+@endphp
 <div class="mb-5 flex items-center gap-1" id="tab-bar-prod-serv">
     <button type="button" id="tab-btn-productos"
             onclick="switchTab('productos')"
@@ -128,6 +138,28 @@
         Servicios
         @if($cntServsTab > 0)
         <span class="tab-ps-cnt text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{{ $cntServsTab }}</span>
+        @endif
+    </button>
+    <button type="button" id="tab-btn-mantenciones"
+            onclick="switchTab('mantenciones')"
+            class="tab-ps-btn flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h3m-7.5 4.5h12m-10.5 4.5h7.5M6 3h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2z"/>
+        </svg>
+        Mantención
+        @if($cntMantencionesTab > 0)
+        <span class="tab-ps-cnt text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{{ $cntMantencionesTab }}</span>
+        @endif
+    </button>
+    <button type="button" id="tab-btn-arriendos"
+            onclick="switchTab('arriendos')"
+            class="tab-ps-btn flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3M5 11h14M6 21h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        Arriendos
+        @if($cntArriendosTab > 0)
+        <span class="tab-ps-cnt text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{{ $cntArriendosTab }}</span>
         @endif
     </button>
 </div>
@@ -158,7 +190,7 @@
         <span id="badge-prod" class="hidden absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white"></span>
     </button>
 
-    <input id="buscador-productos" type="text" placeholder="🔍  Buscar por categoría, descripción, contenedor, stock o estado..."
+    <input id="buscador-productos" type="text" placeholder="🔍  Buscar por categoría, descripción, contenedor, stock, estado o código de barras..."
            class="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
                   focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
 </div>
@@ -339,7 +371,8 @@
                 data-estado="{{ $estado }}"
                 data-tipo="{{ $esServicio ? 'servicio' : 'producto' }}"
                 data-cc-id="{{ $producto->centro_costo_id }}"
-                data-producto-id="{{ $producto->id }}">
+                data-producto-id="{{ $producto->id }}"
+                data-barcode="{{ $producto->codigo_barras ?? '' }}">
                 <td class="px-3 py-2 font-medium text-gray-900">
                     <div class="flex items-center gap-2">
                         @if($pendienteSalida > 0)
@@ -375,7 +408,7 @@
                         @endif
 
                         @if($esServicio)
-                        <span class="inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                        <span class="serv-badge inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
                             <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
                             SERVICIO
                         </span>
@@ -606,10 +639,11 @@
         <tr class="border-b border-gray-100 hover:bg-violet-50/30 transition"
             data-nombre="{{ strtolower($serv->nombre) }}"
             data-categoria="{{ strtolower($serv->categoria?->nombre ?? '') }}"
-            data-estado="{{ $estadoActual }}">
+            data-estado="{{ $estadoActual }}"
+            data-servicio-id="{{ $serv->id }}">
             <td class="px-3 py-2.5 font-medium text-gray-900">
                 <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                    <span class="serv-badge inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
                         <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
                         SERV.
                     </span>
@@ -628,34 +662,32 @@
             </td>
             @endif
             <td class="px-2 py-2.5 text-center">
-                <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                <span class="ge-row-badge inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
                       style="background:{{ $colores['bg'] }}; color:{{ $colores['text'] }};">
-                    <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:{{ $colores['dot'] }};"></span>
+                    <span class="ge-row-dot w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:{{ $colores['dot'] }};"></span>
                     {{ $label }}
                 </span>
             </td>
             <td class="px-2 py-2.5">
-                <div class="flex flex-col gap-1">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold" style="color:{{ $colores['text'] }};">{{ $progreso }}%</span>
-                    </div>
-                    <div class="h-1.5 rounded-full bg-gray-200 overflow-hidden" style="min-width:90px;">
-                        <div class="h-full rounded-full transition-all"
-                             style="width:{{ $progreso }}%; background:{{ $colores['barra'] }};"></div>
+                <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span class="ge-row-pct" style="font-size:0.72rem; font-weight:700; color:{{ $colores['barra'] }};">{{ $progreso }}%</span>
+                    <div class="ge-bar-track" style="height:6px; border-radius:9999px; overflow:hidden; min-width:90px; background:#e2e8f0;">
+                        <div class="ge-row-bar" style="height:6px; border-radius:9999px; width:{{ $progreso }}%; background:{{ $colores['barra'] }};"></div>
                     </div>
                 </div>
             </td>
             <td class="px-2 py-2.5 text-center text-xs text-gray-500">
-                {{ $ultimoSE?->usuario?->name ?? '—' }}
+                <span class="ge-row-responsable">{{ $ultimoSE?->usuario?->name ?? '—' }}</span>
             </td>
             <td class="px-2 py-2.5 text-center text-xs text-gray-400 whitespace-nowrap">
-                {{ $ultimoSE?->created_at?->format('d/m/Y') ?? $serv->created_at->format('d/m/Y') }}
+                <span class="ge-row-fecha">{{ $ultimoSE?->created_at?->format('d/m/Y') ?? $serv->created_at->format('d/m/Y') }}</span>
             </td>
             <td class="px-2 py-2.5 text-center">
                 <div class="flex items-center justify-center gap-1.5">
                     @if(auth()->user()->esAdmin() && $estadoActual !== 'cerrado' && $estadoActual !== 'cancelado')
                     <button type="button"
                             title="Gestionar Estado"
+                            data-ge-id="{{ $serv->id }}"
                             onclick="abrirModalServicio({{ $serv->id }}, {{ json_encode($serv->nombre) }}, {{ json_encode($estadoActual) }}, {{ json_encode($siguiente) }}, {{ json_encode($timeline) }})"
                             class="p-act p-act-move" style="width:auto; padding:0.25rem 0.6rem; gap:0.3rem; font-size:0.7rem; font-weight:600; white-space:nowrap;">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -666,8 +698,8 @@
                     @elseif(auth()->user()->esAdmin())
                     <span class="text-xs text-gray-400 italic">{{ $estadoActual === 'cerrado' ? 'Cerrado' : 'Cancelado' }}</span>
                     @endif
-                    <a href="{{ route('admin.reportes.bincard', $serv->id) }}"
-                       title="BINCARD Operacional"
+                    <a href="{{ route('admin.productos.show', $serv->id) }}"
+                       title="Ver detalle del servicio"
                        class="p-act p-act-ver">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -685,6 +717,214 @@
 @endif
 
 </div>{{-- /tab-panel-servicios --}}
+
+{{-- PANEL: MANTENCIONES --}}
+<div id="tab-panel-mantenciones" style="display:none;">
+@php
+    use App\Models\ServicioEstado as SEMant;
+@endphp
+<div class="mb-3 flex items-center gap-2">
+    <input id="buscador-mantenciones" type="text" placeholder="Buscar mantención, categoría, estado o documento..."
+           class="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white">
+</div>
+@if(($mantenciones ?? collect())->isEmpty())
+<div class="bg-white rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center gap-4 mb-6" style="min-height:300px; padding:3rem 2rem;">
+    <p class="text-lg font-semibold text-gray-700">No hay mantenciones registradas</p>
+    <p class="text-sm text-gray-400 max-w-lg">Crea un item con tipo Mantención para gestionar su flujo operacional separado de arriendos.</p>
+</div>
+@else
+<div class="bg-white rounded-xl shadow overflow-hidden"><div class="overflow-x-auto">
+<table id="tabla-mantenciones" class="w-full text-sm">
+    <thead class="bg-gray-50 text-left"><tr>
+        <th class="px-3 py-2 font-semibold text-gray-600 text-xs">Mantención</th>
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs">Categoría</th>
+        @if(auth()->user()->esDev())
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs">CC</th>
+        @endif
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-center">Estado operacional</th>
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-center">Avance</th>
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs">Documento</th>
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-center">Acciones</th>
+    </tr></thead>
+    <tbody>
+        @foreach($mantenciones as $mant)
+        @php
+            $ultimoMant = $mant->servicioEstados->last();
+            $estadoMant = $ultimoMant?->estado ?? 'pendiente';
+            $progresoMant = SEMant::progreso($estadoMant);
+            $colsMant = SEMant::colores($estadoMant);
+            $siguienteMant = SEMant::flujoSiguiente($estadoMant);
+            $timelineMant = $mant->servicioEstados->map(fn($s) => [
+                'estado' => $s->estado,
+                'label' => SEMant::label($s->estado),
+                'usuario' => $s->usuario?->name ?? '—',
+                'obs' => $s->observacion,
+                'fecha' => $s->created_at->format('d/m/Y H:i'),
+                'colores' => SEMant::colores($s->estado),
+            ])->values()->toArray();
+        @endphp
+        <tr class="border-b border-gray-100 hover:bg-amber-50/40 transition"
+            data-nombre="{{ strtolower($mant->nombre) }}"
+            data-categoria="{{ strtolower($mant->categoria?->nombre ?? '') }}"
+            data-estado="{{ $estadoMant }}"
+            data-documento="{{ strtolower($ultimoMant?->documento_referencia ?? '') }}">
+            <td class="px-3 py-2.5 font-medium text-gray-900">
+                <span class="inline-flex items-center bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full mr-2">MANT.</span>
+                {{ $mant->nombre }}
+            </td>
+            <td class="px-2 py-2.5 text-xs text-gray-500">
+                <div>{{ $mant->categoria?->familia?->nombre ?? '—' }}</div>
+                <div class="text-gray-400">{{ $mant->categoria?->nombre ?? '—' }}</div>
+            </td>
+            @if(auth()->user()->esDev())
+            <td class="px-2 py-2.5 text-center"><span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ $mant->centroCosto?->acronimo ?? '—' }}</span></td>
+            @endif
+            <td class="px-2 py-2.5 text-center"><span class="ge-row-badge inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full" style="background:{{ $colsMant['bg'] }}; color:{{ $colsMant['text'] }};">{{ SEMant::label($estadoMant) }}</span></td>
+            <td class="px-2 py-2.5">
+                <div style="display:flex;align-items:center;gap:.45rem;justify-content:center;">
+                    <div class="ge-bar-track" style="height:6px;border-radius:9999px;overflow:hidden;width:90px;background:#e2e8f0;"><div class="ge-row-bar" style="height:6px;width:{{ $progresoMant }}%;background:{{ $colsMant['barra'] }};"></div></div>
+                    <span class="ge-row-pct text-xs font-bold" style="color:{{ $colsMant['barra'] }};">{{ $progresoMant }}%</span>
+                </div>
+            </td>
+            <td class="px-2 py-2.5 text-xs text-indigo-600 font-mono">{{ $ultimoMant?->documento_referencia ?? '—' }}</td>
+            <td class="px-2 py-2.5 text-center">
+                @if(auth()->user()->esAdmin() && !in_array($estadoMant, ['cerrado','cancelado'], true))
+                <button type="button"
+                        onclick="abrirModalServicio({{ $mant->id }}, {{ json_encode($mant->nombre) }}, {{ json_encode($estadoMant) }}, {{ json_encode($siguienteMant) }}, {{ json_encode($timelineMant) }})"
+                        class="p-act p-act-move" style="width:auto;padding:0.25rem 0.6rem;font-size:0.7rem;font-weight:600;">Estado</button>
+                @endif
+                <a href="{{ route('admin.productos.show', $mant->id) }}" class="p-act p-act-ver" title="Ver detalle">Ver</a>
+            </td>
+        </tr>
+        @endforeach
+    </tbody>
+</table>
+</div></div>
+@endif
+</div>{{-- /tab-panel-mantenciones --}}
+
+{{-- PANEL: ARRIENDOS --}}
+<div id="tab-panel-arriendos" style="display:none;">
+@php use App\Models\ArriendoMovimiento as AM; @endphp
+<div class="mb-3 flex items-center gap-2">
+    <input id="buscador-arriendos" type="text" placeholder="Buscar arriendo, proveedor, estado o documento..."
+           class="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white">
+</div>
+@if(($arriendos ?? collect())->isEmpty())
+<div class="bg-white rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center gap-4 mb-6" style="min-height:300px; padding:3rem 2rem;">
+    <p class="text-lg font-semibold text-gray-700">No hay arriendos registrados</p>
+    <p class="text-sm text-gray-400 max-w-lg">Crea un item con tipo Arriendo desde catalogo o carga rapida para gestionar su trazabilidad contractual.</p>
+</div>
+@else
+<div class="bg-white rounded-xl shadow overflow-hidden"><div class="overflow-x-auto">
+<table id="tabla-arriendos" class="w-full text-sm">
+    <thead class="bg-gray-50 text-left"><tr>
+        <th class="px-3 py-2 font-semibold text-gray-600 text-xs">Arriendo</th>
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs">Proveedor</th>
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-center">Estado</th>
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs">Periodo</th>
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-right">Monto</th>
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs">Documento</th>
+        <th class="px-2 py-2 font-semibold text-gray-600 text-xs text-center">Acciones</th>
+    </tr></thead>
+    <tbody>
+        @foreach($arriendos as $arr)
+        @php
+            $mov = $arr->arriendoMovimientos->first();
+            $estadoArr = $mov?->estado_nuevo ?? 'pendiente';
+            $colsArr = AM::colores($estadoArr);
+            $permitidosArr = AM::flujoPermitido($estadoArr);
+            $periodoArr = ($mov?->fecha_inicio?->format('d/m/Y') ?? 'Sin inicio') . ' - ' . ($mov?->fecha_termino?->format('d/m/Y') ?? 'Abierto');
+        @endphp
+        <tr class="border-b border-gray-100 hover:bg-orange-50/40" data-nombre="{{ strtolower($arr->nombre) }}" data-proveedor="{{ strtolower($mov?->proveedor_nombre ?? '') }}" data-estado="{{ $estadoArr }}" data-documento="{{ strtolower($mov?->documento_referencia ?? '') }}">
+            <td class="px-3 py-2.5"><div class="font-semibold text-gray-900">{{ $arr->nombre }}</div><div class="text-xs text-gray-400">{{ $arr->centroCosto?->acronimo ?? 'Sin CC' }}</div></td>
+            <td class="px-2 py-2.5 text-xs text-gray-600">{{ $mov?->proveedor_nombre ?? '—' }}</td>
+            <td class="px-2 py-2.5 text-center"><span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold" style="background:{{ $colsArr['bg'] }};color:{{ $colsArr['text'] }};">{{ AM::label($estadoArr) }}</span></td>
+            <td class="px-2 py-2.5 text-xs text-gray-600">{{ $periodoArr }}<br><span class="text-gray-400">{{ $mov?->duracion ? $mov->duracion . ' ' . ($mov->unidad_tiempo ?? 'dias') : '' }}</span></td>
+            <td class="px-2 py-2.5 text-right text-xs font-semibold">{{ $mov?->monto_total ? '$' . number_format((float) $mov->monto_total, 0, ',', '.') : '—' }}</td>
+            <td class="px-2 py-2.5 text-xs text-indigo-600 font-mono">{{ $mov?->documento_referencia ?? '—' }}</td>
+            <td class="px-2 py-2.5 text-center">
+                @if(auth()->user()->esAdmin() && !in_array($estadoArr, ['finalizado','cancelado'], true))
+                <button type="button" onclick="abrirModalArriendo({{ $arr->id }}, {{ json_encode($arr->nombre) }}, {{ json_encode($estadoArr) }}, {{ json_encode($permitidosArr) }}, {{ json_encode(['proveedor' => $mov?->proveedor_nombre, 'fecha_inicio' => $mov?->fecha_inicio?->format('Y-m-d'), 'fecha_termino' => $mov?->fecha_termino?->format('Y-m-d'), 'duracion' => $mov?->duracion, 'unidad_tiempo' => $mov?->unidad_tiempo, 'monto_periodo' => $mov?->monto_periodo, 'monto_total' => $mov?->monto_total, 'documento' => $mov?->documento_referencia]) }})" class="p-act p-act-move" style="width:auto;padding:0.25rem 0.6rem;font-size:0.7rem;font-weight:600;">Gestionar</button>
+                @endif
+                <a href="{{ route('admin.productos.show', $arr->id) }}" class="p-act p-act-ver" title="Ver detalle">Ver</a>
+            </td>
+        </tr>
+        @endforeach
+    </tbody>
+</table>
+</div></div>
+@endif
+</div>{{-- /tab-panel-arriendos --}}
+
+@if(auth()->user()->esAdmin())
+<div id="modal-gestionar-arriendo" style="display:none; position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 64px rgba(0,0,0,.3); width:100%; max-width:620px; max-height:90vh; overflow-y:auto;">
+        <div style="padding:1.25rem 1.5rem; border-bottom:1px solid #f3f4f6; display:flex; justify-content:space-between; gap:1rem;">
+            <div>
+                <p style="font-size:.7rem; font-weight:700; color:#f97316; margin:0 0 .2rem;">ARRIENDO</p>
+                <h3 id="arr-titulo" style="font-size:1rem; font-weight:700; color:#1f2937; margin:0;"></h3>
+            </div>
+            <button type="button" onclick="cerrarModalArriendo()" style="border:none;background:none;color:#9ca3af;font-size:1.2rem;cursor:pointer;">x</button>
+        </div>
+        <form id="form-gestionar-arriendo" method="POST" style="padding:1.25rem 1.5rem;">
+            @csrf
+            <input type="hidden" name="estado" id="arr-estado-input">
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;">
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Estado actual</label>
+                    <div id="arr-estado-actual" class="mt-1 text-sm font-bold text-gray-700"></div>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Proveedor</label>
+                    <input name="proveedor_nombre" id="arr-proveedor" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Fecha inicio</label>
+                    <input type="date" name="fecha_inicio" id="arr-fecha-inicio" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Fecha termino</label>
+                    <input type="date" name="fecha_termino" id="arr-fecha-termino" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Duracion</label>
+                    <input type="number" min="1" name="duracion" id="arr-duracion" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Unidad tiempo</label>
+                    <select name="unidad_tiempo" id="arr-unidad-tiempo" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="dias">Dias</option>
+                        <option value="meses">Meses</option>
+                        <option value="anios">Anios</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Monto periodo</label>
+                    <input type="number" min="0" step="0.01" name="monto_periodo" id="arr-monto-periodo" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500">Monto total estimado</label>
+                    <input type="number" min="0" step="0.01" name="monto_total" id="arr-monto-total" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div class="col-span-2">
+                    <label class="text-xs font-semibold text-gray-500">Documento referencia</label>
+                    <input name="documento_referencia" id="arr-documento" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div class="col-span-2">
+                    <label class="text-xs font-semibold text-gray-500">Observacion</label>
+                    <textarea name="observacion" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows="2"></textarea>
+                </div>
+            </div>
+            <div id="arr-opciones" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem;"></div>
+            <div style="margin-top:1rem;display:flex;justify-content:flex-end;gap:.5rem;">
+                <button type="button" onclick="cerrarModalArriendo()" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-600 text-sm">Cancelar</button>
+                <button id="arr-submit" type="submit" class="px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold" style="display:none;">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
 
 {{-- ═══ MODAL: GESTIONAR ESTADO SERVICIO ═════════════════════════════════ --}}
 @if(auth()->user()->esAdmin())
@@ -756,11 +996,12 @@
                                 style="padding:0.45rem 1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:0.5rem; cursor:pointer;">
                             Cancelar
                         </button>
-                        <button type="submit" id="ge-btn-submit"
+                        <button type="button" id="ge-btn-submit" onclick="geConfirmar()"
                                 style="padding:0.45rem 1.25rem; font-size:0.875rem; font-weight:600; color:#fff; background:#7c3aed; border:none; border-radius:0.5rem; cursor:pointer; display:none;">
                             Confirmar cambio
                         </button>
                     </div>
+                    <div id="ge-error" style="display:none; margin-top:0.6rem; padding:0.45rem 0.65rem; background:#fef2f2; border:1px solid #fca5a5; border-radius:0.5rem; font-size:0.78rem; color:#b91c1c;"></div>
                 </form>
             </div>
 
@@ -772,7 +1013,7 @@
 {{-- Modal solicitud (solo usuarios) --}}
 @if(!auth()->user()->esAdmin())
 <div id="modal-solicitud"
-    class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
+    class="fixed inset-0 z-50 bg-black/50 items-center justify-center p-4" style="display:none">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div class="flex items-center justify-between px-6 py-4 border-b">
             <div>
@@ -918,7 +1159,7 @@
 
     function confirmarDescarte() {
         document.getElementById('modal-descarte').style.display = 'none';
-        document.getElementById('modal-solicitud').classList.add('hidden');
+        document.getElementById('modal-solicitud').style.display = 'none';
         ocultarErrorModal();
     }
 
@@ -972,7 +1213,7 @@
         document.getElementById('modal-btn-submit').className =
             'btn-primary px-4 py-2 text-sm font-medium text-white rounded-lg transition bg-orange-500 hover:bg-orange-600';
 
-        document.getElementById('modal-solicitud').classList.remove('hidden');
+        document.getElementById('modal-solicitud').style.display = 'flex';
         document.getElementById('modal-cantidad').focus();
     }
 
@@ -981,7 +1222,7 @@
             document.getElementById('modal-descarte').style.display = 'flex';
             return;
         }
-        document.getElementById('modal-solicitud').classList.add('hidden');
+        document.getElementById('modal-solicitud').style.display = 'none';
         ocultarErrorModal();
     }
 
@@ -1027,7 +1268,7 @@
 {{-- Modal traslado (solo admin) --}}
 @if(auth()->user()->esAdmin())
 <div id="modal-traslado"
-    class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
+    class="fixed inset-0 z-50 bg-black/50 items-center justify-center p-4" style="display:none">
     <div id="modal-traslado-inner" class="bg-white rounded-2xl shadow-2xl w-full max-w-md" style="animation: traslado-in .25s cubic-bezier(.22,.68,0,1.2) both;">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <div>
@@ -1121,7 +1362,7 @@
         inner.style.animation = 'none';
         inner.offsetHeight;
         inner.style.animation = 'traslado-in .25s cubic-bezier(.22,.68,0,1.2) both';
-        document.getElementById('modal-traslado').classList.remove('hidden');
+        document.getElementById('modal-traslado').style.display = 'flex';
     }
 
     function pedirCancelarTrasladar() {
@@ -1164,7 +1405,7 @@
     });
 
     function cerrarModalTrasladar() {
-        document.getElementById('modal-traslado').classList.add('hidden');
+        document.getElementById('modal-traslado').style.display = 'none';
         document.getElementById('form-traslado').reset();
         document.getElementById('traslado-motivo-error').classList.add('hidden');
     }
@@ -1666,6 +1907,10 @@ function escHtmlGm(str) {
                                     </svg>
                                     <span class="ai-file-lbl-txt" id="ai-excel-masivo-txt">Seleccionar Excel (.xlsx, .xls, .csv)</span>
                                 </label>
+                                <div id="ai-excel-masivo-success" class="ai-file-success" style="display:none;">
+                                    <svg style="width:1rem;height:1rem;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    <span>Excel adjuntado con éxito</span>
+                                </div>
                             </div>
                             <div id="ai-boleta-masiva" style="display:flex; flex-direction:column; gap:0.25rem;">
                                 <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151;">
@@ -1681,6 +1926,10 @@ function escHtmlGm(str) {
                                     </svg>
                                     <span class="ai-file-lbl-txt" id="ai-boleta-masiva-txt">Seleccionar PDF, JPG o PNG</span>
                                 </label>
+                                <div id="ai-boleta-masiva-input-success" class="ai-file-success" style="display:none;">
+                                    <svg style="width:1rem;height:1rem;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    <span>PDF adjuntado con éxito</span>
+                                </div>
                             </div>
                             <input type="checkbox" name="vincular_oc" id="ai-vincular-oc" value="1" style="display:none;">
                         </div>
@@ -1710,6 +1959,10 @@ function escHtmlGm(str) {
                                     </svg>
                                     <span class="ai-file-lbl-txt" id="ai-boleta-manual-txt">Seleccionar PDF, JPG o PNG</span>
                                 </label>
+                                <div id="ai-boleta-manual-input-success" class="ai-file-success" style="display:none;">
+                                    <svg style="width:1rem;height:1rem;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    <span>PDF adjuntado con éxito</span>
+                                </div>
                             </div>
                             <div id="ai-tabla-manual-wrap" style="display:none;">
                                 <table style="width:100%; font-size:0.78rem; border-collapse:collapse;">
@@ -1871,6 +2124,12 @@ function escHtmlGm(str) {
     html.dark .ai-file-lbl-xl { background:#1e3a5f; border-color:#3b82f6; color:#93c5fd; }
     html.dark .ai-file-lbl-xl:hover { background:#172554; border-color:#60a5fa; color:#bfdbfe; }
     html.dark .ai-file-lbl-xl.has-file { color:#bfdbfe; }
+    .ai-file-success {
+        align-items:center; gap:0.5rem; margin-top:0.4rem;
+        background:#ecfdf5; border:1px solid #a7f3d0; border-radius:0.5rem;
+        padding:0.45rem 0.75rem; color:#065f46; font-size:0.8rem; font-weight:600;
+    }
+    html.dark .ai-file-success { background:#052e16; border-color:#166534; color:#86efac; }
 
     /* ── Paginación DataTables estilo Tailwind ── */
     .dt-paging { margin-top:1rem !important; display:flex !important; justify-content:flex-end !important; gap:4px !important; align-items:center !important; }
@@ -1976,6 +2235,114 @@ function escHtmlGm(str) {
     html.dark .p-act-out:disabled { opacity:.3; }
 
     html.dark .ai-toast-err { background:#450a0a !important; border-color:#7f1d1d !important; color:#fca5a5 !important; }
+
+    /* ── Modal Crear Producto — dark mode ───────────────────────────────── */
+    html.dark #ai-modal-crear-producto > div {
+        background: #1e293b !important;
+    }
+    /* Títulos y etiquetas */
+    html.dark #ai-crear-titulo { color:#f1f5f9 !important; }
+    html.dark #ai-step-panel-1 p,
+    html.dark #ai-step-panel-2 p,
+    html.dark #ai-step-panel-3 p,
+    html.dark #ai-step-panel-4 label { color:#cbd5e1 !important; }
+    html.dark #ai-step-line-1,
+    html.dark #ai-step-line-2,
+    html.dark #ai-step-line-3 { background:#334155 !important; }
+    /* Inputs y selects dentro del modal */
+    html.dark #ai-crear-nombre-input,
+    html.dark #ai-crear-unidad-id,
+    html.dark #ai-crear-cantidad-inicial,
+    html.dark #ai-crear-stock-minimo,
+    html.dark #ai-crear-stock-critico,
+    html.dark #ai-nueva-familia-input,
+    html.dark #ai-nueva-categoria-input,
+    html.dark #ai-nueva-marca-input {
+        background: #0f172a !important;
+        border-color: #475569 !important;
+        color: #e2e8f0 !important;
+    }
+    /* Botones de footer */
+    html.dark #ai-btn-atras { background:#334155 !important; border-color:#475569 !important; color:#cbd5e1 !important; }
+    html.dark #ai-modal-crear-producto button[onclick="aiCerrarModalCrear()"] { color:#64748b !important; }
+
+    /* Sección paquete — label del checkbox */
+    #ai-crear-paquete-lbl { color: #374151; }
+    html.dark #ai-crear-paquete-lbl { color: #cbd5e1; }
+    /* Sección paquete — contenedor */
+    #ai-crear-paquete-wrap {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+    }
+    html.dark #ai-crear-paquete-wrap {
+        background: rgba(255,255,255,.04);
+        border: 1px solid #334155;
+    }
+    #ai-crear-paquete-wrap label { color: #374151; }
+    html.dark #ai-crear-paquete-wrap label { color: #94a3b8; }
+    html.dark #ai-crear-present-select,
+    html.dark #ai-crear-present-cantidad,
+    html.dark #ai-crear-paquetes-recibidos {
+        background: #0f172a !important;
+        border-color: #475569 !important;
+        color: #e2e8f0 !important;
+    }
+    html.dark #ai-crear-mantencion-wrap {
+        background:#1f2937 !important;
+        border-color:#92400e !important;
+        box-shadow:inset 0 0 0 1px rgba(245,158,11,.18);
+    }
+    html.dark #ai-crear-mantencion-wrap p:first-child {
+        color:#fcd34d !important;
+    }
+    html.dark #ai-crear-mantencion-wrap label {
+        color:#cbd5e1 !important;
+    }
+    html.dark #ai-mant-estado,
+    html.dark #ai-mant-proveedor,
+    html.dark #ai-mant-documento,
+    html.dark #ai-mant-observacion {
+        background:#0f172a !important;
+        border-color:#475569 !important;
+        color:#e2e8f0 !important;
+        color-scheme:dark;
+    }
+    html.dark #ai-crear-arriendo-wrap {
+        background:#172033 !important;
+        border-color:#4c1d95 !important;
+        box-shadow:inset 0 0 0 1px rgba(124,58,237,.18);
+    }
+    html.dark #ai-crear-arriendo-wrap p:first-child {
+        color:#c4b5fd !important;
+    }
+    html.dark #ai-crear-arriendo-wrap label {
+        color:#cbd5e1 !important;
+    }
+    html.dark #ai-arr-proveedor,
+    html.dark #ai-arr-fecha-inicio,
+    html.dark #ai-arr-condicion,
+    html.dark #ai-arr-fecha-termino,
+    html.dark #ai-arr-monto-periodo,
+    html.dark #ai-arr-monto-total,
+    html.dark #ai-arr-documento,
+    html.dark #ai-arr-observacion {
+        background:#0f172a !important;
+        border-color:#475569 !important;
+        color:#e2e8f0 !important;
+        color-scheme:dark;
+    }
+    html.dark #ai-arr-proveedor::placeholder,
+    html.dark #ai-arr-documento::placeholder,
+    html.dark #ai-arr-observacion::placeholder {
+        color:#64748b !important;
+    }
+    html.dark #ai-arr-documento[readonly] {
+        background:#111827 !important;
+        color:#cbd5e1 !important;
+    }
+    html.dark #ai-arr-duracion {
+        color:#a5b4fc !important;
+    }
 </style>
 @endpush
 
@@ -2051,11 +2418,12 @@ function escHtmlGm(str) {
 
             var tr = settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
 
-            // Texto libre
+            // Texto libre (incluye código de barras)
             var q = ($('#buscador-productos').val() || '').toLowerCase().trim();
             if (q) {
                 var celdas = tr ? Array.from(tr.querySelectorAll('td')).map(function(td){ return td.innerText.toLowerCase(); }) : [];
-                if (![0,1,2,3,6].some(function(i){ return (celdas[i]||'').includes(q); })) return false;
+                var barcode = tr ? (tr.getAttribute('data-barcode') || '').toLowerCase() : '';
+                if (![0,1,2,3,6].some(function(i){ return (celdas[i]||'').includes(q); }) && !barcode.includes(q)) return false;
             }
 
             // Tipo (producto físico / servicio)
@@ -2092,6 +2460,49 @@ function escHtmlGm(str) {
         });
 
         $('#buscador-productos').on('input', function () { table.draw(); });
+
+        // ── Pistola código de barras (HID keyboard) ──────────────────────
+        (function () {
+            var el = document.getElementById('buscador-productos');
+            var buf = '', t0 = 0, scannerMode = false, timer = null;
+
+            function commit() {
+                clearTimeout(timer);
+                var code = buf;
+                buf = ''; scannerMode = false;
+                if (code.length >= 4) { el.value = code; table.draw(); }
+                el.focus();
+            }
+
+            el.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                    if (scannerMode) { e.preventDefault(); commit(); }
+                    else { buf = ''; }
+                    return;
+                }
+                if (e.key.length > 1) return;
+
+                var now = Date.now(), dt = now - t0; t0 = now;
+
+                if (dt < 15) {
+                    if (!scannerMode) {
+                        // 2° char rápido confirma scanner: capturar 1° char ya insertado y limpiar campo
+                        scannerMode = true;
+                        buf = el.value.slice(-1) + e.key;
+                        el.value = '';
+                    } else {
+                        buf += e.key;
+                    }
+                    e.preventDefault(); // evitar que el char se inserte en el campo
+                    clearTimeout(timer);
+                    timer = setTimeout(commit, 120); // scanner sin Enter
+                } else {
+                    if (scannerMode) commit();
+                    scannerMode = false; buf = '';
+                    // char lento = escritura manual, comportamiento normal
+                }
+            });
+        }());
 
         // ── Checkboxes contenedor y estado ──────────────────────────────
         $(document).on('change', '.fil-prod-contenedor', function() {
@@ -2297,31 +2708,60 @@ function escHtmlGm(str) {
 </style>
 @endpush
 
-{{-- Modal: crear producto rápido --}}
+{{-- Modal: crear producto rápido — wizard 3 pasos --}}
 <div id="ai-modal-crear-producto" style="display:none; position:fixed; inset:0; z-index:99999; align-items:center; justify-content:center; background:rgba(0,0,0,.55);">
-    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 64px rgba(0,0,0,.3); width:480px; max-width:calc(100vw - 2rem); padding:1.5rem; max-height:88vh; overflow-y:auto; position:relative;">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.1rem;">
-            <div>
-                <h3 id="ai-crear-titulo" style="font-size:1rem; font-weight:700; color:#1f2937; margin:0 0 0.25rem;">Nuevo producto</h3>
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 24px 64px rgba(0,0,0,.3); width:500px; max-width:calc(100vw - 2rem); padding:1.5rem; max-height:88vh; overflow-y:auto; position:relative;">
 
-                <p id="ai-crear-nombre-display" style="font-size:0.8rem; color:#374151; margin:0; font-weight:500; word-break:break-word;"></p>
+        {{-- Header --}}
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.25rem;">
+            <div>
+                <h3 id="ai-crear-titulo" style="font-size:1rem; font-weight:700; color:#1f2937; margin:0 0 0.2rem;">Nuevo producto</h3>
+                <p id="ai-crear-nombre-display" style="font-size:0.8rem; color:#7c3aed; margin:0; font-weight:600; word-break:break-word;"></p>
             </div>
             <button type="button" onclick="aiCerrarModalCrear()" style="flex-shrink:0; color:#9ca3af; background:none; border:none; cursor:pointer; font-size:1.25rem; line-height:1; padding:0.1rem;">✕</button>
         </div>
 
-        {{-- Campo nombre (visible solo cuando se abre desde boleta local) --}}
-        <div id="ai-crear-nombre-wrap" style="display:none; margin-bottom:0.85rem;">
-            <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.4rem;">Nombre del producto <span style="color:#ef4444;">*</span></label>
-            <input type="text" id="ai-crear-nombre-input" placeholder="Ej: Disco Duro 1TB"
-                   style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
+        {{-- Stepper --}}
+        <div style="display:flex; align-items:center; margin-bottom:1.5rem;">
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+                <div id="ai-step-dot-1" style="width:1.75rem; height:1.75rem; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; background:#7c3aed; color:#fff; flex-shrink:0; transition:background .2s;">1</div>
+                <span id="ai-step-lbl-1" style="font-size:0.78rem; font-weight:600; color:#7c3aed; white-space:nowrap; transition:color .2s;">Familia</span>
+            </div>
+            <div id="ai-step-line-1" style="flex:1; height:2px; background:#e5e7eb; margin:0 0.5rem; transition:background .2s;"></div>
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+                <div id="ai-step-dot-2" style="width:1.75rem; height:1.75rem; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; background:#e5e7eb; color:#9ca3af; flex-shrink:0; transition:background .2s;">2</div>
+                <span id="ai-step-lbl-2" style="font-size:0.78rem; font-weight:600; color:#9ca3af; white-space:nowrap; transition:color .2s;">Categoría</span>
+            </div>
+            <div id="ai-step-line-2" style="flex:1; height:2px; background:#e5e7eb; margin:0 0.5rem; transition:background .2s;"></div>
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+                <div id="ai-step-dot-3" style="width:1.75rem; height:1.75rem; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; background:#e5e7eb; color:#9ca3af; flex-shrink:0; transition:background .2s;">3</div>
+                <span id="ai-step-lbl-3" style="font-size:0.78rem; font-weight:600; color:#9ca3af; white-space:nowrap; transition:color .2s;">Marca</span>
+            </div>
+            <div id="ai-step-line-3" style="flex:1; height:2px; background:#e5e7eb; margin:0 0.5rem; transition:background .2s;"></div>
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+                <div id="ai-step-dot-4" style="width:1.75rem; height:1.75rem; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; background:#e5e7eb; color:#9ca3af; flex-shrink:0; transition:background .2s;">4</div>
+                <span id="ai-step-lbl-4" style="font-size:0.78rem; font-weight:600; color:#9ca3af; white-space:nowrap; transition:color .2s;">Producto</span>
+            </div>
         </div>
 
-        <div style="margin-bottom:0.85rem;">
-            <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.5rem;">Familia <span style="color:#ef4444;">*</span></label>
-            <div id="ai-crear-familias" style="display:flex; flex-wrap:wrap; gap:0.4rem; min-height:1.5rem;"></div>
+        {{-- Step 1: Familia --}}
+        <div id="ai-step-panel-1">
+            <p style="font-size:0.8125rem; font-weight:600; color:#374151; margin:0 0 0.65rem;">Tipo de ítem:</p>
+            <div id="ai-crear-tipos-item" style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:0.45rem; margin-bottom:1rem;">
+                <button type="button" data-ai-tipo-item="producto" onclick="aiSeleccionarTipoItem('producto')"
+                        style="width:100%;font-size:0.78rem;font-weight:700;padding:0.6rem 0.55rem;border-radius:0.6rem;border:1.5px solid;cursor:pointer;">Producto</button>
+                <button type="button" data-ai-tipo-item="servicio" onclick="aiSeleccionarTipoItem('servicio')"
+                        style="width:100%;font-size:0.78rem;font-weight:700;padding:0.6rem 0.55rem;border-radius:0.6rem;border:1.5px solid;cursor:pointer;">Servicio</button>
+                <button type="button" data-ai-tipo-item="mantencion" onclick="aiSeleccionarTipoItem('mantencion')"
+                        style="width:100%;font-size:0.78rem;font-weight:700;padding:0.6rem 0.55rem;border-radius:0.6rem;border:1.5px solid;cursor:pointer;">Mantención</button>
+                <button type="button" data-ai-tipo-item="arriendo" onclick="aiSeleccionarTipoItem('arriendo')"
+                        style="width:100%;font-size:0.78rem;font-weight:700;padding:0.6rem 0.55rem;border-radius:0.6rem;border:1.5px solid;cursor:pointer;">Arriendo</button>
+            </div>
+            <p style="font-size:0.8125rem; font-weight:600; color:#374151; margin:0 0 0.65rem;">Selecciona la familia:</p>
+            <div id="ai-crear-familias" style="display:grid; grid-template-columns:1fr 1fr; gap:0.45rem; min-height:2rem;"></div>
             @if(auth()->user()->esDev())
             <button type="button" id="ai-btn-nueva-familia" onclick="aiMostrarNuevaFamilia()"
-                    style="font-size:0.72rem; color:#7c3aed; background:none; border:none; cursor:pointer; padding:0.25rem 0; margin-top:0.4rem; display:inline-flex; align-items:center; gap:0.2rem; font-weight:600;">
+                    style="font-size:0.72rem; color:#7c3aed; background:none; border:none; cursor:pointer; padding:0.3rem 0; margin-top:0.5rem; display:inline-flex; align-items:center; gap:0.2rem; font-weight:600;">
                 + Nueva familia
             </button>
             <div id="ai-nueva-familia-wrap" style="display:none; margin-top:0.35rem;">
@@ -2330,25 +2770,22 @@ function escHtmlGm(str) {
                            style="flex:1; font-size:0.8rem; padding:0.3rem 0.6rem; border:1px solid #d1d5db; border-radius:0.4rem; outline:none; color:#374151;"
                            onkeydown="if(event.key==='Enter')aiGuardarNuevaFamilia(); if(event.key==='Escape')aiOcultarNuevaFamilia();">
                     <button type="button" onclick="aiGuardarNuevaFamilia()"
-                            style="font-size:0.75rem; font-weight:600; padding:0.3rem 0.7rem; background:#7c3aed; color:#fff; border:none; border-radius:0.4rem; cursor:pointer; white-space:nowrap;">
-                        Crear
-                    </button>
+                            style="font-size:0.75rem; font-weight:600; padding:0.3rem 0.7rem; background:#7c3aed; color:#fff; border:none; border-radius:0.4rem; cursor:pointer; white-space:nowrap;">Crear</button>
                     <button type="button" onclick="aiOcultarNuevaFamilia()"
-                            style="font-size:0.75rem; padding:0.3rem 0.5rem; background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; border-radius:0.4rem; cursor:pointer;">
-                        ✕
-                    </button>
+                            style="font-size:0.75rem; padding:0.3rem 0.5rem; background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; border-radius:0.4rem; cursor:pointer;">✕</button>
                 </div>
                 <p id="ai-nueva-familia-error" style="display:none; font-size:0.72rem; color:#dc2626; margin-top:0.2rem;"></p>
             </div>
             @endif
         </div>
 
-        <div id="ai-crear-cat-wrapper" style="display:none; margin-bottom:0.85rem;">
-            <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.5rem;">Categoría <span style="color:#ef4444;">*</span></label>
-            <div id="ai-crear-categorias-btns" style="display:flex; flex-wrap:wrap; gap:0.4rem;"></div>
+        {{-- Step 2: Categoría --}}
+        <div id="ai-step-panel-2" style="display:none;">
+            <p style="font-size:0.8125rem; font-weight:600; color:#374151; margin:0 0 0.65rem;">Selecciona la categoría:</p>
+            <div id="ai-crear-categorias-btns" style="display:grid; grid-template-columns:1fr 1fr; gap:0.45rem; min-height:2rem;"></div>
             @if(auth()->user()->esDev())
             <button type="button" id="ai-btn-nueva-categoria" onclick="aiMostrarNuevaCategoria()"
-                    style="font-size:0.72rem; color:#7c3aed; background:none; border:none; cursor:pointer; padding:0.25rem 0; margin-top:0.4rem; display:inline-flex; align-items:center; gap:0.2rem; font-weight:600;">
+                    style="font-size:0.72rem; color:#7c3aed; background:none; border:none; cursor:pointer; padding:0.3rem 0; margin-top:0.5rem; display:inline-flex; align-items:center; gap:0.2rem; font-weight:600;">
                 + Nueva categoría
             </button>
             <div id="ai-nueva-categoria-wrap" style="display:none; margin-top:0.35rem;">
@@ -2357,64 +2794,203 @@ function escHtmlGm(str) {
                            style="flex:1; font-size:0.8rem; padding:0.3rem 0.6rem; border:1px solid #d1d5db; border-radius:0.4rem; outline:none; color:#374151;"
                            onkeydown="if(event.key==='Enter')aiGuardarNuevaCategoria(); if(event.key==='Escape')aiOcultarNuevaCategoria();">
                     <button type="button" onclick="aiGuardarNuevaCategoria()"
-                            style="font-size:0.75rem; font-weight:600; padding:0.3rem 0.7rem; background:#7c3aed; color:#fff; border:none; border-radius:0.4rem; cursor:pointer; white-space:nowrap;">
-                        Crear
-                    </button>
+                            style="font-size:0.75rem; font-weight:600; padding:0.3rem 0.7rem; background:#7c3aed; color:#fff; border:none; border-radius:0.4rem; cursor:pointer; white-space:nowrap;">Crear</button>
                     <button type="button" onclick="aiOcultarNuevaCategoria()"
-                            style="font-size:0.75rem; padding:0.3rem 0.5rem; background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; border-radius:0.4rem; cursor:pointer;">
-                        ✕
-                    </button>
+                            style="font-size:0.75rem; padding:0.3rem 0.5rem; background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; border-radius:0.4rem; cursor:pointer;">✕</button>
                 </div>
                 <p id="ai-nueva-categoria-error" style="display:none; font-size:0.72rem; color:#dc2626; margin-top:0.2rem;"></p>
             </div>
             @endif
         </div>
 
-        <div id="ai-crear-marca-wrapper" style="display:none; margin-bottom:0.85rem;">
-            <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.5rem;">Marca <span style="color:#ef4444;">*</span></label>
-            <div id="ai-crear-marcas-btns" style="display:flex; flex-wrap:wrap; gap:0.4rem;"></div>
+        {{-- Step 3: Marca --}}
+        <div id="ai-step-panel-3" style="display:none;">
+            <p style="font-size:0.8125rem; font-weight:600; color:#374151; margin:0 0 0.65rem;">Selecciona la marca:</p>
+            <div id="ai-crear-marcas-btns" style="display:grid; grid-template-columns:1fr 1fr; gap:0.45rem; min-height:2rem;"></div>
+            @if(auth()->user()->esDev())
+            <button type="button" id="ai-btn-nueva-marca" onclick="aiMostrarNuevaMarca()"
+                    style="font-size:0.72rem; color:#7c3aed; background:none; border:none; cursor:pointer; padding:0.3rem 0; margin-top:0.5rem; display:inline-flex; align-items:center; gap:0.2rem; font-weight:600;">
+                + Nueva marca
+            </button>
+            <div id="ai-nueva-marca-wrap" style="display:none; margin-top:0.35rem;">
+                <div style="display:flex; gap:0.35rem; align-items:center;">
+                    <input type="text" id="ai-nueva-marca-input" placeholder="Nombre de la nueva marca"
+                           style="flex:1; font-size:0.8rem; padding:0.3rem 0.6rem; border:1px solid #d1d5db; border-radius:0.4rem; outline:none; color:#374151;"
+                           onkeydown="if(event.key==='Enter')aiGuardarNuevaMarca(); if(event.key==='Escape')aiOcultarNuevaMarca();">
+                    <button type="button" onclick="aiGuardarNuevaMarca()"
+                            style="font-size:0.75rem; font-weight:600; padding:0.3rem 0.7rem; background:#7c3aed; color:#fff; border:none; border-radius:0.4rem; cursor:pointer; white-space:nowrap;">Crear</button>
+                    <button type="button" onclick="aiOcultarNuevaMarca()"
+                            style="font-size:0.75rem; padding:0.3rem 0.5rem; background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; border-radius:0.4rem; cursor:pointer;">✕</button>
+                </div>
+                <p id="ai-nueva-marca-error" style="display:none; font-size:0.72rem; color:#dc2626; margin-top:0.2rem;"></p>
+            </div>
+            @endif
         </div>
 
-        <div style="margin-bottom:0.85rem;">
-            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
-                Unidad de Medida <span style="color:#ef4444;">*</span>
-            </label>
-            <select id="ai-crear-unidad-id"
-                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.6rem; font-size:0.875rem; outline:none; box-sizing:border-box; background:#fff;">
-                <option value="">— Selecciona —</option>
-                @foreach(\App\Models\UnidadMedida::activas()->orderBy('nombre')->get() as $um)
-                    <option value="{{ $um->id }}">{{ $um->nombre }} ({{ $um->abreviacion }})</option>
-                @endforeach
-            </select>
-        </div>
-
-        <div id="ai-crear-stock-wrap" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.85rem;">
-            <div>
-                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
-                    Stock mínimo <span style="color:#ef4444;">*</span>
+        {{-- Step 4: Detalles del producto --}}
+        <div id="ai-step-panel-4" style="display:none;">
+            {{-- Nombre (solo contexto local) --}}
+            <div id="ai-crear-nombre-wrap" style="display:none; margin-bottom:0.85rem;">
+                <label style="display:block; font-size:0.8125rem; font-weight:600; color:#374151; margin-bottom:0.4rem;">Nombre del producto <span style="color:#ef4444;">*</span></label>
+                <input type="text" id="ai-crear-nombre-input" placeholder="Ej: Disco Duro 1TB"
+                       style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
+            </div>
+            {{-- Unidad de Medida --}}
+            <div style="margin-bottom:0.85rem;">
+                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">Unidad de Medida <span style="color:#ef4444;">*</span></label>
+                <select id="ai-crear-unidad-id"
+                        style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.6rem; font-size:0.875rem; outline:none; box-sizing:border-box; background:#fff;">
+                    <option value="">— Selecciona —</option>
+                    @foreach(\App\Models\UnidadMedida::activas()->noEsPresentacion()->orderBy('nombre')->get() as $um)
+                        <option value="{{ $um->id }}">{{ $um->nombre }} ({{ $um->abreviacion }})</option>
+                    @endforeach
+                </select>
+            </div>
+            {{-- Paquete / Presentación --}}
+            <div style="margin-bottom:0.85rem;">
+                <label id="ai-crear-paquete-lbl" style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer; user-select:none; font-size:0.8rem; font-weight:600;">
+                    <input type="checkbox" id="ai-crear-paquete-check" onchange="aiTogglePaquete()"
+                           style="width:1rem; height:1rem; accent-color:#7c3aed; cursor:pointer; flex-shrink:0;">
+                    <span>¿Su producto viene en paquete?</span>
                 </label>
-                <input type="number" id="ai-crear-stock-minimo" min="0" value="0"
+                <div id="ai-crear-paquete-wrap" style="display:none; margin-top:0.55rem; padding:0.65rem 0.75rem; border-radius:0.5rem;">
+                    {{-- Fila 1: tipo + paquetes recibidos --}}
+                    <div style="display:grid; grid-template-columns:1fr auto; gap:0.5rem; align-items:end; margin-bottom:0.55rem;">
+                        <div>
+                            <label style="display:block; font-size:0.72rem; font-weight:600; margin-bottom:0.25rem;">Tipo de paquete</label>
+                            <select id="ai-crear-present-select" onchange="aiOnPresentSelect()"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.4rem; padding:0.35rem 0.5rem; font-size:0.8rem; outline:none; box-sizing:border-box; background:#fff;">
+                                <option value="">— Selecciona —</option>
+                                @foreach(\App\Models\UnidadMedida::activas()->where('es_presentacion', true)->whereRaw("nombre NOT REGEXP '[0-9]'")->orderBy('nombre')->get() as $um)
+                                    <option value="{{ $um->nombre }}">{{ $um->nombre }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.72rem; font-weight:600; margin-bottom:0.25rem;">Paquetes recibidos</label>
+                            <input type="number" id="ai-crear-paquetes-recibidos" min="0" value="0" oninput="aiOnPaquetesRecibidos()"
+                                   style="width:5.5rem; border:1px solid #d1d5db; border-radius:0.4rem; padding:0.35rem 0.5rem; font-size:0.8rem; outline:none; box-sizing:border-box;">
+                        </div>
+                    </div>
+                    {{-- Fila 2: unidades por unidad --}}
+                    <div style="margin-bottom:0.5rem;">
+                        <label style="display:block; font-size:0.72rem; font-weight:600; margin-bottom:0.25rem;">Unidades c/u</label>
+                        <input type="number" id="ai-crear-present-cantidad" min="1" value="1" oninput="aiOnPresentCantidad()"
+                               style="width:100%; border:1px solid #d1d5db; border-radius:0.4rem; padding:0.35rem 0.5rem; font-size:0.8rem; outline:none; box-sizing:border-box;">
+                    </div>
+                    {{-- Total calculado --}}
+                    <p id="ai-crear-present-preview" style="font-size:0.75rem; color:#7c3aed; font-weight:700; margin:0;"></p>
+                </div>
+            </div>
+            {{-- Cantidad inicial sin paquete --}}
+            <div id="ai-crear-cantidad-wrap" style="margin-bottom:0.85rem;">
+                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">Unidades que llegaron <span style="color:#6b7280; font-weight:400;">(stock inicial)</span></label>
+                <input type="number" id="ai-crear-cantidad-inicial" min="0" value="0"
                        style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.6rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
             </div>
-            <div>
-                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">
-                    Stock crítico <span style="color:#ef4444;">*</span>
-                </label>
-                <input type="number" id="ai-crear-stock-critico" min="0" value="0"
-                       style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.6rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
+            {{-- Stock --}}
+            <div id="ai-crear-stock-wrap" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.85rem;">
+                <div>
+                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">Stock mínimo <span style="color:#ef4444;">*</span></label>
+                    <input type="number" id="ai-crear-stock-minimo" min="0" value="0"
+                           style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.6rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.3rem;">Stock crítico <span style="color:#ef4444;">*</span></label>
+                    <input type="number" id="ai-crear-stock-critico" min="0" value="0"
+                           style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.6rem; font-size:0.875rem; outline:none; box-sizing:border-box;">
+                </div>
+            </div>
+            <div id="ai-crear-mantencion-wrap" style="display:none; margin-top:0.35rem; padding:0.8rem; border:1px solid #fde68a; border-radius:0.65rem; background:#fffbeb;">
+                <p style="font-size:0.78rem;font-weight:800;color:#b45309;margin:0 0 0.65rem;">Control Mantención</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;">
+                    <div>
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Estado inicial</label>
+                        <select id="ai-mant-estado" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.38rem 0.55rem;font-size:0.8rem;background:#fff;">
+                            <option value="pendiente">Pendiente</option>
+                            <option value="aprobado">Aprobada</option>
+                            <option value="en_proceso">En proceso</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Proveedor</label>
+                        <input id="ai-mant-proveedor" type="text" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.38rem 0.55rem;font-size:0.8rem;">
+                    </div>
+                    <div style="grid-column:span 2;">
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Documento referencia <span style="color:#ef4444;">*</span></label>
+                        <input id="ai-mant-documento" type="text" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.38rem 0.55rem;font-size:0.8rem;">
+                    </div>
+                    <div style="grid-column:span 2;">
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Observación</label>
+                        <textarea id="ai-mant-observacion" rows="2" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.38rem 0.55rem;font-size:0.8rem;resize:vertical;"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div id="ai-crear-arriendo-wrap" style="display:none; margin-top:0.35rem; padding:0.8rem; border:1px solid #e9d5ff; border-radius:0.65rem; background:#faf5ff;">
+                <p style="font-size:0.78rem;font-weight:800;color:#6d28d9;margin:0 0 0.65rem;">Control Arriendo</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;">
+                    <div>
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Proveedor <span style="color:#ef4444;">*</span></label>
+                        <input id="ai-arr-proveedor" type="text" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.38rem 0.55rem;font-size:0.8rem;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Fecha inicio <span style="color:#ef4444;">*</span></label>
+                        <input id="ai-arr-fecha-inicio" type="date" onchange="aiActualizarDuracionArriendo()" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.36rem 0.55rem;font-size:0.8rem;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Condición de término <span style="color:#ef4444;">*</span></label>
+                        <select id="ai-arr-condicion" onchange="aiToggleCondicionArriendo()" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.38rem 0.55rem;font-size:0.8rem;background:#fff;">
+                            <option value="con_fecha">Con fecha de término definida</option>
+                            <option value="sin_fecha">Sin fecha de término definida</option>
+                        </select>
+                    </div>
+                    <div id="ai-arr-fecha-termino-wrap">
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Fecha término <span style="color:#ef4444;">*</span></label>
+                        <input id="ai-arr-fecha-termino" type="date" onchange="aiActualizarDuracionArriendo()" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.36rem 0.55rem;font-size:0.8rem;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Monto período <span style="color:#ef4444;">*</span></label>
+                        <input id="ai-arr-monto-periodo" type="number" min="0" step="0.01" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.38rem 0.55rem;font-size:0.8rem;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Monto total estimado <span style="color:#ef4444;">*</span></label>
+                        <input id="ai-arr-monto-total" type="number" min="0" step="0.01" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.38rem 0.55rem;font-size:0.8rem;">
+                    </div>
+                    <div style="grid-column:span 2;">
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Documento referencia <span style="color:#ef4444;">*</span></label>
+                        <input id="ai-arr-documento" type="text" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.38rem 0.55rem;font-size:0.8rem;">
+                    </div>
+                    <div style="grid-column:span 2;">
+                        <label style="display:block;font-size:0.72rem;font-weight:700;color:#374151;margin-bottom:0.25rem;">Observación</label>
+                        <textarea id="ai-arr-observacion" rows="2" style="width:100%;border:1px solid #d1d5db;border-radius:0.45rem;padding:0.38rem 0.55rem;font-size:0.8rem;resize:vertical;"></textarea>
+                    </div>
+                </div>
+                <p id="ai-arr-duracion" style="font-size:0.72rem;font-weight:700;color:#7c3aed;margin:0.5rem 0 0;"></p>
             </div>
         </div>
 
+        {{-- Error --}}
         <div id="ai-crear-error" style="display:none; font-size:0.8rem; color:#dc2626; margin-bottom:0.75rem; padding:0.4rem 0.6rem; background:#fef2f2; border-radius:0.375rem;"></div>
 
-        <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px solid #f3f4f6; padding-top:1rem; margin-top:0.5rem;">
+        {{-- Footer --}}
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f3f4f6; padding-top:1rem; margin-top:0.75rem;">
             <button type="button" onclick="aiCerrarModalCrear()" style="padding:0.45rem 1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:0.5rem; cursor:pointer;">
                 Cancelar
             </button>
-            <button type="button" id="ai-crear-btn-guardar" onclick="aiConfirmarCrearProducto()"
-                style="padding:0.45rem 1.1rem; font-size:0.875rem; font-weight:600; color:#fff; background:#7c3aed; border:none; border-radius:0.5rem; cursor:pointer;">
-                Crear producto
-            </button>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button type="button" id="ai-btn-atras" onclick="aiStepAtras()"
+                        style="display:none; padding:0.45rem 1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:0.5rem; cursor:pointer;">
+                    ← Atrás
+                </button>
+                <button type="button" id="ai-btn-siguiente" onclick="aiStepSiguiente()"
+                        style="padding:0.45rem 1.1rem; font-size:0.875rem; font-weight:600; color:#fff; background:#7c3aed; border:none; border-radius:0.5rem; cursor:pointer;">
+                    Siguiente →
+                </button>
+                <button type="button" id="ai-crear-btn-guardar" onclick="aiConfirmarCrearProducto()"
+                        style="display:none; padding:0.45rem 1.1rem; font-size:0.875rem; font-weight:600; color:#fff; background:#7c3aed; border:none; border-radius:0.5rem; cursor:pointer;">
+                    Crear producto
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -2437,6 +3013,7 @@ function escHtmlGm(str) {
 html.dark .tab-ps-btn { color:#94a3b8; }
 html.dark .tab-ps-btn:hover { background:#1e293b; color:#e2e8f0; }
 html.dark .tab-ps-active { background:#7c3aed !important; color:#fff !important; }
+html.dark .tab-ps-btn:not(.tab-ps-active) .tab-ps-cnt { background:#4c1d95 !important; color:#ddd6fe !important; }
 
 /* ── Tabla servicios ────────────────────────────────────────────────── */
 #tab-panel-servicios .bg-white { background:#fff; }
@@ -2453,6 +3030,9 @@ html.dark #modal-gestionar-estado .sticky { background:#1e293b !important; borde
 html.dark #modal-gestionar-estado [style*="background:#f8fafc"] { background:#0f172a !important; border-color:#334155 !important; }
 html.dark #modal-gestionar-estado [style*="background:#f1f5f9"] { border-color:#334155 !important; }
 html.dark #ge-observacion { background:#0f172a; color:#e2e8f0; border-color:#334155; }
+html.dark #ge-error { background:#450a0a !important; border-color:#dc2626 !important; color:#fca5a5 !important; }
+html.dark .ge-bar-track { background:#334155 !important; }
+html.dark .serv-badge { background:#3b0764 !important; color:#e9d5ff !important; }
 
 /* Botón estado en tabla servicios */
 .ge-opcion-btn {
@@ -2471,18 +3051,29 @@ html.dark #ge-observacion { background:#0f172a; color:#e2e8f0; border-color:#334
 // ── Tab switching ────────────────────────────────────────────────────
 function switchTab(tab) {
     var isProd = tab === 'productos';
+    var isServ = tab === 'servicios';
+    var isMant = tab === 'mantenciones';
+    var isArr = tab === 'arriendos';
     document.getElementById('tab-panel-productos').style.display = isProd ? '' : 'none';
-    document.getElementById('tab-panel-servicios').style.display = isProd ? 'none' : '';
+    document.getElementById('tab-panel-servicios').style.display = isServ ? '' : 'none';
+    var mantPanel = document.getElementById('tab-panel-mantenciones');
+    if (mantPanel) mantPanel.style.display = isMant ? '' : 'none';
+    var arrPanel = document.getElementById('tab-panel-arriendos');
+    if (arrPanel) arrPanel.style.display = isArr ? '' : 'none';
     document.getElementById('tab-btn-productos').classList.toggle('tab-ps-active', isProd);
-    document.getElementById('tab-btn-servicios').classList.toggle('tab-ps-active', !isProd);
+    document.getElementById('tab-btn-servicios').classList.toggle('tab-ps-active', isServ);
+    var mantBtn = document.getElementById('tab-btn-mantenciones');
+    if (mantBtn) mantBtn.classList.toggle('tab-ps-active', isMant);
+    var arrBtn = document.getElementById('tab-btn-arriendos');
+    if (arrBtn) arrBtn.classList.toggle('tab-ps-active', isArr);
 }
 
 // ── Buscador servicios ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
     var buscServ = document.getElementById('buscador-servicios');
     if (!buscServ) return;
-    buscServ.addEventListener('input', function() {
-        var q = this.value.toLowerCase().trim();
+    function filtrarServicios() {
+        var q = buscServ.value.toLowerCase().trim();
         document.querySelectorAll('#tabla-servicios tbody tr').forEach(function(tr) {
             if (!q) { tr.style.display = ''; return; }
             var nombre = (tr.dataset.nombre || '');
@@ -2490,8 +3081,106 @@ document.addEventListener('DOMContentLoaded', function() {
             var est    = (tr.dataset.estado || '');
             tr.style.display = (nombre.includes(q) || cat.includes(q) || est.includes(q)) ? '' : 'none';
         });
+    }
+    buscServ.addEventListener('input', filtrarServicios);
+
+    // Pistola código de barras — misma lógica que productos
+    (function () {
+        var buf = '', t0 = 0, scannerMode = false, timer = null;
+        function commit() {
+            clearTimeout(timer);
+            var code = buf; buf = ''; scannerMode = false;
+            if (code.length >= 4) { buscServ.value = code; filtrarServicios(); }
+            buscServ.focus();
+        }
+        buscServ.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                if (scannerMode) { e.preventDefault(); commit(); }
+                else { buf = ''; }
+                return;
+            }
+            if (e.key.length > 1) return;
+            var now = Date.now(), dt = now - t0; t0 = now;
+            if (dt < 15) {
+                if (!scannerMode) { scannerMode = true; buf = buscServ.value.slice(-1) + e.key; buscServ.value = ''; }
+                else { buf += e.key; }
+                e.preventDefault();
+                clearTimeout(timer); timer = setTimeout(commit, 120);
+            } else {
+                if (scannerMode) commit();
+                scannerMode = false; buf = '';
+            }
+        });
+    }());
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    var buscMant = document.getElementById('buscador-mantenciones');
+    if (!buscMant) return;
+    buscMant.addEventListener('input', function() {
+        var q = buscMant.value.toLowerCase().trim();
+        document.querySelectorAll('#tabla-mantenciones tbody tr').forEach(function(tr) {
+            if (!q) { tr.style.display = ''; return; }
+            var txt = [tr.dataset.nombre, tr.dataset.categoria, tr.dataset.estado, tr.dataset.documento].join(' ');
+            tr.style.display = txt.indexOf(q) >= 0 ? '' : 'none';
+        });
     });
 });
+
+document.addEventListener('DOMContentLoaded', function() {
+    var buscArr = document.getElementById('buscador-arriendos');
+    if (!buscArr) return;
+    buscArr.addEventListener('input', function() {
+        var q = buscArr.value.toLowerCase().trim();
+        document.querySelectorAll('#tabla-arriendos tbody tr').forEach(function(tr) {
+            if (!q) { tr.style.display = ''; return; }
+            var txt = [tr.dataset.nombre, tr.dataset.proveedor, tr.dataset.estado, tr.dataset.documento].join(' ');
+            tr.style.display = txt.indexOf(q) >= 0 ? '' : 'none';
+        });
+    });
+});
+
+var ARR_LABELS = {
+    pendiente:'Pendiente', activo:'Activo', proximo_vencer:'Proximo a vencer',
+    finalizado:'Finalizado', renovado:'Renovado', cancelado:'Cancelado'
+};
+var _arrEstadoElegido = null;
+function abrirModalArriendo(id, nombre, estadoActual, permitidos, data) {
+    _arrEstadoElegido = null;
+    document.getElementById('arr-titulo').textContent = nombre;
+    document.getElementById('arr-estado-actual').textContent = ARR_LABELS[estadoActual] || estadoActual;
+    document.getElementById('form-gestionar-arriendo').action = '/admin/productos/' + id + '/gestionar-arriendo';
+    document.getElementById('arr-proveedor').value = data.proveedor || '';
+    document.getElementById('arr-fecha-inicio').value = data.fecha_inicio || '';
+    document.getElementById('arr-fecha-termino').value = data.fecha_termino || '';
+    document.getElementById('arr-duracion').value = data.duracion || '';
+    document.getElementById('arr-unidad-tiempo').value = data.unidad_tiempo || 'dias';
+    document.getElementById('arr-monto-periodo').value = data.monto_periodo || '';
+    document.getElementById('arr-monto-total').value = data.monto_total || '';
+    document.getElementById('arr-documento').value = data.documento || '';
+    document.getElementById('arr-estado-input').value = '';
+    document.getElementById('arr-submit').style.display = 'none';
+    var opts = document.getElementById('arr-opciones');
+    opts.innerHTML = '';
+    (permitidos || []).forEach(function(est) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'px-3 py-2 rounded-lg border border-orange-300 text-orange-700 text-xs font-semibold hover:bg-orange-50';
+        b.textContent = ARR_LABELS[est] || est;
+        b.onclick = function() {
+            _arrEstadoElegido = est;
+            document.getElementById('arr-estado-input').value = est;
+            document.getElementById('arr-submit').style.display = 'inline-flex';
+            opts.querySelectorAll('button').forEach(function(x) { x.style.outline = ''; });
+            b.style.outline = '2px solid #f97316';
+        };
+        opts.appendChild(b);
+    });
+    document.getElementById('modal-gestionar-arriendo').style.display = 'flex';
+}
+function cerrarModalArriendo() {
+    document.getElementById('modal-gestionar-arriendo').style.display = 'none';
+}
 
 // ── Estado config (debe coincidir con ServicioEstado::colores/label) ─
 var SE_COLORES = {
@@ -2500,7 +3189,7 @@ var SE_COLORES = {
     en_proceso: { bg:'#fefce8', text:'#a16207', dot:'#eab308', barra:'#eab308' },
     ejecutado:  { bg:'#f0fdf4', text:'#15803d', dot:'#22c55e', barra:'#22c55e' },
     validado:   { bg:'#f0fdf4', text:'#166534', dot:'#16a34a', barra:'#16a34a' },
-    cerrado:    { bg:'#1e293b', text:'#f8fafc', dot:'#94a3b8', barra:'#1e293b' },
+    cerrado:    { bg:'#1e293b', text:'#f8fafc', dot:'#94a3b8', barra:'#64748b' },
     cancelado:  { bg:'#fef2f2', text:'#dc2626', dot:'#ef4444', barra:'#ef4444' },
 };
 var SE_LABELS = {
@@ -2604,9 +3293,47 @@ function elegirEstado(estado, btn) {
     btn.style.outline = '2px solid #7c3aed';
     var submitBtn = document.getElementById('ge-btn-submit');
     submitBtn.style.display = 'inline-flex';
-    var c = SE_COLORES[estado] || SE_COLORES.pendiente;
     submitBtn.style.background = estado === 'cancelado' ? '#ef4444' : '#7c3aed';
     submitBtn.textContent = 'Confirmar → ' + (SE_LABELS[estado] || estado);
+    document.getElementById('ge-error').style.display = 'none';
+}
+
+function geConfirmar() {
+    if (!_geServicioId || !_geEstadoElegido) return;
+    var btn = document.getElementById('ge-btn-submit');
+    var errDiv = document.getElementById('ge-error');
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
+    errDiv.style.display = 'none';
+
+    var token = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content
+                : document.querySelector('input[name="_token"]').value;
+    var obs = document.getElementById('ge-observacion').value;
+
+    fetch('/admin/productos/' + _geServicioId + '/gestionar-estado', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token, 'Accept': 'application/json' },
+        body: JSON.stringify({ estado: _geEstadoElegido, observacion: obs })
+    })
+    .then(function(r) {
+        var status = r.status;
+        return r.json().catch(function() { return {}; }).then(function(d) {
+            if (status >= 200 && status < 300 && d.ok) {
+                window.location.reload();
+            } else {
+                errDiv.textContent = d.error || d.message || ('Error HTTP ' + status);
+                errDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Confirmar → ' + (SE_LABELS[_geEstadoElegido] || _geEstadoElegido);
+            }
+        });
+    })
+    .catch(function(e) {
+        errDiv.textContent = 'Error de conexión: ' + (e.message || 'Intenta de nuevo.');
+        errDiv.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Confirmar → ' + (SE_LABELS[_geEstadoElegido] || _geEstadoElegido);
+    });
 }
 
 function cerrarModalServicio() {
@@ -2678,6 +3405,7 @@ var AI_URL_CREAR         = '{{ route('admin.productos.crear.rapido') }}';
 var AI_URL_PROD_DESTROY  = '{{ url('admin/catalogo/productos') }}/';
 var AI_URL_FAMILIA   = '{{ route('admin.catalogo.familias.store') }}';
 var AI_URL_CATEGORIA = '{{ route('admin.catalogo.categorias.store') }}';
+var AI_URL_MARCA     = '{{ route('admin.catalogo.marcas.store') }}';
 var AI_CSRF          = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 var aiMetodoCargaActual  = 'masiva';
 var aiItemsManual        = [];
@@ -2812,7 +3540,9 @@ function cerrarModalAgregarInv() {
      ['ai-boleta-manual-input','ai-boleta-manual-txt','Seleccionar PDF, JPG o PNG']
     ].forEach(function(p){
         var el=document.getElementById(p[1]); var lb=document.querySelector('label[for="'+p[0]+'"]');
+        var suc=document.getElementById(p[0]+'-success');
         if(el) el.textContent=p[2]; if(lb) lb.classList.remove('has-file');
+        if(suc) suc.style.display='none';
     });
     document.getElementById('ai-seccion-local').style.display = 'none';
     document.getElementById('ai-seccion-externa').style.display = 'none';
@@ -2858,19 +3588,22 @@ document.getElementById('modal-agregar-inv').addEventListener('click', function(
 });
 
 function aiFileUpdate(inputId, txtId, input) {
-    var lbl = document.querySelector('label[for="' + inputId + '"]');
-    var txt = document.getElementById(txtId);
+    var lbl     = document.querySelector('label[for="' + inputId + '"]');
+    var txt     = document.getElementById(txtId);
+    var success = document.getElementById(inputId + '-success');
     var defaults = {
         'ai-excel-masivo':       'Seleccionar Excel (.xlsx, .xls, .csv)',
         'ai-boleta-masiva-input':'Seleccionar PDF, JPG o PNG',
         'ai-boleta-manual-input':'Seleccionar PDF, JPG o PNG'
     };
     if (input.files.length > 0) {
-        if (txt) txt.textContent = '✓ ' + input.files[0].name;
+        if (txt) txt.textContent = input.files[0].name;
         if (lbl) lbl.classList.add('has-file');
+        if (success) success.style.display = 'flex';
     } else {
         if (txt) txt.textContent = defaults[inputId] || 'Seleccionar archivo';
         if (lbl) lbl.classList.remove('has-file');
+        if (success) success.style.display = 'none';
     }
 }
 
@@ -2909,14 +3642,17 @@ function aiMetodoCarga(metodo) {
 
 function aiActualizarBtnExterna(metodo) {
     var btn = document.getElementById('ai-btn-submit');
-    btn.disabled = false;
-    btn.style.cursor = 'pointer';
-    if (metodo === 'masiva') {
-        btn.style.background = '#2563eb';
-        btn.textContent = 'Recibir SICD y cargar Excel';
+    btn.textContent = (metodo === 'masiva') ? 'Recibir SICD y cargar Excel' : 'Recibir SICD y registrar productos';
+    if (aiSicdValido) {
+        btn.disabled = false;
+        btn.style.cursor = 'pointer';
+        btn.style.background = (metodo === 'masiva') ? '#2563eb' : '#7c3aed';
+        btn.style.opacity = '1';
     } else {
-        btn.style.background = '#7c3aed';
-        btn.textContent = 'Recibir SICD y registrar productos';
+        btn.disabled = true;
+        btn.style.cursor = 'not-allowed';
+        btn.style.background = '#9ca3af';
+        btn.style.opacity = '1';
     }
 }
 
@@ -3024,6 +3760,17 @@ function aiEnviar() {
             aiError('El código SICD "' + codigoSicd + '" no está validado en el sistema externo. Verifica el código antes de continuar.', 'ai-codigo-sicd');
             return;
         }
+        if (!_aiSicdEnlazadoId) {
+            aiError('Debes enlazar correctamente el PDF del SICD antes de continuar.', 'ai-codigo-sicd');
+            var _btnEnlazar = document.getElementById('ai-btn-enlazar');
+            if (_btnEnlazar) {
+                _btnEnlazar.style.background = '#ef4444';
+                _btnEnlazar.style.color = '#fff';
+                var _enlazarHint = document.getElementById('ai-enlazar-hint');
+                if (_enlazarHint) _enlazarHint.style.display = 'block';
+            }
+            return;
+        }
         if (aiMetodoCargaActual === 'masiva') {
             if (!document.getElementById('ai-excel-masivo').files.length) {
                 aiError('El archivo Excel de productos es obligatorio.'); return;
@@ -3089,6 +3836,8 @@ document.getElementById('form-agregar-inv').addEventListener('submit-confirmed',
             aiForm.action = aiUrlManual;
         }
     }
+    var preenlazadoInput = document.getElementById('ai-sicd-preenlazado-id');
+    if (preenlazadoInput) preenlazadoInput.value = _aiSicdEnlazadoId || '';
     sessionStorage.removeItem('ai_sicd_pending');
     sessionStorage.removeItem('ai_prods_creados');
     _aiProductosCreados = [];
@@ -3113,14 +3862,39 @@ function aiToggleBoleta(panel) {
     }
 }
 
+function aiMarcarSicdEnlazado(id, url, label) {
+    if (id) {
+        _aiSicdEnlazadoId = id;
+        try { sessionStorage.setItem('ai_sicd_pending', String(id)); } catch(e) {}
+        var preenlazadoInput = document.getElementById('ai-sicd-preenlazado-id');
+        if (preenlazadoInput) preenlazadoInput.value = id;
+    }
+    if (url) window._aiSicdUrl = url;
+
+    var btn = document.getElementById('ai-btn-enlazar');
+    if (!btn || !url) return;
+
+    var link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.textContent = label || '✓ Ver SICD';
+    link.style.cssText = 'font-size:0.7rem;font-weight:600;background:#dcfce7;color:#166534;padding:3px 12px;border-radius:5px;text-decoration:none;';
+    btn.replaceWith(link);
+}
+
 function aiEnlazarSolicitud() {
     var btn = document.getElementById('ai-btn-enlazar');
     if (!btn) return;
 
+    var _hint = document.getElementById('ai-enlazar-hint');
+    if (_hint) _hint.style.display = 'none';
+    btn.style.background = '';
+    btn.style.color = '';
+
     btn.disabled = true;
     btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:5px;">'
         + '<svg style="width:13px;height:13px;animation:ai-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>'
-        + 'Enlazando...</span>';
+        + 'Procesando PDF...</span>';
 
     function doPost(enlazarUrl, sicdUrl) {
         fetch(enlazarUrl, {
@@ -3137,30 +3911,25 @@ function aiEnlazarSolicitud() {
         .then(function(res) {
             btn.disabled = false;
             if (res.ok) {
-                if (res.id) { _aiSicdEnlazadoId = res.id; sessionStorage.setItem('ai_sicd_pending', String(res.id)); }
                 var url = sicdUrl || res.url || null;
                 if (url) {
-                    var link = document.createElement('a');
-                    link.href = url;
-                    link.target = '_blank';
-                    link.textContent = '✓ Ver SICD';
-                    link.style.cssText = 'font-size:0.7rem;font-weight:600;background:#dcfce7;color:#166534;padding:3px 12px;border-radius:5px;text-decoration:none;';
-                    btn.replaceWith(link);
+                    aiMarcarSicdEnlazado(res.id, url, '✓ Ver SICD');
                 } else {
+                    aiMarcarSicdEnlazado(res.id, null);
                     btn.innerHTML = '✓ PDF SICD enlazado';
                     btn.style.cssText += ';background:#dcfce7;color:#166534;cursor:default;';
                 }
             } else {
-                btn.textContent = 'Enlazar PDF SICD';
+                btn.textContent = 'Reintentar PDF SICD';
                 btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
-                setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar PDF SICD'; btn.disabled = false; }, 3000);
+                setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Reintentar PDF SICD'; btn.disabled = false; }, 3000);
             }
         })
         .catch(function(e) {
             btn.disabled = false;
             btn.textContent = 'Error: ' + (e.message || 'conexión');
             btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
-            setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar PDF SICD'; }, 4000);
+            setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Reintentar PDF SICD'; }, 4000);
         });
     }
 
@@ -3182,6 +3951,9 @@ function aiEnlazarSolicitud() {
             if (d.encontrado) {
                 window._aiEnlazarUrl = d.enlazar_url;
                 window._aiSicdUrl    = d.url;
+                if (d.ya_enlazado && d.id) {
+                    aiMarcarSicdEnlazado(d.id, d.url, '✓ Ver SICD');
+                }
                 doPost(d.enlazar_url, d.url);
                 return;
             }
@@ -3203,20 +3975,25 @@ function aiEnlazarSolicitud() {
             .then(function(res) {
                 btn.disabled = false;
                 if (res.ok) {
-                    if (res.id) { _aiSicdEnlazadoId = res.id; sessionStorage.setItem('ai_sicd_pending', String(res.id)); }
-                    btn.innerHTML = '✓ PDF SICD enlazado';
-                    btn.style.cssText += ';background:#dcfce7;color:#166534;cursor:default;';
+                    var url = res.url || null;
+                    if (url) {
+                        aiMarcarSicdEnlazado(res.id, url, '✓ Ver SICD');
+                    } else {
+                        aiMarcarSicdEnlazado(res.id, null);
+                        btn.innerHTML = '✓ PDF SICD enlazado';
+                        btn.style.cssText += ';background:#dcfce7;color:#166534;cursor:default;';
+                    }
                 } else {
                     btn.textContent = 'Error: ' + (res.msg || 'desconocido');
                     btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
-                    setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar PDF SICD'; btn.disabled = false; }, 4000);
+                    setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Reintentar PDF SICD'; btn.disabled = false; }, 4000);
                 }
             })
             .catch(function(e) {
                 btn.disabled = false;
                 btn.textContent = 'Error: ' + (e.message || 'conexión');
                 btn.style.background = '#fee2e2'; btn.style.color = '#991b1b';
-                setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Enlazar PDF SICD'; }, 4000);
+                setTimeout(function() { btn.style.background = '#e0e7ff'; btn.style.color = '#3730a3'; btn.textContent = 'Reintentar PDF SICD'; }, 4000);
             });
         })
         .catch(function() {
@@ -3263,6 +4040,7 @@ function aiValidarCodigo(codigo) {
 
             if (data.valido) {
                 aiSicdValido = true;
+                aiActualizarBtnExterna(aiMetodoCargaActual);
                 var cargaWrap = document.getElementById('ai-ext-carga-wrap');
                 if (cargaWrap) cargaWrap.style.display = 'flex';
                 // Si se buscó por ID numérico, reemplazar el campo con el código real
@@ -3389,17 +4167,7 @@ function aiValidarCodigo(codigo) {
                                             window._aiEnlazarUrl = sicdData.enlazar_url;
                                             window._aiSicdUrl    = sicdData.url;
                                             if (sicdData.ya_enlazado) {
-                                                var btn = document.getElementById('ai-btn-enlazar');
-                                                if (btn) {
-                                                    var link = document.createElement('a');
-                                                    link.href = sicdData.url;
-                                                    link.target = '_blank';
-                                                    link.textContent = '✓ Ver SICD enlazado';
-                                                    var enlazBg = _dm ? '#052e16' : '#dcfce7';
-                                                    var enlazTx = _dm ? '#86efac' : '#166534';
-                                                    link.style.cssText = 'font-size:0.7rem;font-weight:600;background:' + enlazBg + ';color:' + enlazTx + ';padding:3px 12px;border-radius:5px;text-decoration:none;';
-                                                    btn.replaceWith(link);
-                                                }
+                                                aiMarcarSicdEnlazado(sicdData.id, sicdData.url, '✓ Ver SICD enlazado');
                                             }
                                         }
                                     })
@@ -3414,9 +4182,15 @@ function aiValidarCodigo(codigo) {
                                     + '</div>'
                                     + '<div style="display:flex;gap:0.4rem;align-items:center;">'
                                     + '<a href="' + urlPdf + '" target="_blank" style="font-size:0.7rem;font-weight:600;background:#ea580c;color:#fff;padding:3px 12px;border-radius:5px;text-decoration:none;">Ver PDF</a>'
+                                    + '<div style="display:flex;flex-direction:column;align-items:center;">'
                                     + '<button id="ai-btn-enlazar" onclick="aiEnlazarSolicitud()" style="font-size:0.7rem;font-weight:600;background:' + enlazarBg + ';color:' + enlazarTx + ';padding:3px 12px;border-radius:5px;border:none;cursor:pointer;">Enlazar PDF SICD</button>'
+                                    + '<span id="ai-enlazar-hint" style="display:none;font-size:0.6rem;color:#ef4444;margin-top:2px;white-space:nowrap;">falta adjuntar pdf sicd</span>'
+                                    + '</div>'
                                     + '</div>'
                                     + '</div>';
+                                if (_aiSicdEnlazadoId && window._aiSicdUrl) {
+                                    aiMarcarSicdEnlazado(_aiSicdEnlazadoId, window._aiSicdUrl, '✓ Ver SICD enlazado');
+                                }
                         } else {
                             banner.remove();
                         }
@@ -3427,6 +4201,7 @@ function aiValidarCodigo(codigo) {
                     });
             } else {
                 aiSicdValido = false;
+                aiActualizarBtnExterna(aiMetodoCargaActual);
                 var cargaWrapErr = document.getElementById('ai-ext-carga-wrap');
                 if (cargaWrapErr) cargaWrapErr.style.display = 'none';
                 hint.innerHTML = '<svg style="width:13px;height:13px;flex-shrink:0" fill="none" stroke="#dc2626" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg><span style="color:#dc2626;font-weight:600;">' + data.mensaje + '</span>';
@@ -3435,6 +4210,7 @@ function aiValidarCodigo(codigo) {
         })
         .catch(function() {
             aiSicdValido = false;
+            aiActualizarBtnExterna(aiMetodoCargaActual);
             var cargaWrapCatch = document.getElementById('ai-ext-carga-wrap');
             if (cargaWrapCatch) cargaWrapCatch.style.display = 'none';
             hint.innerHTML = '<span style="color:#d97706;">⚠️ Sin conexión al sistema externo.</span>';
@@ -3477,6 +4253,7 @@ document.getElementById('ai-codigo-sicd').addEventListener('input', function() {
     var warnEl = document.getElementById('ai-sicd-ya-ingresada');
     if (warnEl) warnEl.style.display = 'none';
     aiSicdValido = false;
+    aiActualizarBtnExterna(aiMetodoCargaActual);
     var cargaWrapInput = document.getElementById('ai-ext-carga-wrap');
     if (cargaWrapInput) cargaWrapInput.style.display = 'none';
     clearTimeout(aiSicdValidTimer);
@@ -3585,7 +4362,7 @@ document.getElementById('ai-buscador-manual').addEventListener('input', function
     res.style.display = 'block';
 });
 
-function aiAgregarManual(id, nombre, contenedorId) {
+function aiAgregarManual(id, nombre, contenedorId, cantidadInicial) {
     if (aiItemsManual.find(function(i) { return i.id === id; })) {
         document.getElementById('ai-buscador-manual').value = '';
         document.getElementById('ai-resultados-manual').style.display = 'none';
@@ -3593,7 +4370,7 @@ function aiAgregarManual(id, nombre, contenedorId) {
     }
     var idx = aiCounterManual++;
     aiItemsManual.push({ idx: idx, id: id, nombre: nombre, contenedorId: contenedorId });
-    aiRenderFilaManual(idx, id, nombre, contenedorId || null);
+    aiRenderFilaManual(idx, id, nombre, contenedorId || null, cantidadInicial);
     document.getElementById('ai-buscador-manual').value = '';
     document.getElementById('ai-resultados-manual').style.display = 'none';
     aiActualizarTablaManual();
@@ -3603,7 +4380,7 @@ function aiAgregarManualDesdeDato(el) {
     aiAgregarManual(parseInt(el.dataset.pid), el.dataset.pnombre, parseInt(el.dataset.pcid) || null);
 }
 
-function aiRenderFilaManual(idx, id, nombre, contenedorId) {
+function aiRenderFilaManual(idx, id, nombre, contenedorId, cantidadInicial) {
     var tbody = document.getElementById('ai-items-manual');
     var tr = document.createElement('tr');
     tr.id = 'ai-row-manual-' + idx;
@@ -3638,7 +4415,7 @@ function aiRenderFilaManual(idx, id, nombre, contenedorId) {
         + '<span style="font-size:0.8rem;font-weight:500;color:#1f2937;">' + escHtmlAi(nombre) + '</span>'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" id="ai-cant-' + idx + '" name="items_manual[' + idx + '][cantidad]" value="1" min="1"'
+        + '<input type="number" id="ai-cant-' + idx + '" name="items_manual[' + idx + '][cantidad]" value="' + (cantidadInicial > 0 ? cantidadInicial : 1) + '" min="1"'
         + ' style="width:62px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
@@ -3828,11 +4605,153 @@ function aiGetUnidad(productoId) {
 
 var aiCrearFamiliaId = null;
 var aiCrearCatId     = null;
-var aiCrearMarcaId   = null;
+var aiCrearMarcaId      = null;
+var aiSinMarcaExplicito = false;
+var aiCrearTipoItem     = 'producto';
+var aiCrearManejaPresent  = false;
+var aiCrearPresentNombre  = '';
+var aiCrearPresentCantidad = 1;
 var aiCrearNombre    = '';
 var aiEditandoIdx    = null;
+var aiStepActual     = 1;
 
 var aiCrearContexto = 'manual'; // 'manual' | 'local'
+
+function aiCategoriaTieneMarcas() {
+    if (!aiCrearCatId) return false;
+    var cat = aiBuscarCatEnFamilias(aiCrearCatId);
+    return !!(cat && cat.marcas && cat.marcas.length > 0);
+}
+
+function aiSeleccionarTipoItem(tipo) {
+    aiCrearTipoItem = ['producto', 'servicio', 'mantencion', 'arriendo'].indexOf(tipo) >= 0 ? tipo : 'producto';
+    var dark = document.documentElement.classList.contains('dark');
+    document.querySelectorAll('[data-ai-tipo-item]').forEach(function(btn) {
+        var activo = btn.dataset.aiTipoItem === aiCrearTipoItem;
+        if (activo) {
+            btn.style.background = '#7c3aed';
+            btn.style.borderColor = '#7c3aed';
+            btn.style.color = '#fff';
+        } else {
+            btn.style.background = dark ? 'rgba(255,255,255,.06)' : '#f9fafb';
+            btn.style.borderColor = dark ? '#475569' : '#d1d5db';
+            btn.style.color = dark ? '#cbd5e1' : '#374151';
+        }
+    });
+    aiToggleStockPorFamilia();
+}
+
+function aiCrearEsFisico() {
+    return aiCrearTipoItem === 'producto';
+}
+
+function aiDocumentoReferenciaActual() {
+    var tipoIngreso = document.getElementById('ai-tipo')?.value || '';
+    if (tipoIngreso === 'local') {
+        return (document.getElementById('ai-folio')?.value || '').trim();
+    }
+    return (document.getElementById('ai-codigo-sicd')?.value || document.getElementById('ai-ext-folio')?.value || '').trim();
+}
+
+function aiToggleCondicionArriendo() {
+    var cond = document.getElementById('ai-arr-condicion')?.value || 'con_fecha';
+    var wrap = document.getElementById('ai-arr-fecha-termino-wrap');
+    var fecha = document.getElementById('ai-arr-fecha-termino');
+    if (wrap) wrap.style.display = cond === 'con_fecha' ? '' : 'none';
+    if (fecha && cond !== 'con_fecha') fecha.value = '';
+    aiActualizarDuracionArriendo();
+}
+
+function aiActualizarDuracionArriendo() {
+    var inicio = document.getElementById('ai-arr-fecha-inicio')?.value;
+    var termino = document.getElementById('ai-arr-fecha-termino')?.value;
+    var cond = document.getElementById('ai-arr-condicion')?.value || 'con_fecha';
+    var out = document.getElementById('ai-arr-duracion');
+    if (!out) return;
+    if (cond !== 'con_fecha') {
+        out.textContent = 'Estado inicial: Activo sin fecha de término';
+        return;
+    }
+    if (!inicio || !termino) { out.textContent = ''; return; }
+    var d1 = new Date(inicio + 'T00:00:00');
+    var d2 = new Date(termino + 'T00:00:00');
+    var dias = Math.floor((d2 - d1) / 86400000) + 1;
+    out.textContent = dias > 0 ? ('Duración estimada: ' + dias + ' día(s)') : '';
+}
+
+function aiPrepararCamposArriendo() {
+    var doc = aiDocumentoReferenciaActual();
+    var docInput = document.getElementById('ai-arr-documento');
+    if (docInput && doc && !docInput.value) docInput.value = doc;
+    if (docInput) docInput.readOnly = !!doc;
+    var prov = (document.getElementById('ai-prov-nombre')?.value || document.getElementById('ai-ext-prov-nombre')?.value || '').trim();
+    var provInput = document.getElementById('ai-arr-proveedor');
+    if (provInput && prov && !provInput.value) provInput.value = prov;
+    aiToggleCondicionArriendo();
+}
+
+function aiPrepararCamposMantencion() {
+    var doc = aiDocumentoReferenciaActual();
+    var docInput = document.getElementById('ai-mant-documento');
+    if (docInput && doc && !docInput.value) docInput.value = doc;
+    if (docInput) docInput.readOnly = !!doc;
+    var prov = (document.getElementById('ai-prov-nombre')?.value || document.getElementById('ai-ext-prov-nombre')?.value || '').trim();
+    var provInput = document.getElementById('ai-mant-proveedor');
+    if (provInput && prov && !provInput.value) provInput.value = prov;
+}
+
+function aiIrAStep(n) {
+    aiStepActual = n;
+    [1,2,3,4].forEach(function(i) {
+        var panel = document.getElementById('ai-step-panel-' + i);
+        if (panel) panel.style.display = (i === n) ? '' : 'none';
+        var dot = document.getElementById('ai-step-dot-' + i);
+        var lbl = document.getElementById('ai-step-lbl-' + i);
+        if (!dot || !lbl) return;
+        var done   = i < n;
+        var active = i === n;
+        var _bg = (active || done) ? '#7c3aed' : '#e5e7eb';
+        var _fg = (active || done) ? '#fff'    : '#9ca3af';
+        dot.style.background      = _bg;
+        dot.style.backgroundColor = _bg;
+        dot.style.color           = _fg;
+        lbl.style.color           = active ? '#7c3aed' : (done ? '#4b5563' : '#9ca3af');
+        if (i < 4) {
+            var line = document.getElementById('ai-step-line-' + i);
+            if (line) line.style.background = done ? '#7c3aed' : '#e5e7eb';
+        }
+    });
+    document.getElementById('ai-btn-atras').style.display         = n > 1 ? '' : 'none';
+    document.getElementById('ai-btn-siguiente').style.display     = n < 4 ? '' : 'none';
+    document.getElementById('ai-crear-btn-guardar').style.display = n === 4 ? '' : 'none';
+    document.getElementById('ai-crear-error').style.display = 'none';
+}
+
+function aiStepSiguiente() {
+    var errDiv = document.getElementById('ai-crear-error');
+    errDiv.style.display = 'none';
+    if (aiStepActual === 1) {
+        if (!aiCrearFamiliaId) { errDiv.textContent = 'Selecciona una familia.'; errDiv.style.display = 'block'; return; }
+        aiRenderCrearCategorias();
+        aiIrAStep(2);
+    } else if (aiStepActual === 2) {
+        if (!aiCrearCatId) { errDiv.textContent = 'Selecciona una categoría.'; errDiv.style.display = 'block'; return; }
+        aiRenderCrearMarcas();
+        aiIrAStep(3);
+    } else if (aiStepActual === 3) {
+        if (!aiCrearMarcaId && !aiSinMarcaExplicito) { errDiv.textContent = 'Selecciona una marca o "Sin marca".'; errDiv.style.display = 'block'; return; }
+        aiToggleStockPorFamilia();
+        var nw3 = document.getElementById('ai-crear-nombre-wrap');
+        if (nw3) nw3.style.display = aiCrearContexto === 'local' ? '' : 'none';
+        aiIrAStep(4);
+    }
+}
+
+function aiStepAtras() {
+    if (aiStepActual === 2) { aiIrAStep(1); }
+    else if (aiStepActual === 3) { aiIrAStep(2); }
+    else if (aiStepActual === 4) { aiIrAStep(3); }
+}
 
 function aiAbrirModalCrearLocal() {
     if (!AI_IS_ADMIN) return;
@@ -3851,26 +4770,45 @@ function aiAbrirModalCrear(nombre, editIdx) {
     aiEditandoIdx    = (editIdx !== undefined) ? editIdx : null;
     aiCrearFamiliaId = null;
     aiCrearCatId     = null;
-    aiCrearMarcaId   = null;
-    aiCrearNombre    = nombre;
-    document.getElementById('ai-crear-error').style.display = 'none';
-    document.getElementById('ai-crear-cat-wrapper').style.display = 'none';
-    document.getElementById('ai-crear-marca-wrapper').style.display = 'none';
-    document.getElementById('ai-crear-stock-minimo').value  = '0';
-    document.getElementById('ai-crear-stock-critico').value = '0';
+    aiCrearMarcaId        = null;
+    aiSinMarcaExplicito   = false;
+    aiCrearTipoItem       = 'producto';
+    aiCrearManejaPresent  = false;
+    aiCrearPresentNombre  = '';
+    aiCrearPresentCantidad = 1;
+    aiCrearNombre         = nombre;
+    document.getElementById('ai-crear-stock-minimo').value    = '0';
+    document.getElementById('ai-crear-stock-critico').value   = '0';
+    document.getElementById('ai-crear-cantidad-inicial').value = '0';
     var selUm = document.getElementById('ai-crear-unidad-id');
     if (selUm) selUm.value = '';
-    var nombreWrap = document.getElementById('ai-crear-nombre-wrap');
-    if (nombreWrap) nombreWrap.style.display = 'none';
+    // Reset paquete
+    aiCrearManejaPresent  = false;
+    aiCrearPresentNombre  = '';
+    aiCrearPresentCantidad = 1;
+    var paqChk  = document.getElementById('ai-crear-paquete-check');
+    var paqWrap = document.getElementById('ai-crear-paquete-wrap');
+    var paqSel  = document.getElementById('ai-crear-present-select');
+    var paqCant = document.getElementById('ai-crear-present-cantidad');
+    var paqRec  = document.getElementById('ai-crear-paquetes-recibidos');
+    var paqPrev = document.getElementById('ai-crear-present-preview');
+    var sinPaq  = document.getElementById('ai-crear-cantidad-wrap');
+    if (paqChk)  paqChk.checked = false;
+    if (paqWrap) paqWrap.style.display = 'none';
+    if (paqSel)  paqSel.value = '';
+    if (paqCant) paqCant.value = '1';
+    if (paqRec)  paqRec.value = '0';
+    if (paqPrev) paqPrev.textContent = '';
+    if (sinPaq)  sinPaq.style.display = '';
     var nombreEl = document.getElementById('ai-crear-nombre-display');
-    if (nombreEl) { nombreEl.textContent = nombre; nombreEl.style.display = ''; }
+    if (nombreEl) { nombreEl.textContent = nombre; nombreEl.style.display = nombre ? '' : 'none'; }
     var tituloEl = document.getElementById('ai-crear-titulo');
     if (tituloEl) tituloEl.textContent = aiEditandoIdx !== null ? 'Editar producto' : 'Nuevo producto';
     var res = document.getElementById('ai-resultados-manual');
     if (res) res.style.display = 'none';
     aiRenderCrearFamilias();
-    aiRenderCrearCategorias();
-    aiToggleStockPorFamilia();
+    aiSeleccionarTipoItem(aiCrearTipoItem);
+    aiIrAStep(1);
     document.getElementById('ai-modal-crear-producto').style.display = 'flex';
 }
 
@@ -3886,8 +4824,33 @@ function aiCerrarModalCrear() {
 
 function aiToggleStockPorFamilia() {
     var esServicios = (aiCrearFamiliaId !== null && aiCrearFamiliaId === AI_SERVICIOS_FAMILIA_ID);
+    var esNoFisico = esServicios || !aiCrearEsFisico();
     var wrap = document.getElementById('ai-crear-stock-wrap');
-    if (wrap) wrap.style.display = esServicios ? 'none' : 'grid';
+    var unidad = document.getElementById('ai-crear-unidad-id')?.closest('div');
+    var paquete = document.getElementById('ai-crear-paquete-check')?.closest('div');
+    var cantidad = document.getElementById('ai-crear-cantidad-wrap');
+    if (wrap) wrap.style.display = esNoFisico ? 'none' : 'grid';
+    var arrWrap = document.getElementById('ai-crear-arriendo-wrap');
+    if (arrWrap) arrWrap.style.display = aiCrearTipoItem === 'arriendo' ? 'block' : 'none';
+    var mantWrap = document.getElementById('ai-crear-mantencion-wrap');
+    if (mantWrap) mantWrap.style.display = aiCrearTipoItem === 'mantencion' ? 'block' : 'none';
+    if (unidad) unidad.style.display = esNoFisico ? 'none' : '';
+    if (paquete) paquete.style.display = esNoFisico ? 'none' : '';
+    if (cantidad) cantidad.style.display = esNoFisico ? 'none' : '';
+    if (esNoFisico) {
+        var selUm = document.getElementById('ai-crear-unidad-id');
+        if (selUm) selUm.value = '';
+        var chk = document.getElementById('ai-crear-paquete-check');
+        if (chk) chk.checked = false;
+        aiCrearManejaPresent = false;
+        var pkgWrap = document.getElementById('ai-crear-paquete-wrap');
+        if (pkgWrap) pkgWrap.style.display = 'none';
+        document.getElementById('ai-crear-stock-minimo').value = '0';
+        document.getElementById('ai-crear-stock-critico').value = '0';
+        document.getElementById('ai-crear-cantidad-inicial').value = '0';
+    }
+    if (aiCrearTipoItem === 'arriendo') aiPrepararCamposArriendo();
+    if (aiCrearTipoItem === 'mantencion') aiPrepararCamposMantencion();
 }
 
 function aiRenderCrearFamilias() {
@@ -3903,17 +4866,14 @@ function aiRenderCrearFamilias() {
         btn.textContent = f.nombre;
         var inactiveCss = _dm
             ? 'background:rgba(255,255,255,.06);color:#cbd5e1;border-color:#475569;'
-            : 'background:#fff;color:#374151;border-color:#d1d5db;';
-        btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;margin:0;'
+            : 'background:#f9fafb;color:#374151;border-color:#d1d5db;';
+        btn.style.cssText = 'width:100%;text-align:left;font-size:0.85rem;font-weight:600;padding:0.65rem 0.9rem;border-radius:0.6rem;border:1.5px solid;cursor:pointer;transition:all .12s;'
             + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : inactiveCss);
         btn.onclick = function() {
-            var same = (aiCrearFamiliaId === f.id);
-            aiCrearFamiliaId = same ? null : f.id;
-            aiCrearCatId     = null;
-            aiCrearMarcaId   = null;
+            aiCrearFamiliaId = (aiCrearFamiliaId === f.id) ? null : f.id;
+            aiCrearCatId   = null;
+            aiCrearMarcaId = null;
             aiRenderCrearFamilias();
-            aiRenderCrearCategorias();
-            aiToggleStockPorFamilia();
         };
         cont.appendChild(btn);
     });
@@ -3932,19 +4892,16 @@ function aiEsCatPYP(catId) {
 }
 
 function aiRenderCrearCategorias() {
-    var wrapper = document.getElementById('ai-crear-cat-wrapper');
-    var cont    = document.getElementById('ai-crear-categorias-btns');
-    if (!wrapper || !cont) return;
+    var cont = document.getElementById('ai-crear-categorias-btns');
+    if (!cont) return;
 
     var sinFamOrNone = (!aiCrearFamiliaId || aiCrearFamiliaId === AI_SIN_FAMILIA_ID);
     var cats = [];
 
     if (!sinFamOrNone) {
-        // Familia real seleccionada → solo sus categorías
         var familia = (aiFamilias || []).find(function(f) { return f.id === aiCrearFamiliaId; });
         cats = (familia ? familia.categorias : []) || [];
     } else {
-        // Sin familia o SIN FAMILIA → todas las categorías excepto SERVICIOS y PARTES Y PIEZAS
         (aiFamilias || []).forEach(function(f) {
             if (f.tipo === 'servicios' || f.tipo === 'partes_piezas') return;
             (f.categorias || []).forEach(function(c) { cats.push(c); });
@@ -3969,38 +4926,48 @@ function aiRenderCrearCategorias() {
             btn.textContent = c.nombre;
             var inactiveCssCat = _dmCat
                 ? 'background:rgba(255,255,255,.06);color:#cbd5e1;border-color:#475569;'
-                : 'background:#fff;color:#374151;border-color:#d1d5db;';
-            btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;'
+                : 'background:#f9fafb;color:#374151;border-color:#d1d5db;';
+            btn.style.cssText = 'width:100%;text-align:left;font-size:0.85rem;font-weight:600;padding:0.65rem 0.9rem;border-radius:0.6rem;border:1.5px solid;cursor:pointer;transition:all .12s;'
                 + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : inactiveCssCat);
-            btn.onclick = function() { aiCrearCatId = c.id; aiCrearMarcaId = null; aiRenderCrearCategorias(); aiRenderCrearMarcas(); };
+            btn.onclick = function() { aiCrearCatId = c.id; aiCrearMarcaId = null; aiSinMarcaExplicito = false; aiRenderCrearCategorias(); };
             cont.appendChild(btn);
         });
     }
-    wrapper.style.display = 'block';
-    aiRenderCrearMarcas();
 }
 
 function aiRenderCrearMarcas() {
-    var wrapper = document.getElementById('ai-crear-marca-wrapper');
-    var cont    = document.getElementById('ai-crear-marcas-btns');
-    if (!wrapper || !cont) return;
-    if (!aiCrearCatId) { wrapper.style.display = 'none'; return; }
-    // Busca la categoría en cualquier familia (soporta SIN FAMILIA)
+    var cont = document.getElementById('ai-crear-marcas-btns');
+    if (!cont) return;
+    cont.innerHTML = '';
+    if (!aiCrearCatId) return;
     var cat    = aiBuscarCatEnFamilias(aiCrearCatId);
     var marcas = (cat && cat.marcas ? cat.marcas : []);
-    if (marcas.length === 0) { wrapper.style.display = 'none'; return; }
-    cont.innerHTML = '';
+    var _dm    = document.documentElement.classList.contains('dark');
+    var inactiveCss = _dm
+        ? 'background:rgba(255,255,255,.06);color:#cbd5e1;border-color:#475569;'
+        : 'background:#f9fafb;color:#374151;border-color:#d1d5db;';
     marcas.forEach(function(m) {
-        var sel = m.id === aiCrearMarcaId;
+        var sel = (aiCrearMarcaId === m.id);
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = m.nombre;
-        btn.style.cssText = 'font-size:0.8rem;font-weight:600;padding:0.35rem 0.85rem;border-radius:0.5rem;border:1px solid;cursor:pointer;'
-            + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : 'background:#fff;color:#374151;border-color:#d1d5db;');
-        btn.onclick = function() { aiCrearMarcaId = m.id; aiRenderCrearMarcas(); };
+        btn.style.cssText = 'width:100%;text-align:left;font-size:0.85rem;font-weight:600;padding:0.65rem 0.9rem;border-radius:0.6rem;border:1.5px solid;cursor:pointer;transition:all .12s;'
+            + (sel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;' : inactiveCss);
+        btn.onclick = function() { aiCrearMarcaId = m.id; aiSinMarcaExplicito = false; aiRenderCrearMarcas(); };
         cont.appendChild(btn);
     });
-    wrapper.style.display = 'block';
+    // "Sin marca" option — always visible so user can explicitly opt out
+    var sinSel = aiSinMarcaExplicito;
+    var btnSin = document.createElement('button');
+    btnSin.type = 'button';
+    btnSin.textContent = 'Sin marca';
+    var sinInactive = _dm
+        ? 'background:rgba(255,255,255,.04);color:#94a3b8;border-color:#334155;'
+        : 'background:#f9fafb;color:#6b7280;border-color:#d1d5db;';
+    btnSin.style.cssText = 'width:100%;text-align:left;font-size:0.85rem;font-weight:600;padding:0.65rem 0.9rem;border-radius:0.6rem;border:1.5px dashed;cursor:pointer;transition:all .12s;'
+        + (sinSel ? 'background:#7c3aed;color:#fff;border-color:#7c3aed;border-style:solid;' : sinInactive);
+    btnSin.onclick = function() { aiCrearMarcaId = null; aiSinMarcaExplicito = true; aiRenderCrearMarcas(); };
+    cont.appendChild(btnSin);
 }
 
 function aiConfirmarCrearProducto() {
@@ -4028,8 +4995,36 @@ function aiConfirmarCrearProducto() {
     })();
     if (_marcasRequeridas && !aiCrearMarcaId) { errDiv.textContent = 'Selecciona una marca.'; errDiv.style.display = 'block'; return; }
 
-    var minimo  = parseInt(document.getElementById('ai-crear-stock-minimo').value)  || 0;
-    var critico = parseInt(document.getElementById('ai-crear-stock-critico').value) || 0;
+    var esFisicoCrear = aiCrearEsFisico();
+    if (aiCrearTipoItem === 'arriendo') {
+        aiPrepararCamposArriendo();
+        var arrProv = document.getElementById('ai-arr-proveedor').value.trim();
+        var arrInicio = document.getElementById('ai-arr-fecha-inicio').value;
+        var arrCond = document.getElementById('ai-arr-condicion').value;
+        var arrTermino = document.getElementById('ai-arr-fecha-termino').value;
+        var arrMontoPeriodo = document.getElementById('ai-arr-monto-periodo').value;
+        var arrMontoTotal = document.getElementById('ai-arr-monto-total').value;
+        var arrDoc = document.getElementById('ai-arr-documento').value.trim();
+        if (!arrProv) { errDiv.textContent = 'El proveedor es obligatorio para Arriendo.'; errDiv.style.display = 'block'; return; }
+        if (!arrInicio) { errDiv.textContent = 'La fecha inicio es obligatoria.'; errDiv.style.display = 'block'; return; }
+        if (!arrCond) { errDiv.textContent = 'La condición de término es obligatoria.'; errDiv.style.display = 'block'; return; }
+        if (arrCond === 'con_fecha' && !arrTermino) { errDiv.textContent = 'La fecha término es obligatoria cuando la condición tiene fecha definida.'; errDiv.style.display = 'block'; return; }
+        if (arrMontoPeriodo === '') { errDiv.textContent = 'El monto período es obligatorio.'; errDiv.style.display = 'block'; return; }
+        if (arrMontoTotal === '') { errDiv.textContent = 'El monto total estimado es obligatorio.'; errDiv.style.display = 'block'; return; }
+        if (!arrDoc) { errDiv.textContent = 'El documento referencia es obligatorio.'; errDiv.style.display = 'block'; return; }
+    } else if (aiCrearTipoItem === 'mantencion') {
+        aiPrepararCamposMantencion();
+        var mantDoc = document.getElementById('ai-mant-documento').value.trim();
+        if (!mantDoc) { errDiv.textContent = 'El documento referencia es obligatorio para Mantención.'; errDiv.style.display = 'block'; return; }
+    }
+    var minimo  = esFisicoCrear ? (parseInt(document.getElementById('ai-crear-stock-minimo').value)  || 0) : 0;
+    var critico = esFisicoCrear ? (parseInt(document.getElementById('ai-crear-stock-critico').value) || 0) : 0;
+
+    var _cantidadInicial = esFisicoCrear && aiCrearManejaPresent && aiCrearPresentNombre
+        ? (parseInt(document.getElementById('ai-crear-paquetes-recibidos')?.value) || 0) * (aiCrearPresentCantidad || 1)
+        : (esFisicoCrear ? (parseInt(document.getElementById('ai-crear-cantidad-inicial')?.value) || 0) : 0);
+    var _tipoIngresoActual = document.getElementById('ai-tipo')?.value || '';
+    var _stockInicialCrear = (aiCrearContexto === 'manual' && _tipoIngresoActual === 'licitacion') ? 0 : _cantidadInicial;
 
     var btn = document.getElementById('ai-crear-btn-guardar');
     btn.disabled = true; btn.textContent = 'Creando…';
@@ -4037,7 +5032,32 @@ function aiConfirmarCrearProducto() {
     fetch(AI_URL_CREAR, {
         method: 'POST',
         headers: { 'X-CSRF-TOKEN': AI_CSRF, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoria_id: aiCrearCatId, marca_id: aiCrearMarcaId || null, nombre: aiCrearNombre, stock_minimo: minimo, stock_critico: critico, unidad_medida_id: parseInt(document.getElementById('ai-crear-unidad-id')?.value) || null }),
+        body: JSON.stringify({
+            categoria_id:          aiCrearCatId,
+            marca_id:              aiCrearMarcaId || null,
+            nombre:                aiCrearNombre,
+            tipo_item:             aiCrearTipoItem,
+            es_servicio:           aiCrearTipoItem === 'servicio',
+            stock_inicial:         _stockInicialCrear,
+            stock_minimo:          minimo,
+            stock_critico:         critico,
+            unidad_medida_id:      esFisicoCrear ? (parseInt(document.getElementById('ai-crear-unidad-id')?.value) || null) : null,
+            maneja_presentacion:   esFisicoCrear && aiCrearManejaPresent && !!aiCrearPresentNombre,
+            tipo_presentacion:     (esFisicoCrear && aiCrearManejaPresent && aiCrearPresentNombre) ? aiCrearPresentNombre : null,
+            cantidad_presentacion: (esFisicoCrear && aiCrearManejaPresent && aiCrearPresentNombre) ? aiCrearPresentCantidad : null,
+            arriendo_proveedor_nombre: document.getElementById('ai-arr-proveedor')?.value || null,
+            arriendo_fecha_inicio: document.getElementById('ai-arr-fecha-inicio')?.value || null,
+            arriendo_condicion_termino: document.getElementById('ai-arr-condicion')?.value || null,
+            arriendo_fecha_termino: document.getElementById('ai-arr-fecha-termino')?.value || null,
+            arriendo_monto_periodo: document.getElementById('ai-arr-monto-periodo')?.value || null,
+            arriendo_monto_total: document.getElementById('ai-arr-monto-total')?.value || null,
+            arriendo_documento_referencia: document.getElementById('ai-arr-documento')?.value || null,
+            arriendo_observacion: document.getElementById('ai-arr-observacion')?.value || null,
+            mantencion_estado: document.getElementById('ai-mant-estado')?.value || 'pendiente',
+            mantencion_proveedor_nombre: document.getElementById('ai-mant-proveedor')?.value || null,
+            mantencion_documento_referencia: document.getElementById('ai-mant-documento')?.value || null,
+            mantencion_observacion: document.getElementById('ai-mant-observacion')?.value || null,
+        }),
     })
     .then(function(res) { return res.json().then(function(p) { return { ok: res.ok, p: p }; }); })
     .then(function(data) {
@@ -4067,7 +5087,7 @@ function aiConfirmarCrearProducto() {
                 if (aiCrearContexto === 'local') {
                     if (typeof aiAgregar === 'function') aiAgregar(p.id, p.nombre);
                 } else {
-                    if (typeof aiAgregarManual === 'function') aiAgregarManual(p.id, p.nombre, null);
+                    if (typeof aiAgregarManual === 'function') aiAgregarManual(p.id, p.nombre, null, _cantidadInicial);
                 }
             }
             var buscadorId = aiCrearContexto === 'local' ? 'ai-buscador' : 'ai-buscador-manual';
@@ -4165,6 +5185,103 @@ function aiGuardarNuevaCategoria() {
         document.getElementById('ai-nueva-categoria-input').value = '';
         aiOcultarNuevaCategoria();
         aiRenderCrearCategorias();
+    })
+    .catch(function() { errEl.textContent = 'Error de conexión.'; errEl.style.display = 'block'; });
+}
+
+function aiTogglePaquete() {
+    var chk    = document.getElementById('ai-crear-paquete-check');
+    var wrap   = document.getElementById('ai-crear-paquete-wrap');
+    var sinPaq = document.getElementById('ai-crear-cantidad-wrap');
+    aiCrearManejaPresent = chk ? chk.checked : false;
+    if (aiCrearManejaPresent) {
+        wrap.style.display = 'block';
+        if (sinPaq) sinPaq.style.display = 'none';
+    } else {
+        wrap.style.display = 'none';
+        if (sinPaq) sinPaq.style.display = '';
+        aiCrearPresentNombre   = '';
+        aiCrearPresentCantidad = 1;
+        var sel  = document.getElementById('ai-crear-present-select');
+        var cant = document.getElementById('ai-crear-present-cantidad');
+        var rec  = document.getElementById('ai-crear-paquetes-recibidos');
+        var prev = document.getElementById('ai-crear-present-preview');
+        if (sel)  sel.value = '';
+        if (cant) cant.value = '1';
+        if (rec)  rec.value = '0';
+        if (prev) prev.textContent = '';
+    }
+}
+function aiOnPresentSelect() {
+    var sel = document.getElementById('ai-crear-present-select');
+    aiCrearPresentNombre = sel ? (sel.value || '') : '';
+    aiUpdatePresentPreview();
+}
+function aiOnPresentCantidad() {
+    var inp = document.getElementById('ai-crear-present-cantidad');
+    aiCrearPresentCantidad = inp ? (parseInt(inp.value) || 1) : 1;
+    aiUpdatePresentPreview();
+}
+function aiOnPaquetesRecibidos() {
+    aiUpdatePresentPreview();
+}
+function aiUpdatePresentPreview() {
+    var prev  = document.getElementById('ai-crear-present-preview');
+    if (!prev) return;
+    var rec   = parseInt(document.getElementById('ai-crear-paquetes-recibidos')?.value) || 0;
+    var uPaq  = aiCrearPresentCantidad || 1;
+    var total = rec * uPaq;
+    if (aiCrearPresentNombre) {
+        var tipo = aiCrearPresentNombre.charAt(0) + aiCrearPresentNombre.slice(1).toLowerCase();
+        prev.textContent = rec + ' ' + tipo + (rec !== 1 ? 's' : '')
+            + ' × ' + uPaq + ' u. = ' + total + ' unidades en stock';
+    } else {
+        prev.textContent = rec > 0 ? (rec + ' paquetes × ' + uPaq + ' u. = ' + total + ' unidades') : '';
+    }
+}
+
+function aiMostrarNuevaMarca() {
+    var btn = document.getElementById('ai-btn-nueva-marca');
+    var wrap = document.getElementById('ai-nueva-marca-wrap');
+    if (btn) btn.style.display = 'none';
+    if (wrap) wrap.style.display = 'block';
+    var inp = document.getElementById('ai-nueva-marca-input');
+    if (inp) { inp.value = ''; inp.focus(); }
+    var err = document.getElementById('ai-nueva-marca-error');
+    if (err) err.style.display = 'none';
+}
+function aiOcultarNuevaMarca() {
+    var btn = document.getElementById('ai-btn-nueva-marca');
+    var wrap = document.getElementById('ai-nueva-marca-wrap');
+    if (wrap) wrap.style.display = 'none';
+    if (btn) btn.style.display = 'inline-flex';
+}
+function aiGuardarNuevaMarca() {
+    var nombre = (document.getElementById('ai-nueva-marca-input')?.value || '').trim();
+    var errEl  = document.getElementById('ai-nueva-marca-error');
+    errEl.style.display = 'none';
+    if (!nombre) { errEl.textContent = 'Escribe un nombre.'; errEl.style.display = 'block'; return; }
+    if (!aiCrearCatId) { errEl.textContent = 'Selecciona una categoría primero.'; errEl.style.display = 'block'; return; }
+
+    fetch(AI_URL_MARCA, {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': AI_CSRF, 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ nombre: nombre, categoria_id: aiCrearCatId }),
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+        if (!res.ok) {
+            errEl.textContent = (res.d.errors ? Object.values(res.d.errors).flat().join(' ') : null) || res.d.message || 'Error al crear.';
+            errEl.style.display = 'block';
+            return;
+        }
+        var cat = aiBuscarCatEnFamilias(aiCrearCatId);
+        if (cat) cat.marcas.push({ id: res.d.id, nombre: res.d.nombre });
+        aiCrearMarcaId = res.d.id;
+        aiSinMarcaExplicito = false;
+        document.getElementById('ai-nueva-marca-input').value = '';
+        aiOcultarNuevaMarca();
+        aiRenderCrearMarcas();
     })
     .catch(function() { errEl.textContent = 'Error de conexión.'; errEl.style.display = 'block'; });
 }

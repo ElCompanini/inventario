@@ -46,13 +46,24 @@
                             <th class="px-4 py-3 text-center font-semibold text-gray-600">Asignado esta OC</th>
                             <th class="px-4 py-3 text-center font-semibold text-gray-600">Cantidad recibida</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-600">Container destino</th>
+                            <th class="px-4 py-3 text-center font-semibold text-gray-600">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @foreach($detallesOc as $ocDet)
-                        @php $det = $ocDet->sicdDetalle; @endphp
-                            <tr class="hover:bg-gray-50">
+                        @php
+                            $det = $ocDet->sicdDetalle;
+                            $yaPendiente = \App\Models\OcItemPendiente::where('orden_compra_id', $oc->id)
+                                ->where('sicd_detalle_id', $ocDet->sicd_detalle_id)
+                                ->whereNull('resuelto_at')->whereNull('deleted_at')->exists();
+                        @endphp
+                            <tr class="hover:bg-gray-50 {{ $yaPendiente ? 'bg-amber-50' : '' }}" id="fila-{{ $ocDet->id }}">
                                 <td class="px-4 py-3" style="vertical-align:middle;">
+                                    @if($yaPendiente)
+                                        <span style="display:inline-flex; align-items:center; gap:4px; font-size:0.7rem; font-weight:700; background:#fef3c7; color:#92400e; border:1px solid #fde68a; border-radius:9999px; padding:1px 8px; margin-bottom:4px;">
+                                            ⏳ Pendiente de revisión
+                                        </span><br>
+                                    @endif
                                     @if($det->producto)
                                         <p class="font-medium text-gray-800">{{ $det->producto->nombre }}</p>
                                         @if($det->producto->nombre !== $det->nombre_producto_excel)
@@ -71,14 +82,22 @@
                                     <p class="text-xs font-normal text-gray-400">de {{ $det->cantidad_solicitada }} SICD</p>
                                 </td>
                                 <td class="px-4 py-3 text-center" style="vertical-align:middle;">
-                                    <input type="number"
-                                           name="recibido[{{ $ocDet->id }}]"
-                                           data-asignado="{{ $ocDet->cantidad_asignada }}"
-                                           data-detid="{{ $ocDet->id }}"
-                                           value="{{ old("recibido.{$ocDet->id}", $ocDet->cantidad_asignada) }}"
-                                           min="0"
-                                           max="{{ $ocDet->cantidad_asignada }}"
-                                           class="input-recibido w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                    @if($yaPendiente && !$det->producto)
+                                        {{-- Sin producto enlazado: forzar qty=0, no actualizará stock --}}
+                                        <input type="hidden" name="recibido[{{ $ocDet->id }}]" value="0">
+                                        <div style="display:inline-flex; align-items:center; gap:4px; font-size:0.72rem; font-weight:700; background:#fef3c7; color:#92400e; border:1px solid #fde68a; border-radius:0.4rem; padding:0.25rem 0.6rem; white-space:nowrap;">
+                                            ⏳ No aplica
+                                        </div>
+                                    @else
+                                        <input type="number"
+                                               name="recibido[{{ $ocDet->id }}]"
+                                               data-asignado="{{ $ocDet->cantidad_asignada }}"
+                                               data-detid="{{ $ocDet->id }}"
+                                               value="{{ old("recibido.{$ocDet->id}", $ocDet->cantidad_asignada) }}"
+                                               min="0"
+                                               max="{{ $ocDet->cantidad_asignada }}"
+                                               class="input-recibido w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                    @endif
                                 </td>
                                 <td class="px-4 py-3" style="vertical-align:middle;">
                                     @if($det->producto)
@@ -97,10 +116,23 @@
                                         <span class="text-xs text-gray-400">—</span>
                                     @endif
                                 </td>
+                                <td class="px-4 py-3 text-center" style="vertical-align:middle;">
+                                    @if(!$yaPendiente)
+                                        <button type="button"
+                                                onclick='abrirModalPendiente({{ $ocDet->sicd_detalle_id }}, {!! json_encode($det->producto?->nombre ?? $det->nombre_producto_excel, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) !!})'
+                                                style="display:inline-flex; align-items:center; gap:4px; font-size:0.75rem; font-weight:600; color:#92400e; background:#fef3c7; border:1px solid #fde68a; border-radius:0.5rem; padding:0.3rem 0.65rem; cursor:pointer; white-space:nowrap;"
+                                                onmouseover="this.style.background='#fde68a'"
+                                                onmouseout="this.style.background='#fef3c7'">
+                                            ⚠ Marcar pendiente
+                                        </button>
+                                    @else
+                                        <span style="font-size:0.72rem; color:#92400e; font-weight:600;">Ya marcado</span>
+                                    @endif
+                                </td>
                             </tr>
                             <tr id="motivo-row-{{ $ocDet->id }}"
                                 style="display:none; background:#fff7ed;">
-                                <td colspan="5" class="px-4 py-3" style="border-top:1px dashed #fed7aa;">
+                                <td colspan="6" class="px-4 py-3" style="border-top:1px dashed #fed7aa;">
                                     <div style="display:flex; align-items:flex-start; gap:0.75rem;">
                                         <span style="font-size:0.8rem; font-weight:700; color:#c2410c; white-space:nowrap; padding-top:0.4rem;">
                                             ⚠ Cantidad diferente — Motivo:
@@ -141,6 +173,65 @@
     </div>
 </form>
 
+{{-- ====== Modal: Marcar ítem como pendiente ====== --}}
+<div id="modal-pendiente-recepcion"
+     style="display:none; position:fixed; inset:0; z-index:9500; background:rgba(0,0,0,.5); align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#fff; border-radius:1rem; box-shadow:0 20px 60px rgba(0,0,0,.25); width:480px; max-width:calc(100vw - 2rem); animation:recep-in .2s cubic-bezier(.22,.68,0,1.2) both;">
+        <div style="padding:1.25rem 1.5rem 1rem; border-bottom:1px solid #f1f5f9;">
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <div style="width:2.5rem; height:2.5rem; border-radius:9999px; background:#fef3c7; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:1.1rem;">
+                    ⚠
+                </div>
+                <div>
+                    <p style="font-size:1rem; font-weight:700; color:#111827; margin:0;">Marcar como pendiente de revisión</p>
+                    <p id="pendiente-modal-producto" style="font-size:0.8rem; color:#6b7280; margin:0.1rem 0 0; max-width:360px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></p>
+                </div>
+            </div>
+        </div>
+        <form id="form-pendiente-recepcion" method="POST" action="">
+            @csrf
+            <input type="hidden" name="sicd_detalle_id" id="pendiente-detalle-id">
+            <div style="padding:1.25rem 1.5rem;">
+                <label style="display:block; font-size:0.8rem; font-weight:600; color:#374151; margin-bottom:0.4rem;">Motivo <span style="color:#dc2626;">*</span></label>
+                <select name="motivo" required
+                        style="width:100%; border:1.5px solid #d1d5db; border-radius:0.5rem; padding:0.5rem 0.625rem; font-size:0.875rem; color:#111827; background:#fff; outline:none;"
+                        onfocus="this.style.borderColor='#f59e0b'; this.style.boxShadow='0 0 0 3px rgba(245,158,11,0.15)'"
+                        onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'">
+                    <option value="">— Selecciona el motivo —</option>
+                    <option value="cambio">Cambio de producto</option>
+                    <option value="producto_erroneo">Producto erróneo</option>
+                    <option value="faltante">Faltante en despacho</option>
+                    <option value="desistimiento">Desistimiento del proveedor</option>
+                    <option value="otro">Otro motivo</option>
+                </select>
+
+                <label style="display:block; font-size:0.8rem; font-weight:600; color:#374151; margin-top:0.875rem; margin-bottom:0.4rem;">Notas adicionales</label>
+                <textarea name="notas" rows="3"
+                          placeholder="Descripción adicional del problema (opcional)..."
+                          style="width:100%; border:1.5px solid #d1d5db; border-radius:0.5rem; padding:0.5rem 0.625rem; font-size:0.8rem; color:#374151; background:#fff; resize:vertical; outline:none; box-sizing:border-box;"
+                          onfocus="this.style.borderColor='#f59e0b'; this.style.boxShadow='0 0 0 3px rgba(245,158,11,0.15)'"
+                          onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'"></textarea>
+
+                <p style="font-size:0.75rem; color:#6b7280; margin-top:0.625rem; line-height:1.5;">
+                    El ítem quedará en revisión. Podrás resolverlo desde el <strong>panel de revisión</strong> en el dashboard.
+                </p>
+            </div>
+            <div style="padding:0.75rem 1.5rem 1.25rem; display:flex; gap:0.5rem; justify-content:flex-end; border-top:1px solid #f1f5f9;">
+                <button type="button" onclick="cerrarModalPendiente()"
+                        style="padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; color:#374151; background:#f3f4f6; border:none; border-radius:0.5rem; cursor:pointer;">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        style="padding:0.5rem 1.25rem; font-size:0.875rem; font-weight:600; color:#fff; background:#d97706; border:none; border-radius:0.5rem; cursor:pointer; transition:background .15s;"
+                        onmouseover="this.style.background='#b45309'"
+                        onmouseout="this.style.background='#d97706'">
+                    Marcar como pendiente →
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {{-- Modal confirmación recepción --}}
 <div id="modal-confirm-recepcion"
      style="display:none; position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,.5); align-items:center; justify-content:center; padding:1rem;">
@@ -159,6 +250,11 @@
             </div>
             <p style="font-size:0.85rem; color:#374151; line-height:1.6; margin:0;">
                 Esta acción <strong>actualizará el stock</strong> de todos los productos recibidos y marcará la OC como recibida.<br>
+                @if(($ocPendientesCount ?? 0) > 0)
+                <span style="color:#d97706; font-size:0.78rem; display:block; margin-top:0.375rem;">
+                    ⏳ {{ $ocPendientesCount }} ítem(s) marcado(s) como pendiente no actualizarán stock ahora.
+                </span>
+                @endif
                 <span style="color:#dc2626; font-size:0.78rem;">⚠ Esta acción no se puede deshacer.</span>
             </p>
         </div>
@@ -197,14 +293,28 @@
     }
 
     document.querySelectorAll('.input-recibido').forEach(function(cantInput) {
-        // Verificar al cargar (por si hay old() con valor distinto)
         verificarMotivo(cantInput);
-
         cantInput.addEventListener('input', function () {
             verificarMotivo(this);
         });
     });
 
+    // ── Modal Marcar Pendiente ──────────────────────────────────────────────────
+    function abrirModalPendiente(ocDetalleId, nombreProducto) {
+        document.getElementById('pendiente-detalle-id').value = ocDetalleId;
+        document.getElementById('pendiente-modal-producto').textContent = nombreProducto;
+        document.getElementById('form-pendiente-recepcion').action =
+            '{{ route('admin.oc-pendientes.store', $oc->id) }}';
+        document.getElementById('modal-pendiente-recepcion').style.display = 'flex';
+    }
+    function cerrarModalPendiente() {
+        document.getElementById('modal-pendiente-recepcion').style.display = 'none';
+    }
+    document.getElementById('modal-pendiente-recepcion').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalPendiente();
+    });
+
+    // ── Modal Confirmar Recepción ───────────────────────────────────────────────
     function abrirConfirmRecepcion() {
         document.getElementById('modal-confirm-recepcion').style.display = 'flex';
     }
@@ -229,6 +339,10 @@
 @push('head')
 <style>
 @keyframes recep-in { from { opacity:0; transform:scale(.95) translateY(-8px); } to { opacity:1; transform:none; } }
+html.dark .bg-white { background: #1e293b !important; }
+html.dark .bg-amber-50 { background: rgba(120, 53, 15, 0.12) !important; }
+html.dark #modal-pendiente-recepcion > div { background: #1e293b !important; }
+html.dark #modal-confirm-recepcion > div { background: #1e293b !important; }
 </style>
 @endpush
 

@@ -5,59 +5,59 @@
 @section('content')
 
 <div class="mb-4" style="max-width:640px; margin-left:auto; margin-right:auto;">
-    <a href="{{ route('admin.usuarios.index') }}" class="text-xs text-indigo-600 hover:underline">← Volver a Usuarios</a>
-    <h1 class="text-lg font-bold text-gray-800 mt-0.5">Editar Usuario</h1>
+    <a href="{{ route('admin.usuarios.index') }}" class="text-xs text-indigo-600 hover:underline">Volver a Usuarios</a>
+    <h1 class="text-lg font-bold text-gray-800 dark:text-gray-100 mt-0.5">Editar Usuario</h1>
 </div>
 
-<div class="bg-white rounded-xl shadow p-5 mx-auto" style="max-width:640px;">
+<div class="bg-white dark:bg-slate-800 rounded-xl shadow p-5 mx-auto border border-gray-100 dark:border-slate-700" style="max-width:640px;">
     <form method="POST" action="{{ route('admin.usuarios.update', $usuario->id) }}" class="space-y-3">
         @csrf @method('PUT')
 
         <div class="grid grid-cols-2 gap-3">
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Nombre</label>
+                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Nombre</label>
                 <input type="text" name="name" value="{{ old('name', $usuario->name) }}" required
-                       class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                       class="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 @error('name') <p class="text-red-500 text-xs mt-0.5">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Email</label>
+                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Email</label>
                 <input type="text" name="email" value="{{ old('email', $usuario->email) }}" required
-                       class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                       class="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 @error('email') <p class="text-red-500 text-xs mt-0.5">{{ $message }}</p> @enderror
             </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Rol</label>
-                @php $rolLabels = [0 => 'Usuario', 1 => 'Admin', 2 => 'Dev']; @endphp
-                @if(auth()->id() === $usuario->id)
+                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Rol</label>
+                @php $rolLabels = [0 => 'Usuario', 1 => 'Admin', 2 => 'Super Administrador']; @endphp
+                @if(auth()->id() === $usuario->id || (int) $usuario->rol === 2)
                     <input type="hidden" name="rol" value="{{ $usuario->rol }}">
-                    <div class="w-full border border-gray-200 bg-gray-50 rounded-lg px-2.5 py-1.5 text-sm text-gray-400 select-none">
+                    <div class="w-full border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 rounded-lg px-2.5 py-1.5 text-sm text-gray-400 select-none">
                         {{ $rolLabels[$usuario->rol] ?? 'Usuario' }} <span class="text-xs">(no modificable)</span>
                     </div>
                 @elseif(auth()->user()->esDev())
                     <select name="rol" required
-                            class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            class="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400">
                         <option value="0" {{ old('rol', $usuario->rol) == 0 ? 'selected' : '' }}>Usuario</option>
                         <option value="1" {{ old('rol', $usuario->rol) == 1 ? 'selected' : '' }}>Admin</option>
-                        <option value="2" {{ old('rol', $usuario->rol) == 2 ? 'selected' : '' }}>Dev</option>
+                        <option value="2" {{ old('rol', $usuario->rol) == 2 ? 'selected' : '' }}>Super Administrador</option>
                     </select>
                 @else
                     <input type="hidden" name="rol" value="{{ $usuario->rol }}">
-                    <div class="w-full border border-gray-200 bg-gray-50 rounded-lg px-2.5 py-1.5 text-sm text-gray-400 select-none">
-                        {{ $rolLabels[$usuario->rol] ?? 'Usuario' }} <span class="text-xs">(solo dev puede cambiar roles)</span>
+                    <div class="w-full border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 rounded-lg px-2.5 py-1.5 text-sm text-gray-400 select-none">
+                        {{ $rolLabels[$usuario->rol] ?? 'Usuario' }} <span class="text-xs">(solo Super Administrador puede cambiar roles)</span>
                     </div>
                 @endif
                 @error('rol') <p class="text-red-500 text-xs mt-0.5">{{ $message }}</p> @enderror
             </div>
             @if(auth()->user()->esAdmin())
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Centro de Costo</label>
+                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Centro de Costo</label>
                 <select name="centro_costo_id" id="cc-select-editar"
-                        class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer">
-                    <option value="">— Sin centro de costo —</option>
+                        class="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm font-mono text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer">
+                    <option value="">Sin centro de costo</option>
                     @foreach($centrosCosto as $cc)
                         <option value="{{ $cc->id }}" {{ old('centro_costo_id', $usuario->centro_costo_id) == $cc->id ? 'selected' : '' }}>{{ $cc->acronimo }}</option>
                     @endforeach
@@ -71,12 +71,11 @@
             @endif
         </div>
 
-        {{-- Permisos: visibles para Dev editando cualquier usuario no-dev --}}
         @if(auth()->user()->esDev())
         <div id="bloque-permisos" style="border-top:1px solid #e5e7eb; padding-top:0.75rem; {{ old('rol', $usuario->rol) == 2 ? 'display:none;' : '' }}">
             <div class="flex items-center justify-between mb-2">
-                <p class="text-xs font-semibold text-gray-600">Permisos de acceso</p>
-                <span class="text-[10px] text-gray-400">Vacío = acceso completo (solo para Admin)</span>
+                <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">Permisos de acceso</p>
+                <span class="text-[10px] text-gray-400">Vacio = acceso completo (solo para Admin)</span>
             </div>
             @foreach(\App\Models\User::PERMISOS_GRUPOS as $grupo => $claves)
             <div class="mb-3">
@@ -84,23 +83,15 @@
                 <div class="grid grid-cols-2 gap-1">
                     @foreach($claves as $key)
                         @php
-                            $label  = \App\Models\User::PERMISOS_DISPONIBLES[$key];
+                            $label = \App\Models\User::PERMISOS_DISPONIBLES[$key];
                             $activo = old($key, in_array($key, $usuario->permisos ?? []) ? '1' : '') === '1';
                         @endphp
-                        <div class="flex items-center justify-between gap-3 select-none py-1 px-2 rounded-lg hover:bg-gray-50 transition">
-                            <span class="text-xs text-gray-700">{{ $label }}</span>
+                        <div class="flex items-center justify-between gap-3 select-none py-1 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition">
+                            <span class="text-xs text-gray-700 dark:text-gray-300">{{ $label }}</span>
                             <input type="checkbox" name="{{ $key }}" value="1" {{ $activo ? 'checked' : '' }}
                                    id="perm-{{ $key }}" class="perm-toggle" style="display:none;">
-                            <div class="perm-track" data-for="perm-{{ $key }}" style="
-                                width:34px; height:19px; border-radius:9999px; position:relative; cursor:pointer; flex-shrink:0;
-                                background: {{ $activo ? '#2563eb' : '#6b7280' }};
-                                transition: background .12s;">
-                                <div class="perm-thumb" style="
-                                    width:13px; height:13px; border-radius:50%; background:#fff;
-                                    position:absolute; top:3px;
-                                    left: {{ $activo ? '18px' : '3px' }};
-                                    transition: left .12s;
-                                    box-shadow: 0 1px 3px rgba(0,0,0,0.25);"></div>
+                            <div class="perm-track" data-for="perm-{{ $key }}" style="width:34px; height:19px; border-radius:9999px; position:relative; cursor:pointer; flex-shrink:0; background: {{ $activo ? '#2563eb' : '#6b7280' }}; transition: background .12s;">
+                                <div class="perm-thumb" style="width:13px; height:13px; border-radius:50%; background:#fff; position:absolute; top:3px; left: {{ $activo ? '18px' : '3px' }}; transition: left .12s; box-shadow: 0 1px 3px rgba(0,0,0,0.25);"></div>
                             </div>
                         </div>
                     @endforeach
@@ -110,13 +101,24 @@
         </div>
         @endif
 
+        @if($usuario->pendingPasswordResetRequest || (int) ($usuario->password_reset_status ?? 0) === 1)
+        <div style="border-top:1px solid #e5e7eb; padding-top:0.75rem;">
+            @if($usuario->pendingPasswordResetRequest)
+                <p class="text-xs font-semibold text-rose-600 dark:text-rose-400">Solicitud de reseteo pendiente</p>
+                <p class="text-[10px] text-gray-400">Solicitud registrada el {{ $usuario->pendingPasswordResetRequest->requested_at?->format('d/m/Y H:i') }}.</p>
+            @else
+                <p class="text-xs font-semibold text-amber-600 dark:text-amber-400">Contrasena reiniciada</p>
+                <p class="text-[10px] text-gray-400">El usuario debe cambiar su propia contrasena.</p>
+            @endif
+        </div>
+        @endif
+
         <div class="flex justify-end gap-2 pt-1">
             <a href="{{ route('admin.usuarios.index') }}"
-               class="btn-secondary px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
+               class="btn-secondary px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg">
                 Cancelar
             </a>
-            <button type="submit"
-                    class="btn-primary px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+            <button type="submit" class="btn-primary px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
                 Guardar cambios
             </button>
         </div>
@@ -133,22 +135,19 @@
         });
     }
 
-    // Toggle visual para permisos
     document.querySelectorAll('.perm-track').forEach(function(track) {
-        var chk   = document.getElementById(track.dataset.for);
+        var chk = document.getElementById(track.dataset.for);
         var thumb = track.querySelector('.perm-thumb');
-
         track.addEventListener('click', function() {
             if (chk.disabled) return;
             chk.checked = !chk.checked;
             track.style.background = chk.checked ? '#2563eb' : '#6b7280';
-            thumb.style.left       = chk.checked ? '18px' : '3px';
+            thumb.style.left = chk.checked ? '18px' : '3px';
             chk.dispatchEvent(new Event('change'));
         });
     });
 
-    // Dependencia: aprobar_solicitudes obliga a tener solicitudes activo
-    var chkAprobar     = document.querySelector('input[name="aprobar_solicitudes"]');
+    var chkAprobar = document.querySelector('input[name="aprobar_solicitudes"]');
     var chkSolicitudes = document.querySelector('input[name="solicitudes"]');
 
     function setDisabledSolicitudes(disabled) {
@@ -156,7 +155,7 @@
         var track = document.querySelector('.perm-track[data-for="' + chkSolicitudes.id + '"]');
         chkSolicitudes.disabled = disabled;
         track.style.opacity = disabled ? '0.5' : '1';
-        track.style.cursor  = disabled ? 'not-allowed' : 'pointer';
+        track.style.cursor = disabled ? 'not-allowed' : 'pointer';
     }
 
     if (chkAprobar && chkSolicitudes) {
@@ -172,9 +171,7 @@
             }
         });
 
-        if (chkAprobar.checked) {
-            setDisabledSolicitudes(true);
-        }
+        if (chkAprobar.checked) setDisabledSolicitudes(true);
 
         document.querySelector('form').addEventListener('submit', function () {
             chkSolicitudes.disabled = false;

@@ -23,6 +23,17 @@ class SicdDetalle extends Model
         'total_neto',
         'precio_neto_original',
         'total_neto_original',
+        'clasificacion_pendiente',
+        'pendiente_user_id',
+        'pendiente_at',
+        'resuelto_user_id',
+        'resuelto_at',
+    ];
+
+    protected $casts = [
+        'clasificacion_pendiente' => 'boolean',
+        'pendiente_at'            => 'datetime',
+        'resuelto_at'             => 'datetime',
     ];
 
     public function sicd()
@@ -33,6 +44,16 @@ class SicdDetalle extends Model
     public function producto()
     {
         return $this->belongsTo(Producto::class);
+    }
+
+    public function pendienteUser()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'pendiente_user_id');
+    }
+
+    public function resueltoUser()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'resuelto_user_id');
     }
 
     public function ocDetalles()

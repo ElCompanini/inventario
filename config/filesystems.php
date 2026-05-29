@@ -33,8 +33,8 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
-            'throw' => false,
+            'serve' => env('FILESYSTEM_SERVE', false),
+            'throw' => env('FILESYSTEM_THROW', true),
             'report' => false,
         ],
 
@@ -43,7 +43,7 @@ return [
             'root' => storage_path('app/public'),
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
-            'throw' => false,
+            'throw' => env('FILESYSTEM_THROW', true),
             'report' => false,
         ],
 

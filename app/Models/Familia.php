@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Familia extends Model
 {
     protected $table = 'familias';
-    protected $fillable = ['nombre', 'activo', 'centro_costo_id', 'protegido', 'tipo', 'tipo_catalogo'];
+    protected $fillable = ['nombre', 'activo', 'centro_costo_id', 'protegido', 'tipo', 'tipo_catalogo', 'tipo_item'];
 
     protected $casts = ['protegido' => 'boolean', 'activo' => 'boolean'];
 
@@ -20,6 +20,10 @@ class Familia extends Model
         });
 
         static::saving(function (self $f) {
+            if (!$f->tipo_item || !in_array($f->tipo_item, ['producto', 'servicio', 'mantencion', 'arriendo'], true)) {
+                $f->tipo_item = $f->tipo === 'servicios' || $f->tipo_catalogo === 'servicio' ? 'servicio' : 'producto';
+            }
+
             if ($f->protegido && $f->isDirty('activo') && !$f->activo) {
                 $f->activo = true;
             }
@@ -69,5 +73,10 @@ class Familia extends Model
     public function categorias()
     {
         return $this->hasMany(Categoria::class)->orderBy('nombre');
+    }
+
+    public function scopeTipoItem($query, string $tipo)
+    {
+        return $query->where('tipo_item', $tipo);
     }
 }

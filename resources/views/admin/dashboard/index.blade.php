@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Dashboard')
 
@@ -159,6 +159,27 @@
     html.dark #modal-vp [style*="border-top:1px solid #f1f5f9"] { border-color:#1e293b !important; }
     html.dark #modal-vp [style*="background:#f8fafc"] { background:#0f172a !important; }
     html.dark #modal-vp [style*="background:#fff"] { background:#1e293b !important; }
+
+    html.dark .oc-pend-alerta { background: #1e293b !important; border-color: rgba(217,119,6,0.4) !important; }
+    html.dark .oc-pend-alerta p[style*="color:#d97706"] { color: #fbbf24 !important; }
+    html.dark .oc-pend-alerta span[style*="color:#d97706"] { color: #fbbf24 !important; }
+
+    @keyframes factura-pendiente-tilt {
+        0%, 100% { box-shadow: 0 0 0 rgba(249,115,22,0); border-color: rgba(249,115,22,0.22); }
+        45% { box-shadow: 0 0 0 3px rgba(249,115,22,0.16), 0 0 18px rgba(249,115,22,0.32); border-color: rgba(249,115,22,0.7); }
+    }
+    @keyframes factura-text-tilt {
+        0%, 100% { opacity: 1; }
+        50% { opacity: .45; }
+    }
+    .factura-pendiente-alerta {
+        animation: factura-pendiente-tilt 1.15s ease-in-out infinite;
+    }
+    .factura-pendiente-alerta .factura-alerta-texto,
+    .factura-pendiente-alerta .factura-alerta-cantidad,
+    .factura-pendiente-alerta .factura-alerta-icono {
+        animation: factura-text-tilt 1.15s ease-in-out infinite;
+    }
 </style>
 @endpush
 
@@ -169,9 +190,9 @@
     $num    = fn($v) => number_format((int)$v, 0, ',', '.');
 @endphp
 
-{{-- ══════════════════════════════════════════════════════════
+{{-- ==========================================================
      HEADER
-══════════════════════════════════════════════════════════ --}}
+========================================================== --}}
 <div class="mb-6">
     <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
         Bienvenido, {{ $user->name }}
@@ -187,24 +208,45 @@
     </p>
 </div>
 
-{{-- ══════════════════════════════════════════════════════════
+{{-- ==========================================================
      KPI CARDS
-══════════════════════════════════════════════════════════ --}}
+========================================================== --}}
 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
 
-    {{-- STOCK TOTAL --}}
-    <a href="{{ route('dashboard') }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
+    {{-- FACTURAS PENDIENTES --}}
+    <a href="{{ route('admin.ordenes.index', ['factura' => 'pendiente']) }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 {{ $facturasPendientesCount > 0 ? 'factura-pendiente-alerta' : '' }}">
         <div class="flex items-center justify-between mb-2">
-            <span class="dash-section-title">Stock Total</span>
-            <div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
-                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/></svg>
+            <span class="dash-section-title">Facturas Pendientes</span>
+            <div class="factura-alerta-icono w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-900/25 flex items-center justify-center">
+                <svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5A3.375 3.375 0 0010.125 2.25H6.75A2.25 2.25 0 004.5 4.5v15A2.25 2.25 0 006.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-5.25z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 11.25v4.5m2.25-2.25h-4.5"/></svg>
             </div>
         </div>
-        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $num($stockStats->total_unidades) }}</p>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">unidades en inventario</p>
+        <p class="factura-alerta-cantidad text-2xl font-bold {{ $facturasPendientesCount > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-gray-100' }}">
+            {{ $num($facturasPendientesCount) }}
+        </p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">por subir</p>
         <div class="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700">
-            <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{{ $num($stockStats->total_productos) }}</span>
-            <span class="text-xs text-gray-400"> productos activos</span>
+            <span class="factura-alerta-texto text-xs font-semibold text-orange-600 dark:text-orange-400">Ver OC pendientes</span>
+        </div>
+    </a>
+    {{-- PRODUCTOS A REVISAR (OC pendientes de asignación) --}}
+    <a href="{{ route('admin.oc-pendientes.index') }}" class="kpi-card block bg-white rounded-xl shadow-sm border p-4 {{ $ocItemsPendientesCount > 0 ? 'oc-pend-alerta' : 'border-gray-100' }}" style="{{ $ocItemsPendientesCount > 0 ? 'border-color:rgba(217,119,6,0.35);' : '' }}">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem;">
+            <span class="dash-section-title">Productos a revisar</span>
+            <div style="width:2rem; height:2rem; border-radius:0.5rem; background:#fef3c7; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg style="width:1rem;height:1rem;" fill="none" stroke="#d97706" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+        </div>
+        <p style="font-size:1.5rem; font-weight:700; color:{{ $ocItemsPendientesCount > 0 ? '#d97706' : '#111827' }};">
+            {{ $num($ocItemsPendientesCount) }}
+        </p>
+        <p style="font-size:0.75rem; color:#6b7280; margin-top:0.125rem;">de OC sin asignar</p>
+        <div style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid #f1f5f9;">
+            <span style="font-size:0.75rem; font-weight:600; color:{{ $ocItemsPendientesCount > 0 ? '#d97706' : '#6b7280' }};">
+                {{ $ocItemsPendientesCount > 0 ? 'Requieren atención →' : 'Todo al día ✓' }}
+            </span>
         </div>
     </a>
 
@@ -244,6 +286,25 @@
         </div>
     </a>
 
+    @if((int) auth()->user()->rol === 2)
+    {{-- RESETEOS DE CONTRASENA --}}
+    <a href="{{ route('admin.usuarios.index', ['filtro' => 'reset_pendiente']) }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
+        <div class="flex items-center justify-between mb-2">
+            <span class="dash-section-title">Reseteos</span>
+            <div class="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/25 flex items-center justify-center">
+                <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 1115 0M16.5 14.25h4.5m-2.25-2.25v4.5"/></svg>
+            </div>
+        </div>
+        <p class="text-2xl font-bold {{ $passwordResetPendientes > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-gray-100' }}">
+            {{ $num($passwordResetPendientes) }}
+        </p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">usuario(s) olvidaron su contrasena</p>
+        <div class="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700">
+            <span class="text-xs font-semibold text-rose-600 dark:text-rose-400">Ver usuarios</span>
+        </div>
+    </a>
+    @endif
+
     {{-- ÓRDENES DE COMPRA --}}
     <a href="{{ route('admin.ordenes.index') }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
         <div class="flex items-center justify-between mb-2">
@@ -260,7 +321,23 @@
         </div>
     </a>
 
-    {{-- Variación Presupuestaria — abre modal VP --}}
+    {{-- STOCK TOTAL --}}
+    <a href="{{ route('dashboard') }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
+        <div class="flex items-center justify-between mb-2">
+            <span class="dash-section-title">Stock Total</span>
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/></svg>
+            </div>
+        </div>
+        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $num($stockStats->total_unidades) }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">unidades en inventario</p>
+        <div class="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700">
+            <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{{ $num($stockStats->total_productos) }}</span>
+            <span class="text-xs text-gray-400"> productos activos</span>
+        </div>
+    </a>
+
+    {{-- Variacion Presupuestaria - abre modal VP --}}
     <button type="button" onclick="abrirVP()"
         class="kpi-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 text-left w-full cursor-pointer"
         title="Abrir análisis detallado de Variación Presupuestaria">
@@ -307,27 +384,11 @@
         </div>
     </button>
 
-    {{-- EQUIPOS ARMADOS --}}
-    <a href="{{ route('admin.computadores.index') }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
-        <div class="flex items-center justify-between mb-2">
-            <span class="dash-section-title">Equipos</span>
-            <div class="w-8 h-8 rounded-lg bg-violet-50 dark:bg-violet-900/25 flex items-center justify-center">
-                <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-            </div>
-        </div>
-        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $num($equiposStats->total) }}</p>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">total armados</p>
-        <div class="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700 flex gap-2 text-xs">
-            <span class="text-green-600 dark:text-green-400 font-semibold">{{ $num($equiposStats->completos) }} listos</span>
-            <span class="text-amber-500 font-semibold">{{ $num($equiposStats->en_armado) }} en armado</span>
-        </div>
-    </a>
-
 </div>
 
-{{-- ══════════════════════════════════════════════════════════
+{{-- ==========================================================
      ROW 2: ACTIVIDAD RECIENTE + EQUIPOS ARMADOS
-══════════════════════════════════════════════════════════ --}}
+========================================================== --}}
 <div class="grid grid-cols-1 gap-4 mb-4" id="row-actividad">
 
     {{-- Actividad Reciente --}}
@@ -387,7 +448,7 @@
                         class="flex-1 min-w-0 text-xs rounded-md px-2 py-1 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 </div>
                 <button id="act-clear-filter" title="Limpiar filtro"
-                    class="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors shrink-0 px-1">✕</button>
+                    class="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors shrink-0 px-1">×</button>
             </div>
         </div>
 
@@ -491,7 +552,7 @@
                         class="eq-date-input flex-1 min-w-0 text-xs rounded-md px-2 py-1 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 </div>
                 <button id="eq-clear-filter" title="Limpiar filtro"
-                    class="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors shrink-0 px-1">✕</button>
+                    class="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors shrink-0 px-1">×</button>
             </div>
         </div>
 
@@ -524,43 +585,27 @@
         </div>
 
         {{-- Resumen contadores (dinámico) --}}
-        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700 grid grid-cols-3 text-center text-xs gap-2">
+        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700 grid grid-cols-4 text-center text-xs gap-2">
             <div><p id="eq-cnt-listos" class="font-bold text-green-600 dark:text-green-400">{{ $num($equiposStats->completos) }}</p><p class="text-gray-400">Listos / En uso</p></div>
             <div><p id="eq-cnt-armado" class="font-bold text-amber-500">{{ $num($equiposStats->en_armado) }}</p><p class="text-gray-400">En armado</p></div>
             <div><p id="eq-cnt-desarm" class="font-bold text-gray-400">{{ $num($equiposStats->desarmados) }}</p><p class="text-gray-400">Desarmados</p></div>
+            <div><p id="eq-piezas-periodo" class="font-bold text-violet-600 dark:text-violet-400">—</p><p class="text-gray-400">Piezas usadas</p></div>
         </div>
 
-        {{-- Métricas de piezas --}}
-        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700 space-y-2">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p id="eq-piezas-periodo" class="text-lg font-bold text-violet-600 dark:text-violet-400">—</p>
-                    <p class="text-[10px] text-gray-400 leading-tight">piezas en período</p>
-                </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(139,92,246,0.1);">
-                    <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                    </svg>
-                </div>
-            </div>
-            <div class="flex items-center justify-between rounded-lg px-3 py-2" style="background:rgba(139,92,246,0.06);">
-                <div>
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Total histórico</p>
-                    <p class="text-sm font-bold text-violet-700 dark:text-violet-300">{{ $num($piezasTotal) }} <span class="text-xs font-normal text-gray-400">piezas</span></p>
-                </div>
-                <svg class="w-3.5 h-3.5 text-violet-400 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                </svg>
-            </div>
+        {{-- Detalle piezas usadas --}}
+        <div id="eq-piezas-detalle" class="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700" style="display:none;">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Detalle por producto</p>
+            <div id="eq-piezas-items" class="space-y-1 max-h-40 overflow-y-auto pr-1"></div>
         </div>
+
     </div>
     @endif
 
 </div>
 
-{{-- ══════════════════════════════════════════════════════════
+{{-- ==========================================================
      ROW 3: TOTAL UTILIZADO + PRODUCTOS MÁS UTILIZADOS
-══════════════════════════════════════════════════════════ --}}
+========================================================== --}}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 <div class="dash-card bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
 
@@ -606,7 +651,7 @@
                     class="tu-date-input flex-1 min-w-0 text-xs rounded-md px-2 py-1 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-rose-400">
             </div>
             <button id="tu-clear-dates" title="Restablecer fechas"
-                class="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors shrink-0 px-1">✕</button>
+                class="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors shrink-0 px-1">×</button>
         </div>
     </div>
 
@@ -732,9 +777,9 @@
 </div>
 </div>
 
-{{-- ══════════════════════════════════════════════════════════
+{{-- ==========================================================
      ROW 4: GRÁFICO MOVIMIENTO + ALERTAS
-══════════════════════════════════════════════════════════ --}}
+========================================================== --}}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
     {{-- Gráfico Movimiento 30 días --}}
@@ -835,9 +880,9 @@
     </div>
 </div>
 
-{{-- ══════════════════════════════════════════════════════════
+{{-- ==========================================================
      ROW 3: BINCARD + PANEL LOGÍSTICO
-══════════════════════════════════════════════════════════ --}}
+========================================================== --}}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
     {{-- BINCARD / Valorización --}}
@@ -923,9 +968,9 @@
     </div>
 </div>
 
-{{-- ══════════════════════════════════════════════════════════
+{{-- ==========================================================
      ROW 4: COMPRAS POR TIPO + REPORTERÍAS
-══════════════════════════════════════════════════════════ --}}
+========================================================== --}}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
     {{-- Gráfico Compras por Fuente --}}
@@ -992,7 +1037,7 @@
 </div>
 
 
-{{-- ══ MODAL VARIACIÓN PRESUPUESTARIA ══════════════════════════════════════ --}}
+{{-- == MODAL VARIACIÓN PRESUPUESTARIA ====================================== --}}
 <div id="modal-vp" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.55); overflow-y:auto; align-items:flex-start; justify-content:center; padding:2rem 1rem;">
 <div style="background:#fff; border-radius:1rem; width:100%; max-width:1100px; margin:0 auto; box-shadow:0 20px 60px rgba(0,0,0,0.25);">
     <!-- Header -->
@@ -1041,7 +1086,7 @@
                 <button onclick="fetchVP()" id="vp-btn-calc" style="flex:1;background:#4f46e5;color:#fff;border:none;border-radius:0.5rem;padding:0.45rem 0.75rem;font-size:0.8rem;font-weight:600;cursor:pointer;">
                     Calcular
                 </button>
-                <button onclick="limpiarVP()" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:0.5rem;padding:0.45rem 0.6rem;font-size:0.8rem;cursor:pointer;">✕</button>
+                <button onclick="limpiarVP()" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:0.5rem;padding:0.45rem 0.6rem;font-size:0.8rem;cursor:pointer;">×</button>
             </div>
         </div>
     </div>
@@ -1082,6 +1127,7 @@
                     <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:right;">Total SICD</th>
                     <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:right;">Total OC</th>
                     <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:right;">OCs</th>
+                    <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:left;">Tipo doc.</th>
                     <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:right;">Variación</th>
                     <th style="padding:.5rem .65rem;font-size:.68rem;font-weight:700;text-align:center;">Estado Var.</th>
                 </tr>
@@ -1122,7 +1168,7 @@
         };
     }
 
-    // ── Chart.js global defaults ──────────────────────────────────────────
+    // -- Chart.js global defaults ------------------------------------------
     function applyTheme() {
         const t = themeColors();
         Chart.defaults.color = t.text;
@@ -1130,7 +1176,7 @@
     }
     applyTheme();
 
-    // ── Gráfico Movimiento ─────────────────────────────────────────────────
+    // -- Gráfico Movimiento -------------------------------------------------
     const ctxMov = document.getElementById('chartMovimiento');
     let chartMov = null;
     if (ctxMov) {
@@ -1190,7 +1236,7 @@
         chartMov = new Chart(ctxMov, buildMovData());
     }
 
-    // ── Gráfico Compras (Doughnut) ─────────────────────────────────────────
+    // -- Gráfico Compras (Doughnut) -----------------------------------------
     const ctxCom = document.getElementById('chartCompras');
     let chartCom = null;
     if (ctxCom && COMPRAS.labels.length > 0) {
@@ -1240,7 +1286,7 @@
         chartCom = new Chart(ctxCom, buildComData());
     }
 
-    // ── Gráfico Productos (Horizontal Bar) ────────────────────────────────
+    // -- Gráfico Productos (Horizontal Bar) --------------------------------
     const ctxProd = document.getElementById('chartProductos');
     let chartProd = null;
     if (ctxProd && PRODUCTOS.labels && PRODUCTOS.labels.length > 0) {
@@ -1290,7 +1336,7 @@
         chartProd = new Chart(ctxProd, buildProdData());
     }
 
-    // ── Actualizar charts al cambiar dark mode ─────────────────────────────
+    // -- Actualizar charts al cambiar dark mode -----------------------------
     new MutationObserver(function () {
         applyTheme();
         function updateChart(chart, buildFn) {
@@ -1309,7 +1355,7 @@
 </script>
 
 <script>
-// ── Filtro de rango de fechas — card Equipos Armados ──────────────────────
+// -- Filtro de rango de fechas — card Equipos Armados ----------------------
 (function () {
     const ENDPOINT = '{{ route('admin.dashboard.equipos-filtro') }}';
 
@@ -1323,7 +1369,9 @@
     const cntListos       = document.getElementById('eq-cnt-listos');
     const cntArmado       = document.getElementById('eq-cnt-armado');
     const cntDesarm       = document.getElementById('eq-cnt-desarm');
-    const elPiezasPeriodo = document.getElementById('eq-piezas-periodo');
+    const elPiezasPeriodo  = document.getElementById('eq-piezas-periodo');
+    const elPiezasDetalle  = document.getElementById('eq-piezas-detalle');
+    const elPiezasItems    = document.getElementById('eq-piezas-items');
 
     if (!btnToggle) return;
 
@@ -1429,6 +1477,21 @@
                     elPiezasPeriodo.style.animation = 'eq-fade-in .3s ease both';
                 }
 
+                // Detalle piezas usadas
+                if (elPiezasDetalle && elPiezasItems) {
+                    if (data.top_piezas && data.top_piezas.length > 0) {
+                        elPiezasItems.innerHTML = data.top_piezas.map(p =>
+                            `<div class="flex items-center justify-between text-xs py-1 px-2 rounded" style="background:rgba(139,92,246,0.06);">
+                                <span class="text-gray-700 dark:text-gray-300 truncate flex-1">${p.nombre}</span>
+                                <span class="font-bold text-violet-600 dark:text-violet-400 ml-3 shrink-0">${fmt(p.total_usado)} uds.</span>
+                            </div>`
+                        ).join('');
+                        elPiezasDetalle.style.display = '';
+                    } else {
+                        elPiezasDetalle.style.display = 'none';
+                    }
+                }
+
                 // Actualizar subtítulo
                 subtitle.textContent = fmtLabel(desde, hasta);
             })
@@ -1447,7 +1510,7 @@
 </script>
 
 <script>
-// ── Actividad Reciente — filtro de fechas + exportación ───────────────────
+// -- Actividad Reciente — filtro de fechas + exportación -------------------
 (function () {
     const ENDPOINT     = '{{ route('admin.dashboard.actividad-filtro') }}';
     const EXCEL_BASE   = '{{ route('admin.dashboard.actividad-excel') }}';
@@ -1589,7 +1652,7 @@
 </script>
 
 <script>
-// ── Total Utilizado — card ────────────────────────────────────────────────
+// -- Total Utilizado — card ------------------------------------------------
 (function () {
     const ENDPOINT   = '{{ route('admin.dashboard.total-utilizado') }}';
     const OPC_URL    = '{{ route('admin.dashboard.tu-opciones') }}';
@@ -1618,7 +1681,7 @@
     inpDesde.value = ymd(inicio);
     inpHasta.value = ymd(hoy);
 
-    // ── Toggles ──────────────────────────────────────────────────────────
+    // -- Toggles ----------------------------------------------------------
     let calOpen = false;
     btnCal.addEventListener('click', function () {
         calOpen = !calOpen;
@@ -1640,7 +1703,7 @@
         btnFilter.style.background = filterOpen ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.1)';
     });
 
-    // ── Helpers ───────────────────────────────────────────────────────────
+    // -- Helpers -----------------------------------------------------------
     function getChecked(name) {
         return [...document.querySelectorAll('.tu-check[data-name="' + name + '"]:checked')].map(cb => cb.value);
     }
@@ -1658,7 +1721,7 @@
             + '</label>';
     }
 
-    // ── Cascada de filtros ────────────────────────────────────────────────
+    // -- Cascada de filtros ------------------------------------------------
     function loadCascade(familiaIds, categoriaIds, skipCats) {
         const params = new URLSearchParams();
         familiaIds.forEach(id  => params.append('familia_ids[]', id));
@@ -1695,7 +1758,7 @@
             });
     }
 
-    // ── Event delegation en el panel de filtros ───────────────────────────
+    // -- Event delegation en el panel de filtros ---------------------------
     filterPanel.addEventListener('change', function (e) {
         const cb = e.target;
         if (!cb.classList.contains('tu-check')) return;
@@ -1714,7 +1777,7 @@
         schedFetch();
     });
 
-    // ── Limpiar ───────────────────────────────────────────────────────────
+    // -- Limpiar -----------------------------------------------------------
     btnClrDates && btnClrDates.addEventListener('click', function () {
         inpDesde.value = ymd(inicio);
         inpHasta.value = ymd(hoy);
@@ -1730,14 +1793,14 @@
     inpDesde.addEventListener('change', schedFetch);
     inpHasta.addEventListener('change', schedFetch);
 
-    // ── Debounce fetch ────────────────────────────────────────────────────
+    // -- Debounce fetch ----------------------------------------------------
     let timer = null;
     function schedFetch() {
         clearTimeout(timer);
         timer = setTimeout(fetchTU, 400);
     }
 
-    // ── Fetch datos ───────────────────────────────────────────────────────
+    // -- Fetch datos -------------------------------------------------------
     function fetchTU() {
         const desde = inpDesde.value;
         const hasta = inpHasta.value;
@@ -1773,12 +1836,12 @@
             });
     }
 
-    // ── Carga inicial ─────────────────────────────────────────────────────
+    // -- Carga inicial -----------------------------------------------------
     loadCascade([], [], false);
     fetchTU();
 })();
 
-// ── Variación Presupuestaria ──────────────────────────────────────────
+// -- Variación Presupuestaria ------------------------------------------
 (function () {
     const ENDPOINT = "{{ route('admin.dashboard.variacion-presupuestaria') }}";
     const modal    = document.getElementById('modal-vp');
@@ -1954,6 +2017,14 @@
                     const colMuted  = d2 ? '#94a3b8' : '#64748b';
                     const colText   = d2 ? '#e2e8f0' : '#374151';
                     const ocsStr = f.ocs.map(o => o.numero ? 'OC-' + o.numero : '—').join(', ') || '—';
+                    const tiposStr = f.ocs.map(o => o.numero ? (o.numero + ': ' + (o.tipo_adquisicion_label || 'Indeterminado') + ' · ' + (o.tipo_adquisicion_origen || 'Manual')) : '—').join(' | ') || '—';
+                    const tipoBadges = f.ocs.map(o => {
+                        const tipo = o.tipo_adquisicion || 'indeterminado';
+                        const label = o.tipo_adquisicion_label || 'Indeterminado';
+                        const bg = tipo === 'compra_agil' ? (d2 ? 'rgba(22,163,74,.2)' : '#dcfce7') : (tipo === 'licitacion' ? (d2 ? 'rgba(79,70,229,.22)' : '#e0e7ff') : (d2 ? 'rgba(100,116,139,.22)' : '#f3f4f6'));
+                        const color = tipo === 'compra_agil' ? (d2 ? '#86efac' : '#15803d') : (tipo === 'licitacion' ? (d2 ? '#a5b4fc' : '#4338ca') : (d2 ? '#94a3b8' : '#64748b'));
+                        return `<span style="display:inline-block;background:${bg};color:${color};font-size:.62rem;font-weight:700;padding:2px 6px;border-radius:9999px;margin:1px;">${label}</span>`;
+                    }).join('') || '<span style="color:' + colMuted + ';">—</span>';
                     return `<tr style="background:${rowBg};border-bottom:1px solid ${rowBorder};">
                         <td style="padding:.45rem .65rem;font-weight:700;color:${d2?'#a5b4fc':'#4f46e5'};font-family:monospace;">${f.codigo ?? ('SICD-'+String(f.sicd_id).padStart(6,'0'))}</td>
                         <td style="padding:.45rem .65rem;color:${colText};max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.proveedor}">${f.proveedor}</td>
@@ -1962,6 +2033,7 @@
                         <td style="padding:.45rem .65rem;text-align:right;font-weight:600;color:${d2?'#34d399':'#15803d'};">${moneda(f.sicd_total)}</td>
                         <td style="padding:.45rem .65rem;text-align:right;font-weight:600;color:${d2?'#93c5fd':'#1d4ed8'};">${moneda(f.oc_total)}</td>
                         <td style="padding:.45rem .65rem;text-align:right;color:${colMuted};font-size:.7rem;" title="${ocsStr}">${f.n_ocs}</td>
+                        <td style="padding:.45rem .65rem;color:${colMuted};font-size:.7rem;max-width:170px;" title="${tiposStr}">${tipoBadges}</td>
                         <td style="padding:.45rem .65rem;text-align:right;font-weight:700;color:${vColor};">${vStr}</td>
                         <td style="padding:.45rem .65rem;text-align:center;"><span style="background:${vBg};color:${vColor};font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:9999px;white-space:nowrap;">${vLabel}</span></td>
                     </tr>`;

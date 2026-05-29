@@ -30,9 +30,12 @@ class RetiroController extends Controller
         $user = Auth::user();
         $ccId = $user->ccFiltro();
 
+        // SEC-07: escapar metacaracteres LIKE para prevenir wildcard injection
+        $qEscaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q);
+
         $productos = Producto::with(['categoria.familia'])
-            ->where('nombre', 'like', "%{$q}%")
-            ->where('es_servicio', false)
+            ->where('nombre', 'like', "%{$qEscaped}%")
+            ->soloFisicos()
             ->whereDoesntHave('categoria.familia', fn($f) => $f->where('tipo', 'servicios'))
             ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId))
             ->select('id', 'nombre', 'stock_actual', 'categoria_id', 'centro_costo_id',
@@ -86,8 +89,8 @@ class RetiroController extends Controller
                 foreach ($items as $item) {
                     $producto = Producto::lockForUpdate()->findOrFail($item['producto_id']);
 
-                    if ($producto->es_servicio) {
-                        throw new \Exception("El producto \"{$producto->nombre}\" es un servicio y no puede retirarse.");
+                    if (!$producto->isProducto()) {
+                        throw new \Exception("El item \"{$producto->nombre}\" no maneja retiro de stock fisico.");
                     }
 
                     if ($ccId && $producto->centro_costo_id !== $ccId) {

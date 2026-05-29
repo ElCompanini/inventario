@@ -13,10 +13,13 @@ use App\Models\HistorialCambio;
 use App\Models\Precio;
 use App\Models\Sicd;
 use App\Models\UnidadMedida;
+use App\Models\ArriendoMovimiento;
+use App\Models\ServicioEstado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class AdminController extends Controller
@@ -46,7 +49,7 @@ class AdminController extends Controller
             ->whereIn('estado', ['aprobado', 'en_devolucion'])
             ->where('tipo', 'salida')
             ->whereHas('producto', fn($q) => $q->withoutGlobalScopes()
-                ->where('es_servicio', false)
+                ->soloFisicos()
                 ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId))
             )
             ->orderByDesc('created_at')
@@ -94,7 +97,7 @@ class AdminController extends Controller
         }
 
         $producto = $solicitud->producto;
-        if (!$producto || $producto->es_servicio) {
+        if (!$producto || !$producto->isProducto()) {
             return back()->with('error', 'El producto no es válido para devoluciones de stock físico.');
         }
 
@@ -121,34 +124,56 @@ class AdminController extends Controller
             'motivo_devolucion.min'        => 'El motivo debe tener al menos 5 caracteres.',
         ]);
 
-        DB::transaction(function () use ($solicitud, $producto, $data) {
-            $cantidad   = (int) $data['cantidad_devolucion'];
-            $stockAntes = $producto->stock_actual;
+        $errorMsg = null;
 
-            $producto->stock_actual += $cantidad;
-            $producto->actualizarFechasStock();
-            $producto->save();
+        DB::transaction(function () use ($solicitud, $producto, $data, &$errorMsg) {
+            // Re-leer con lock para evitar doble devolución concurrente
+            $solicitudLocked = Solicitud::lockForUpdate()->findOrFail($solicitud->id);
+            $productoLocked  = Producto::withoutGlobalScopes()->lockForUpdate()->findOrFail($solicitud->producto_id);
+
+            // Revalidar máximo devolvible dentro del lock
+            $yaDevueltoNow  = HistorialCambio::where('tipo', 'devolucion')
+                ->where('origen', 'solicitud')
+                ->where('origen_id', $solicitudLocked->id)
+                ->sum('cantidad');
+            $maxDevolverNow = $solicitudLocked->cantidad - (int) $yaDevueltoNow;
+
+            if ((int) $data['cantidad_devolucion'] > $maxDevolverNow) {
+                $errorMsg = "Otra devolución se procesó en paralelo. Máximo devolvible actualizado: {$maxDevolverNow} unidad(es).";
+                return;
+            }
+
+            $cantidad   = (int) $data['cantidad_devolucion'];
+            $stockAntes = $productoLocked->stock_actual;
+
+            $productoLocked->stock_actual += $cantidad;
+            $productoLocked->actualizarFechasStock();
+            $productoLocked->save();
 
             HistorialCambio::create([
-                'producto_id'        => $producto->id,
-                'nombre_producto'    => $producto->nombre,
-                'contenedor_id'      => $producto->contenedor,
+                'producto_id'        => $productoLocked->id,
+                'nombre_producto'    => $productoLocked->nombre,
+                'contenedor_id'      => $productoLocked->contenedor,
                 'cantidad'           => $cantidad,
                 'tipo'               => 'devolucion',
                 'motivo'             => $data['motivo_devolucion'],
                 'aprobado_por'       => Auth::user()->name,
-                'usuario_id'         => $solicitud->usuario_id,
+                'usuario_id'         => $solicitudLocked->usuario_id,
                 'origen'             => 'solicitud',
-                'origen_id'          => $solicitud->id,
+                'origen_id'          => $solicitudLocked->id,
                 'origen_tipo'        => 'devolucion',
                 'referencia_tipo'    => 'solicitud',
-                'referencia_id'      => $solicitud->id,
-                'doc_referencia'     => 'SOL-' . str_pad($solicitud->id, 6, '0', STR_PAD_LEFT),
+                'referencia_id'      => $solicitudLocked->id,
+                'doc_referencia'     => 'SOL-' . str_pad($solicitudLocked->id, 6, '0', STR_PAD_LEFT),
                 'stock_anterior'     => $stockAntes,
-                'stock_posterior'    => $producto->stock_actual,
+                'stock_posterior'    => $productoLocked->stock_actual,
                 'usuario_ejecutor_id'=> Auth::id(),
             ]);
         });
+
+        if ($errorMsg) {
+            return back()->with('error', $errorMsg);
+        }
 
         $qty = (int) $data['cantidad_devolucion'];
         return back()->with('success', "Devolución de {$qty} unidad(es) de «{$producto->nombre}» registrada. Stock actualizado.");
@@ -191,37 +216,47 @@ class AdminController extends Controller
     {
         abort_unless(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
 
-        $solicitudDev = SolicitudDevolucion::with([
-            'solicitud',
+        // Carga previa solo para construir mensajes de respuesta fuera de la transacción
+        $solicitudDevPrev = SolicitudDevolucion::with([
             'producto' => fn($q) => $q->withoutGlobalScopes(),
         ])->findOrFail($id);
 
-        if ($solicitudDev->estado !== 'pendiente') {
-            return back()->with('error', 'Esta solicitud de devolución ya fue procesada.');
-        }
+        $errorMsg   = null;
+        $successMsg = null;
 
-        $producto = $solicitudDev->producto;
-        if (!$producto || $producto->es_servicio) {
-            return back()->with('error', 'Producto no válido para devolución de stock físico.');
-        }
+        DB::transaction(function () use ($id, &$errorMsg, &$successMsg) {
+            // Bloquear la SolicitudDevolucion para prevenir doble aprobación concurrente
+            $solicitudDev = SolicitudDevolucion::lockForUpdate()->findOrFail($id);
 
-        // Recalcular máximo devolvible con aprobadas al momento de la acción
-        $solicitud     = $solicitudDev->solicitud;
-        $yaDevuelto    = SolicitudDevolucion::where('solicitud_id', $solicitudDev->solicitud_id)
-            ->where('estado', 'aprobada')
-            ->sum('cantidad');
-        $maxDevolvible = $solicitud->cantidad - (int)$yaDevuelto;
+            if ($solicitudDev->estado !== 'pendiente') {
+                $errorMsg = 'Esta solicitud de devolución ya fue procesada.';
+                return;
+            }
 
-        if ($solicitudDev->cantidad > $maxDevolvible) {
-            $solicitudDev->update([
-                'estado'         => 'rechazada',
-                'aprobado_por_id'=> Auth::id(),
-                'motivo_rechazo' => 'Excede el saldo devolvible al momento de la aprobación (ya se aprobaron otras devoluciones).',
-            ]);
-            return back()->with('error', 'La cantidad solicitada excede el saldo devolvible. La solicitud fue rechazada automáticamente.');
-        }
+            $producto = Producto::withoutGlobalScopes()->lockForUpdate()->findOrFail($solicitudDev->producto_id);
 
-        DB::transaction(function () use ($solicitudDev, $producto) {
+            if (!$producto->isProducto()) {
+                $errorMsg = 'Producto no válido para devolución de stock físico.';
+                return;
+            }
+
+            // Recalcular máximo devolvible dentro del lock para evitar condición de carrera
+            $solicitud     = Solicitud::lockForUpdate()->findOrFail($solicitudDev->solicitud_id);
+            $yaDevuelto    = SolicitudDevolucion::where('solicitud_id', $solicitudDev->solicitud_id)
+                ->where('estado', 'aprobada')
+                ->sum('cantidad');
+            $maxDevolvible = $solicitud->cantidad - (int) $yaDevuelto;
+
+            if ($solicitudDev->cantidad > $maxDevolvible) {
+                $solicitudDev->update([
+                    'estado'         => 'rechazada',
+                    'aprobado_por_id'=> Auth::id(),
+                    'motivo_rechazo' => 'Excede el saldo devolvible al momento de la aprobación (ya se aprobaron otras devoluciones).',
+                ]);
+                $errorMsg = 'La cantidad solicitada excede el saldo devolvible. La solicitud fue rechazada automáticamente.';
+                return;
+            }
+
             $stockAntes = $producto->stock_actual;
 
             $producto->stock_actual += $solicitudDev->cantidad;
@@ -251,12 +286,15 @@ class AdminController extends Controller
                 'estado'          => 'aprobada',
                 'aprobado_por_id' => Auth::id(),
             ]);
+
+            $successMsg = "Devolución {$solicitudDev->numeroDoc()} aprobada: {$solicitudDev->cantidad} unidad(es) de «{$producto->nombre}» restituidas al stock.";
         });
 
-        $qty  = $solicitudDev->cantidad;
-        $nom  = $producto->nombre;
-        $docN = $solicitudDev->numeroDoc();
-        return back()->with('success', "Devolución {$docN} aprobada: {$qty} unidad(es) de «{$nom}» restituidas al stock.");
+        if ($errorMsg) {
+            return back()->with('error', $errorMsg);
+        }
+
+        return back()->with('success', $successMsg ?? 'Devolución aprobada correctamente.');
     }
 
     public function rechazarDevolucion(int $id, Request $request)
@@ -289,32 +327,38 @@ class AdminController extends Controller
     public function aprobar(int $id)
     {
         abort_unless(auth()->user()->esAdmin() || auth()->user()->tienePermiso('aprobar_solicitudes'), 403);
-        $solicitud = Solicitud::with('producto')->findOrFail($id);
 
-        if ($solicitud->estado !== 'pendiente') {
-            return back()->with('error', 'Esta solicitud ya fue procesada.');
-        }
+        $errorMsg = null;
 
-        $producto = $solicitud->producto;
+        DB::transaction(function () use ($id, &$errorMsg) {
+            $solicitud = Solicitud::lockForUpdate()->findOrFail($id);
 
-        // Servicios no tienen stock físico — bloquear salidas de stock
-        if ($producto->es_servicio && $solicitud->tipo === 'salida') {
-            return back()->with('error', "«{$producto->nombre}» es un servicio y no tiene stock físico que descontar.");
-        }
-
-        // Validar stock negativo para salidas de productos físicos
-        if (!$producto->es_servicio && $solicitud->tipo === 'salida') {
-            if ($producto->stock_actual < $solicitud->cantidad) {
-                return back()->with('error',
-                    "Stock insuficiente. Stock actual: {$producto->stock_actual}, solicitado: {$solicitud->cantidad}.");
+            if ($solicitud->estado !== 'pendiente') {
+                $errorMsg = 'Esta solicitud ya fue procesada.';
+                return;
             }
-        }
 
-        DB::transaction(function () use ($solicitud, $producto) {
+            // Bloquear producto dentro de la misma transacción para check + update atómico
+            $producto = Producto::withoutGlobalScopes()->lockForUpdate()->findOrFail($solicitud->producto_id);
+
+            // Servicios no tienen stock físico — bloquear salidas de stock
+            if (!$producto->isProducto() && $solicitud->tipo === 'salida') {
+                $errorMsg = "«{$producto->nombre}» es un servicio y no tiene stock físico que descontar.";
+                return;
+            }
+
+            // Validar stock negativo para salidas de productos físicos
+            if ($producto->isProducto() && $solicitud->tipo === 'salida') {
+                if ($producto->stock_actual < $solicitud->cantidad) {
+                    $errorMsg = "Stock insuficiente. Stock actual: {$producto->stock_actual}, solicitado: {$solicitud->cantidad}.";
+                    return;
+                }
+            }
+
             $stockAntes = $producto->stock_actual;
 
             // Solo actualizar stock para productos físicos
-            if (!$producto->es_servicio) {
+            if ($producto->isProducto()) {
                 if ($solicitud->tipo === 'entrada') {
                     $producto->stock_actual += $solicitud->cantidad;
                 } else {
@@ -347,6 +391,10 @@ class AdminController extends Controller
                 'usuario_ejecutor_id'=> Auth::id(),
             ]);
         });
+
+        if ($errorMsg) {
+            return back()->with('error', $errorMsg);
+        }
 
         return back()->with('success', 'Solicitud aprobada y stock actualizado.');
     }
@@ -428,38 +476,7 @@ class AdminController extends Controller
 
         $historial = $query->get();
 
-        // Clave de agrupación: origen+id+tipo cuando existe, sino motivo+usuario+minuto exacto
-        $lotes = $historial
-            ->groupBy(function ($r) {
-                if ($r->origen && $r->origen_id) {
-                    return "origen:{$r->origen}-{$r->origen_id}-{$r->tipo}";
-                }
-                // Agrupar registros sin origen por motivo + usuario + minuto
-                return "sinOrigen:{$r->usuario_id}:{$r->motivo}:{$r->created_at->format('Y-m-d H:i')}";
-            })
-            ->filter(fn($g) => $g->count() > 1);
-
-        // Lista ordenada de filas: grupos colapsados + individuales
-        $filas = collect();
-        $vistos = [];
-        foreach ($historial as $r) {
-            if ($r->origen && $r->origen_id) {
-                $key = "origen:{$r->origen}-{$r->origen_id}-{$r->tipo}";
-            } else {
-                $key = "sinOrigen:{$r->usuario_id}:{$r->motivo}:{$r->created_at->format('Y-m-d H:i')}";
-            }
-
-            if ($lotes->has($key)) {
-                if (!in_array($key, $vistos)) {
-                    $vistos[] = $key;
-                    $filas->push(['tipo' => 'grupo', 'registros' => $lotes[$key]]);
-                }
-            } else {
-                $filas->push(['tipo' => 'individual', 'registro' => $r]);
-            }
-        }
-
-        return view('admin.historial', compact('historial', 'filas'));
+        return view('admin.historial', compact('historial'));
     }
 
     public function editarStock(int $id)
@@ -488,19 +505,24 @@ class AdminController extends Controller
             'motivo.max'        => 'El motivo no puede superar los 500 caracteres.',
         ]);
 
-        $producto = Producto::findOrFail($id);
-
-        if ($producto->es_servicio) {
-            return back()->with('error', "«{$producto->nombre}» es un servicio y no tiene stock físico. Los servicios se registran únicamente a través de SICD, OC o Gastos Menores.");
+        // Verificar es_servicio antes de entrar a la transacción (campo inmutable)
+        $productoPreCheck = Producto::findOrFail($id);
+        if (!$productoPreCheck->isProducto()) {
+            return back()->with('error', "«{$productoPreCheck->nombre}» es un servicio y no tiene stock físico. Los servicios se registran únicamente a través de SICD, OC o Gastos Menores.");
         }
 
-        if ($data['tipo'] === 'salida' && $producto->stock_actual < $data['cantidad']) {
-            return back()->withErrors([
-                'cantidad' => "Stock insuficiente. Stock actual: {$producto->stock_actual}.",
-            ])->withInput();
-        }
+        $errorMsg    = null;
+        $productoNombre = $productoPreCheck->nombre;
 
-        DB::transaction(function () use ($producto, $data) {
+        DB::transaction(function () use ($id, $data, &$errorMsg) {
+            // Re-leer con lock para que el check de stock y la modificación sean atómicos
+            $producto = Producto::lockForUpdate()->findOrFail($id);
+
+            if ($data['tipo'] === 'salida' && $producto->stock_actual < $data['cantidad']) {
+                $errorMsg = "Stock insuficiente. Stock actual: {$producto->stock_actual}.";
+                return;
+            }
+
             $stockAntes = $producto->stock_actual;
 
             if ($data['tipo'] === 'entrada') {
@@ -527,8 +549,12 @@ class AdminController extends Controller
             ]);
         });
 
+        if ($errorMsg) {
+            return back()->withErrors(['cantidad' => $errorMsg])->withInput();
+        }
+
         return redirect()->route('dashboard')
-            ->with('success', "Stock de '{$producto->nombre}' actualizado correctamente.");
+            ->with('success', "Stock de '{$productoNombre}' actualizado correctamente.");
     }
 
     public function trasladarContainer(int $id, Request $request)
@@ -723,6 +749,106 @@ class AdminController extends Controller
         return round((1 - $dist / $maxLen) * 100, 1);
     }
 
+    private static function normalizarTipoItemValor(mixed $valor, ?int $filaExcel = null): string
+    {
+        $raw = trim((string) $valor);
+        if ($raw === '') {
+            return 'producto';
+        }
+
+        $norm = self::normalizarTexto($raw);
+        $compact = preg_replace('/[^a-z0-9]/', '', $norm) ?: '';
+
+        $mapa = [
+            'producto' => 'producto',
+            'productos' => 'producto',
+            'bien' => 'producto',
+            'bienes' => 'producto',
+            'fisico' => 'producto',
+            'fisicos' => 'producto',
+            'servicio' => 'servicio',
+            'servicios' => 'servicio',
+            'mantencion' => 'mantencion',
+            'mantenciones' => 'mantencion',
+            'mantenimiento' => 'mantencion',
+            'mantenimientos' => 'mantencion',
+            'arriendo' => 'arriendo',
+            'arriendos' => 'arriendo',
+            'mantencionarriendo' => 'mantencion',
+            'mantencionyarriendo' => 'mantencion',
+        ];
+
+        if (isset($mapa[$compact])) {
+            return $mapa[$compact];
+        }
+
+        $mensaje = $filaExcel
+            ? "Tipo de ítem inválido en fila {$filaExcel}."
+            : 'Tipo de ítem inválido.';
+
+        throw ValidationException::withMessages(['excel_masivo' => $mensaje]);
+    }
+
+    private static function calcularDuracionArriendo(?string $inicio, ?string $termino): ?int
+    {
+        if (!$inicio || !$termino) {
+            return null;
+        }
+
+        return \Carbon\Carbon::parse($inicio)->diffInDays(\Carbon\Carbon::parse($termino)) + 1;
+    }
+
+    private static function crearMovimientoInicialArriendo(Producto $producto, array $data): void
+    {
+        if (!$producto->isArriendo()) {
+            return;
+        }
+
+        $condicion = $data['arriendo_condicion_termino'] ?? 'sin_fecha';
+        $fechaInicio = $data['arriendo_fecha_inicio'] ?? null;
+        $fechaTermino = $condicion === 'con_fecha' ? ($data['arriendo_fecha_termino'] ?? null) : null;
+
+        ArriendoMovimiento::create([
+            'producto_id' => $producto->id,
+            'estado_anterior' => null,
+            'estado_nuevo' => 'activo',
+            'fecha_inicio' => $fechaInicio,
+            'fecha_termino' => $fechaTermino,
+            'condicion_termino' => $condicion,
+            'duracion' => self::calcularDuracionArriendo($fechaInicio, $fechaTermino),
+            'unidad_tiempo' => 'dias',
+            'monto_periodo' => $data['arriendo_monto_periodo'] ?? null,
+            'monto_total' => $data['arriendo_monto_total'] ?? null,
+            'proveedor_nombre' => $data['arriendo_proveedor_nombre'] ?? null,
+            'responsable_id' => auth()->id(),
+            'ejecutado_por' => auth()->id(),
+            'observacion' => $data['arriendo_observacion'] ?? null,
+            'documento_referencia' => $data['arriendo_documento_referencia'] ?? null,
+        ]);
+    }
+
+    private static function crearMovimientoInicialMantencion(Producto $producto, array $data): void
+    {
+        if (!$producto->isMantencion()) {
+            return;
+        }
+
+        $estado = $data['mantencion_estado'] ?? 'pendiente';
+        if (!in_array($estado, ['pendiente', 'aprobado', 'en_proceso', 'ejecutado', 'validado', 'cerrado', 'cancelado'], true)) {
+            $estado = 'pendiente';
+        }
+
+        ServicioEstado::create([
+            'producto_id' => $producto->id,
+            'estado' => $estado,
+            'estado_anterior' => null,
+            'usuario_id' => auth()->id(),
+            'observacion' => $data['mantencion_observacion'] ?? null,
+            'documento_referencia' => $data['mantencion_documento_referencia'] ?? null,
+            'proveedor_nombre' => $data['mantencion_proveedor_nombre'] ?? null,
+        ]);
+    }
+
     public function cargaMasiva(Request $request)
     {
         abort_unless(auth()->user()->esAdmin(), 403);
@@ -821,20 +947,20 @@ class AdminController extends Controller
         $exactos    = [];
         $conflictos = [];
 
-        foreach ($rows as $row) {
+        foreach ($rows as $rowIndex => $row) {
             $desc        = trim((string) ($row[0] ?? ''));
             $unidadExcel = trim((string) ($row[1] ?? ''));
             $cantidad    = (int) ($row[2] ?? 0);
             $precioNeto  = is_numeric($row[3] ?? '') ? (float) $row[3] : null;
             $totalNeto   = is_numeric($row[4] ?? '') ? (float) $row[4] : null;
             // Columna F (índice 5): TIPO — "SERVICIO" → servicio, cualquier otro → producto físico
-            $tipoExcel   = strtoupper(trim((string) ($row[5] ?? '')));
-            $esServicio  = $tipoExcel === 'SERVICIO';
+            $tipoItem    = self::normalizarTipoItemValor($row[5] ?? '', ((int) $rowIndex) + 2);
+            $esServicio  = $tipoItem === 'servicio';
             // Columnas G/H/I (índices 6/7/8): presentación (opcional, retrocompatible)
             $tipoPres    = trim((string) ($row[6] ?? ''));
             $cantPres    = is_numeric($row[7] ?? '') ? (int) $row[7] : 0;
             $unidadBase  = trim((string) ($row[8] ?? ''));
-            $manejaPres  = !$esServicio && $tipoPres !== '' && $cantPres >= 2;
+            $manejaPres  = $tipoItem === 'producto' && $tipoPres !== '' && $cantPres >= 1;
 
             if ($desc === '' || $cantidad <= 0) continue;
 
@@ -854,6 +980,7 @@ class AdminController extends Controller
                 'cantidad_real'        => $cantidadReal,    // unidades reales (para stock y BINCARD)
                 'precioNeto'           => $precioNeto,
                 'es_servicio'          => $esServicio,
+                'tipo_item'            => $tipoItem,
                 'totalNeto'            => $totalNeto,
                 'unidad_medida_id'     => null,
                 'unidad_warning'       => null,
@@ -976,6 +1103,11 @@ class AdminController extends Controller
 
         // Leer ID de SICD pre-enlazada desde el modal del dashboard (puede ser null)
         $sicdPreEnlazadoId = (int)($request->input('sicd_preenlazado_id')) ?: null;
+        if ($vincularOc && !$this->sicdPreEnlazadoValido($sicdPreEnlazadoId, $codigoSicd)) {
+            return back()
+                ->withInput()
+                ->with('error', 'Debes enlazar correctamente el PDF del SICD antes de continuar.');
+        }
 
         // Crear SICD temporal para rastrear el proceso — se activará al confirmar
         // o se eliminará (soft delete) si el usuario cancela/abandona.
@@ -1023,6 +1155,46 @@ class AdminController extends Controller
             ],
         ]);
         return redirect()->route('admin.productos.carga.masiva.contenedores');
+    }
+
+    public function buscarProductoParaEnlace(Request $request): \Illuminate\Http\JsonResponse
+    {
+        abort_unless(auth()->user()->esAdmin(), 403);
+
+        $q    = trim($request->input('q', ''));
+        $ccId = auth()->user()->ccFiltro();
+
+        if (mb_strlen($q) < 2) {
+            return response()->json([]);
+        }
+
+        $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+
+        $productos = Producto::with(['categoria.familia', 'marca'])
+            ->where(function ($w) use ($like) {
+                $w->where('nombre', 'LIKE', $like)
+                  ->orWhere('codigo_barras', 'LIKE', $like);
+            })
+            ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId))
+            ->orderBy('nombre')
+            ->limit(25)
+            ->get(['id', 'nombre', 'categoria_id', 'marca_id', 'codigo_barras']);
+
+        return response()->json($productos->map(function ($p) {
+            $cat   = $p->categoria;
+            $fam   = $cat?->familia;
+            $marca = $p->marca;
+            return [
+                'id'               => $p->id,
+                'nombre'           => $p->nombre,
+                'familia_id'       => $fam?->id,
+                'familia_nombre'   => $fam?->nombre ?? 'Sin familia',
+                'categoria_id'     => $cat?->id,
+                'categoria_nombre' => $cat?->nombre ?? 'Sin categoría',
+                'marca_id'         => $marca?->id,
+                'marca_nombre'     => $marca?->nombre ?? 'Sin marca',
+            ];
+        })->values());
     }
 
     public function resolverCargaMasiva()
@@ -1086,23 +1258,64 @@ class AdminController extends Controller
                 $conflicto['producto_nombre'] = $linked?->nombre;
                 $conflicto['contenedor_id']   = $linked?->contenedor;
             } elseif ($accion === 'nuevo') {
+                $tipoItem = self::normalizarTipoItemValor($res['tipo_item'] ?? ($conflicto['tipo_item'] ?? 'producto'));
+                if ($tipoItem === 'arriendo') {
+                    validator($res, [
+                        'arriendo_proveedor_nombre' => ['required', 'string', 'max:255'],
+                        'arriendo_fecha_inicio' => ['required', 'date'],
+                        'arriendo_condicion_termino' => ['required', 'in:con_fecha,sin_fecha'],
+                        'arriendo_fecha_termino' => ['required_if:arriendo_condicion_termino,con_fecha', 'nullable', 'date', 'after_or_equal:arriendo_fecha_inicio'],
+                        'arriendo_monto_periodo' => ['required', 'numeric', 'min:0'],
+                        'arriendo_monto_total' => ['required', 'numeric', 'min:0'],
+                        'arriendo_documento_referencia' => ['required', 'string', 'max:255'],
+                        'arriendo_observacion' => ['nullable', 'string', 'max:1000'],
+                    ])->validate();
+                } elseif ($tipoItem === 'mantencion') {
+                    validator($res, [
+                        'mantencion_estado' => ['nullable', 'in:pendiente,aprobado,en_proceso,ejecutado,validado,cerrado,cancelado'],
+                        'mantencion_proveedor_nombre' => ['nullable', 'string', 'max:255'],
+                        'mantencion_documento_referencia' => ['required', 'string', 'max:255'],
+                        'mantencion_observacion' => ['nullable', 'string', 'max:1000'],
+                    ])->validate();
+                }
                 $conflicto['producto_id']        = null;
                 $conflicto['accion']             = 'nuevo';
-                $conflicto['nuevo_nombre']       = $conflicto['descripcion'];
+                $conflicto['tipo_item']          = $tipoItem;
+                $conflicto['es_servicio']        = $tipoItem === 'servicio';
+                $conflicto['nuevo_nombre']       = !empty($res['nuevo_nombre']) ? trim($res['nuevo_nombre']) : $conflicto['descripcion'];
                 $conflicto['nuevo_categoria_id'] = !empty($res['nuevo_categoria_id']) ? (int) $res['nuevo_categoria_id'] : null;
                 $conflicto['nuevo_marca_id']     = !empty($res['nuevo_marca_id'])     ? (int) $res['nuevo_marca_id']     : null;
-                $conflicto['nuevo_stock_minimo']  = (int) ($res['nuevo_stock_minimo']  ?? 0);
-                $conflicto['nuevo_stock_critico'] = (int) ($res['nuevo_stock_critico'] ?? 0);
-                $conflicto['contenedor_id']      = null;
+                $conflicto['nuevo_stock_minimo']  = $tipoItem === 'producto' ? (int) ($res['nuevo_stock_minimo']  ?? 0) : 0;
+                $conflicto['nuevo_stock_critico'] = $tipoItem === 'producto' ? (int) ($res['nuevo_stock_critico'] ?? 0) : 0;
+                $conflicto['unidad_medida_id']   = !empty($res['unidad_medida_id'])   ? (int) $res['unidad_medida_id']   : null;
+                $conflicto['contenedor_id']      = $tipoItem === 'producto' && !empty($res['contenedor_id']) ? (int) $res['contenedor_id'] : null;
                 // Package settings from modal (override any Excel-provided values)
-                $manejaPres = !empty($res['nuevo_maneja_presentacion']);
+                $manejaPres = $tipoItem === 'producto' && !empty($res['nuevo_maneja_presentacion']);
                 $conflicto['maneja_presentacion']   = $manejaPres;
                 $conflicto['tipo_presentacion']     = $manejaPres ? ($res['nuevo_tipo_presentacion']     ?? null) : null;
                 $conflicto['cantidad_presentacion'] = $manejaPres && !empty($res['nuevo_cantidad_presentacion'])
                     ? (int) $res['nuevo_cantidad_presentacion'] : null;
                 $conflicto['unidad_base']           = $manejaPres ? ($res['nuevo_unidad_base'] ?? null) : null;
+                $conflicto['arriendo_proveedor_nombre'] = $res['arriendo_proveedor_nombre'] ?? null;
+                $conflicto['arriendo_fecha_inicio'] = $res['arriendo_fecha_inicio'] ?? null;
+                $conflicto['arriendo_condicion_termino'] = $res['arriendo_condicion_termino'] ?? null;
+                $conflicto['arriendo_fecha_termino'] = $res['arriendo_fecha_termino'] ?? null;
+                $conflicto['arriendo_monto_periodo'] = $res['arriendo_monto_periodo'] ?? null;
+                $conflicto['arriendo_monto_total'] = $res['arriendo_monto_total'] ?? null;
+                $conflicto['arriendo_documento_referencia'] = $res['arriendo_documento_referencia'] ?? null;
+                $conflicto['arriendo_observacion'] = $res['arriendo_observacion'] ?? null;
+                $conflicto['mantencion_estado'] = $res['mantencion_estado'] ?? 'pendiente';
+                $conflicto['mantencion_proveedor_nombre'] = $res['mantencion_proveedor_nombre'] ?? null;
+                $conflicto['mantencion_documento_referencia'] = $res['mantencion_documento_referencia'] ?? null;
+                $conflicto['mantencion_observacion'] = $res['mantencion_observacion'] ?? null;
+            } elseif ($accion === 'pendiente') {
+                $conflicto['producto_id']             = null;
+                $conflicto['accion']                  = 'pendiente';
+                $conflicto['clasificacion_pendiente'] = true;
             } else {
-                $conflicto['producto_id'] = null;
+                // accion='omitir' o cualquier valor no reconocido
+                $conflicto['producto_id']             = null;
+                $conflicto['clasificacion_pendiente'] = false;
             }
 
             $items[] = $conflicto;
@@ -1196,7 +1409,12 @@ class AdminController extends Controller
         $items = $pendiente['items'];
 
         foreach ($items as $i => &$item) {
-            $item['contenedor_id'] = (int) ($contenedores[$i] ?? ($item['contenedor_id'] ?? 1));
+            $tipoItem = self::normalizarTipoItemValor($item['tipo_item'] ?? (($item['es_servicio'] ?? false) ? 'servicio' : 'producto'));
+            $item['tipo_item'] = $tipoItem;
+            $item['es_servicio'] = $tipoItem === 'servicio';
+            $item['contenedor_id'] = $tipoItem === 'producto'
+                ? (int) ($contenedores[$i] ?? ($item['contenedor_id'] ?? 1))
+                : null;
         }
         unset($item);
 
@@ -1224,7 +1442,6 @@ class AdminController extends Controller
             $boletaId = null;
             if (!$vincularOc && $boletaTempRuta && Storage::disk('local')->exists($boletaTempRuta)) {
                 $rutaAbsoluta = Storage::disk('local')->path($boletaTempRuta);
-                \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
                 $boleta   = \App\Models\Boleta::create([
                     'archivo_nombre' => $boletaNombre ?? basename($boletaTempRuta),
                     'archivo_blob'   => base64_encode(file_get_contents($rutaAbsoluta)),
@@ -1239,14 +1456,20 @@ class AdminController extends Controller
             if ($sicdPreEnlazadoId) {
                 $sicdPreLinked = Sicd::withoutGlobalScope('sin_temporales')
                     ->where('id', $sicdPreEnlazadoId)
-                    ->whereNotNull('documento_blob')
+                    ->where(function ($q) {
+                        $q->whereNotNull('documento_blob')
+                            ->orWhereNotNull('documento_ruta');
+                    })
                     ->whereDoesntHave('detalles')
                     ->first();
             }
             if (!$sicdPreLinked) {
                 $sicdPreLinked = Sicd::withoutGlobalScope('sin_temporales')
                     ->where('codigo_sicd', $codigoSicd)
-                    ->whereNotNull('documento_blob')
+                    ->where(function ($q) {
+                        $q->whereNotNull('documento_blob')
+                            ->orWhereNotNull('documento_ruta');
+                    })
                     ->whereDoesntHave('detalles')
                     ->latest()
                     ->first();
@@ -1316,33 +1539,45 @@ class AdminController extends Controller
 
                 // Crear producto nuevo si el usuario eligió esa opción
                 if (!$productoId && ($item['accion'] ?? '') === 'nuevo' && !empty($item['nuevo_nombre'])) {
-                    $manejaPres = !($item['es_servicio'] ?? false) && ($item['maneja_presentacion'] ?? false);
+                    $tipoItem = self::normalizarTipoItemValor($item['tipo_item'] ?? (($item['es_servicio'] ?? false) ? 'servicio' : 'producto'));
+                    $manejaPres = $tipoItem === 'producto' && ($item['maneja_presentacion'] ?? false);
                     $nuevo = Producto::create([
                         'nombre'                => $item['nuevo_nombre'],
                         'categoria_id'          => $item['nuevo_categoria_id']  ?? null,
                         'marca_id'              => $item['nuevo_marca_id']      ?? Marca::idSinMarca(),
                         'unidad_medida_id'      => $item['unidad_medida_id']    ?? null,
                         'stock_actual'          => 0,
-                        'stock_minimo'          => (int) ($item['nuevo_stock_minimo']  ?? 0),
-                        'stock_critico'         => (int) ($item['nuevo_stock_critico'] ?? 0),
-                        'contenedor'            => $item['contenedor_id'] ?? 1,
+                        'stock_minimo'          => $tipoItem === 'producto' ? (int) ($item['nuevo_stock_minimo']  ?? 0) : 0,
+                        'stock_critico'         => $tipoItem === 'producto' ? (int) ($item['nuevo_stock_critico'] ?? 0) : 0,
+                        'contenedor'            => $tipoItem === 'producto' ? ($item['contenedor_id'] ?? 1) : null,
                         'centro_costo_id'       => $ccId,
-                        'es_servicio'           => $item['es_servicio'] ?? false,
+                        'es_servicio'           => $tipoItem === 'servicio',
+                        'tipo_item'             => $tipoItem,
                         'maneja_presentacion'   => $manejaPres,
                         'tipo_presentacion'     => $manejaPres ? ($item['tipo_presentacion'] ?? null)     : null,
                         'cantidad_presentacion' => $manejaPres ? ($item['cantidad_presentacion'] ?? null) : null,
                         'unidad_base'           => $manejaPres ? ($item['unidad_base'] ?? null)           : null,
                     ]);
+                    if ($tipoItem === 'arriendo') {
+                        self::crearMovimientoInicialArriendo($nuevo, $item);
+                    } elseif ($tipoItem === 'mantencion') {
+                        self::crearMovimientoInicialMantencion($nuevo, $item);
+                    }
                     $productoId = $nuevo->id;
                 }
 
                 // Si el usuario cambió el contenedor para un producto existente,
                 // buscar o crear el producto en el nuevo contenedor
                 if ($productoId && !empty($item['contenedor_id'])) {
-                    $prod = Producto::find($productoId);
+                    $prod = Producto::withoutGlobalScopes()
+                        ->whereKey($productoId)
+                        ->lockForUpdate()
+                        ->first();
                     if ($prod && $prod->contenedor != $item['contenedor_id']) {
-                        $enDestino = Producto::where('nombre', $prod->nombre)
+                        $enDestino = Producto::withoutGlobalScopes()
+                            ->where('nombre', $prod->nombre)
                             ->where('contenedor', $item['contenedor_id'])
+                            ->lockForUpdate()
                             ->first();
                         if ($enDestino) {
                             $productoId = $enDestino->id;
@@ -1362,22 +1597,29 @@ class AdminController extends Controller
                 }
 
                 if ($sicd) {
+                    $esPendiente = $item['clasificacion_pendiente'] ?? false;
                     $sicd->detalles()->create([
-                        'producto_id'           => $productoId,
-                        'nombre_producto_excel' => $item['descripcion'],
-                        'unidad'                => $item['unidad'] ?: null,
-                        'cantidad_solicitada'   => $item['cantidad'],
+                        'producto_id'             => $productoId,
+                        'nombre_producto_excel'   => $item['descripcion'],
+                        'unidad'                  => $item['unidad'] ?: null,
+                        'cantidad_solicitada'     => $item['cantidad'],
                         // Si va a OC, la recepción real ocurre después → cantidad_recibida = 0
-                        'cantidad_recibida'     => (!$vincularOc && $productoId) ? $item['cantidad'] : 0,
-                        'precio_neto'           => $item['precioNeto'] ?? null,
-                        'total_neto'            => $item['totalNeto'] ?? null,
+                        'cantidad_recibida'       => (!$vincularOc && $productoId) ? $item['cantidad'] : 0,
+                        'precio_neto'             => $item['precioNeto'] ?? null,
+                        'total_neto'              => $item['totalNeto'] ?? null,
+                        'clasificacion_pendiente' => $esPendiente,
+                        'pendiente_user_id'       => $esPendiente ? Auth::id() : null,
+                        'pendiente_at'            => $esPendiente ? now() : null,
                     ]);
                 }
 
                 // Si va a OC no tocar el stock ahora; se actualizará al procesar la recepción
                 if ($vincularOc || !$productoId) continue;
 
-                $producto = Producto::find($productoId);
+                $producto = Producto::withoutGlobalScopes()
+                    ->whereKey($productoId)
+                    ->lockForUpdate()
+                    ->first();
                 if (!$producto) continue;
 
                 // cantidad_real = real units (quantity × cantidad_presentacion, or quantity when no presentacion)
@@ -1396,7 +1638,7 @@ class AdminController extends Controller
                 $stockAntes = $producto->stock_actual;
 
                 // Servicios: registrar en historial para costos/BINCARD, pero NO tocar stock_actual
-                if (!$producto->es_servicio) {
+                if ($producto->isProducto()) {
                     $producto->stock_actual += $cantidadReal;
                     // Actualizar presentación del producto si el Excel trae datos y el producto aún no la tiene
                     if (!$producto->maneja_presentacion && ($item['maneja_presentacion'] ?? false)) {
@@ -1411,6 +1653,7 @@ class AdminController extends Controller
                     $producto->save();
                 }
 
+                if (!$producto->isMantencion() && !$producto->isArriendo()) {
                 HistorialCambio::create([
                     'producto_id'        => $producto->id,
                     'nombre_producto'    => $producto->nombre,
@@ -1428,6 +1671,7 @@ class AdminController extends Controller
                     'stock_posterior'    => $producto->stock_actual,
                     'usuario_ejecutor_id'=> Auth::id(),
                 ]);
+                }
 
                 $actualizados++;
             }
@@ -1468,6 +1712,13 @@ class AdminController extends Controller
         $proveedorNombre = strtoupper(trim($request->input('proveedor_nombre', ''))) ?: null;
         $rutProveedor    = trim($request->input('rut_proveedor', '')) ?: null;
         $folio           = trim($request->input('folio', '')) ?: null;
+        $sicdPreEnlazadoId = (int) ($request->input('sicd_preenlazado_id')) ?: null;
+
+        if ($vincularOc && !$this->sicdPreEnlazadoValido($sicdPreEnlazadoId, $codigoSicd)) {
+            return back()
+                ->withInput()
+                ->with('error', 'Debes enlazar correctamente el PDF del SICD antes de continuar.');
+        }
 
         // Advertir si la SICD ya está ingresada en el sistema (tiene detalles)
         if ($codigoSicd && !$request->boolean('confirmar_duplicado')) {
@@ -1490,7 +1741,6 @@ class AdminController extends Controller
             $boletaId = null;
             if (!$vincularOc && $request->hasFile('boleta_sicd')) {
                 $file = $request->file('boleta_sicd');
-                \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
                 $boleta   = \App\Models\Boleta::create([
                     'archivo_nombre' => $file->getClientOriginalName(),
                     'archivo_blob'   => base64_encode(file_get_contents($file->getRealPath())),
@@ -1499,14 +1749,32 @@ class AdminController extends Controller
                 $boletaId = $boleta->id;
             }
             // Reutilizar SICD pre-enlazado (usuario hizo clic en "Enlazar PDF" antes de confirmar)
-            $sicd = Sicd::where('codigo_sicd', $codigoSicd)
-                ->whereNotNull('documento_blob')
-                ->whereDoesntHave('detalles')
-                ->latest()
-                ->first();
+            $sicd = null;
+            if ($sicdPreEnlazadoId) {
+                $sicd = Sicd::withoutGlobalScope('sin_temporales')
+                    ->where('id', $sicdPreEnlazadoId)
+                    ->where(function ($q) {
+                        $q->whereNotNull('documento_blob')
+                            ->orWhereNotNull('documento_ruta');
+                    })
+                    ->whereDoesntHave('detalles')
+                    ->first();
+            }
+            if (!$sicd) {
+                $sicd = Sicd::withoutGlobalScope('sin_temporales')
+                    ->where('codigo_sicd', $codigoSicd)
+                    ->where(function ($q) {
+                        $q->whereNotNull('documento_blob')
+                            ->orWhereNotNull('documento_ruta');
+                    })
+                    ->whereDoesntHave('detalles')
+                    ->latest()
+                    ->first();
+            }
 
             if ($sicd) {
                 $sicd->fill([
+                    'es_temporal'     => false,
                     'boleta_id'       => $boletaId,
                     'descripcion'     => $descripcion,
                     'estado'          => $vincularOc ? 'pendiente' : 'recibido',
@@ -1535,15 +1803,20 @@ class AdminController extends Controller
 
         DB::transaction(function () use ($request, $sicd, $codigoSicd, $ccIdManual, $vincularOc) {
             foreach ($request->items_manual as $item) {
-                $producto     = Producto::withoutGlobalScopes()->findOrFail($item['producto_id']);
+                $producto     = Producto::withoutGlobalScopes()
+                    ->whereKey($item['producto_id'])
+                    ->lockForUpdate()
+                    ->firstOrFail();
                 $cantidad     = (int) $item['cantidad'];
                 $unidad       = trim($item['unidad'] ?? '') ?: null;
                 $motivo       = trim($item['motivo'] ?? '') ?: ($codigoSicd ? "Carga manual – SICD {$codigoSicd}" : 'Carga manual de inventario');
                 $contenedorId = isset($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
 
-                if (!$vincularOc && $contenedorId && $contenedorId !== $producto->contenedor) {
-                    $enDestino = Producto::withoutGlobalScopes()->where('nombre', $producto->nombre)
+                if ($contenedorId && $contenedorId !== $producto->contenedor) {
+                    $enDestino = Producto::withoutGlobalScopes()
+                        ->where('nombre', $producto->nombre)
                         ->where('contenedor', $contenedorId)
+                        ->lockForUpdate()
                         ->first();
                     if ($enDestino) {
                         $producto = $enDestino;
@@ -1565,6 +1838,9 @@ class AdminController extends Controller
                     $producto->unidad = $unidad;
                 }
 
+                $precioNeto  = null;
+                $precioTotal = null;
+
                 if ($sicd) {
                     $precioNeto  = isset($item['precio_neto'])  && $item['precio_neto']  !== '' ? (float) $item['precio_neto']  : null;
                     $precioTotal = isset($item['precio_total']) && $item['precio_total'] !== '' ? (float) $item['precio_total'] : null;
@@ -1576,7 +1852,7 @@ class AdminController extends Controller
                         'nombre_producto_excel' => $producto->nombre,
                         'unidad'                => trim($item['unidad'] ?? '') ?: null,
                         'cantidad_solicitada'   => $cantidad,
-                        'cantidad_recibida'     => $cantidad,
+                        'cantidad_recibida'     => $vincularOc ? 0 : $cantidad,
                         'precio_neto'           => $precioNeto,
                         'total_neto'            => $precioTotal,
                     ]);
@@ -1624,6 +1900,11 @@ class AdminController extends Controller
             }
         });
 
+        if ($vincularOc && $sicd) {
+            return redirect()->route('admin.ordenes.create')
+                ->with('success', "SICD {$codigoSicd} creado con productos pendientes. Asígnalo a una Orden de Compra para recibirlo.");
+        }
+
         if ($sicd) {
             return redirect()->route('admin.sicd.show', $sicd->id)
                 ->with('success', "SICD {$codigoSicd} creado y stock actualizado.");
@@ -1637,31 +1918,92 @@ class AdminController extends Controller
     {
         abort_unless(auth()->user()->esAdmin(), 403);
 
+        if ($request->filled('tipo_item')) {
+            $request->merge(['tipo_item' => self::normalizarTipoItemValor($request->input('tipo_item'))]);
+        }
+
         $request->validate([
-            'categoria_id'    => ['required', 'integer', 'exists:categorias,id'],
-            'marca_id'        => ['nullable', 'integer', 'exists:marcas,id'],
-            'nombre'          => ['required', 'string', 'max:500'],
-            'stock_minimo'    => ['nullable', 'integer', 'min:0'],
-            'stock_critico'   => ['nullable', 'integer', 'min:0'],
-            'unidad_medida_id'=> ['nullable', 'integer', 'exists:unidades_medida,id'],
-            'es_servicio'     => ['nullable', 'boolean'],
+            'categoria_id'         => ['required', 'integer', 'exists:categorias,id'],
+            'marca_id'             => ['nullable', 'integer', 'exists:marcas,id'],
+            'nombre'               => ['required', 'string', 'max:500'],
+            'stock_inicial'        => ['nullable', 'integer', 'min:0'],
+            'stock_minimo'         => ['nullable', 'integer', 'min:0'],
+            'stock_critico'        => ['nullable', 'integer', 'min:0'],
+            'unidad_medida_id'     => ['nullable', 'integer', 'exists:unidades_medida,id'],
+            'es_servicio'          => ['nullable', 'boolean'],
+            'tipo_item'            => ['nullable', 'in:producto,servicio,mantencion,arriendo'],
+            'maneja_presentacion'  => ['nullable', 'boolean'],
+            'tipo_presentacion'    => ['nullable', 'string', 'max:100'],
+            'cantidad_presentacion'=> ['nullable', 'integer', 'min:1'],
         ]);
 
         $categoria          = Categoria::with('familia')->findOrFail($request->categoria_id);
         $esFamiliaServicios = $categoria->familia?->tipo === 'servicios';
+        $tipoItem           = $esFamiliaServicios ? 'servicio' : ($request->input('tipo_item') ?: ($request->boolean('es_servicio', false) ? 'servicio' : 'producto'));
+        if (!in_array($tipoItem, ['producto', 'servicio', 'mantencion', 'arriendo'], true)) {
+            $tipoItem = 'producto';
+        }
+        if ($tipoItem === 'arriendo') {
+            $request->validate([
+                'arriendo_proveedor_nombre' => ['required', 'string', 'max:255'],
+                'arriendo_fecha_inicio' => ['required', 'date'],
+                'arriendo_condicion_termino' => ['required', 'in:con_fecha,sin_fecha'],
+                'arriendo_fecha_termino' => ['required_if:arriendo_condicion_termino,con_fecha', 'nullable', 'date', 'after_or_equal:arriendo_fecha_inicio'],
+                'arriendo_monto_periodo' => ['required', 'numeric', 'min:0'],
+                'arriendo_monto_total' => ['required', 'numeric', 'min:0'],
+                'arriendo_documento_referencia' => ['required', 'string', 'max:255'],
+                'arriendo_observacion' => ['nullable', 'string', 'max:1000'],
+            ]);
+        } elseif ($tipoItem === 'mantencion') {
+            $request->validate([
+                'mantencion_estado' => ['nullable', 'in:pendiente,aprobado,en_proceso,ejecutado,validado,cerrado,cancelado'],
+                'mantencion_proveedor_nombre' => ['nullable', 'string', 'max:255'],
+                'mantencion_documento_referencia' => ['required', 'string', 'max:255'],
+                'mantencion_observacion' => ['nullable', 'string', 'max:1000'],
+            ]);
+        }
+        $manejaPres         = $tipoItem === 'producto' && $request->boolean('maneja_presentacion');
 
-        $producto = \App\Models\Producto::create([
-            'nombre'           => trim($request->nombre),
-            'stock_actual'     => 0,
-            'stock_minimo'     => (int) ($request->stock_minimo ?? 0),
-            'stock_critico'    => (int) ($request->stock_critico ?? 0),
-            'contenedor'       => null,
-            'categoria_id'     => $categoria->id,
-            'marca_id'         => $esFamiliaServicios ? Marca::idSinMarca() : ($request->marca_id ?: Marca::idSinMarca()),
-            'centro_costo_id'  => auth()->user()->centro_costo_id,
-            'unidad_medida_id' => $request->unidad_medida_id ?: null,
-            'es_servicio'      => $esFamiliaServicios || $request->boolean('es_servicio', false),
-        ]);
+        $producto = DB::transaction(function () use ($request, $categoria, $esFamiliaServicios, $tipoItem, $manejaPres) {
+            $producto = \App\Models\Producto::create([
+                'nombre'                => trim($request->nombre),
+                'stock_actual'          => $tipoItem === 'producto' ? (int) ($request->stock_inicial ?? 0) : 0,
+                'stock_minimo'          => $tipoItem === 'producto' ? (int) ($request->stock_minimo ?? 0) : 0,
+                'stock_critico'         => $tipoItem === 'producto' ? (int) ($request->stock_critico ?? 0) : 0,
+                'contenedor'            => null,
+                'categoria_id'          => $categoria->id,
+                'marca_id'              => $esFamiliaServicios ? Marca::idSinMarca() : ($request->marca_id ?: Marca::idSinMarca()),
+                'centro_costo_id'       => auth()->user()->centro_costo_id,
+                'unidad_medida_id'      => $tipoItem === 'producto' ? ($request->unidad_medida_id ?: null) : null,
+                'es_servicio'           => $tipoItem === 'servicio',
+                'tipo_item'             => $tipoItem,
+                'maneja_presentacion'   => $manejaPres,
+                'tipo_presentacion'     => $manejaPres ? $request->tipo_presentacion : null,
+                'cantidad_presentacion' => $manejaPres ? (int) $request->cantidad_presentacion : null,
+            ]);
+
+            if ($tipoItem === 'arriendo') {
+                self::crearMovimientoInicialArriendo($producto, $request->only([
+                    'arriendo_proveedor_nombre',
+                    'arriendo_fecha_inicio',
+                    'arriendo_condicion_termino',
+                    'arriendo_fecha_termino',
+                    'arriendo_monto_periodo',
+                    'arriendo_monto_total',
+                    'arriendo_documento_referencia',
+                    'arriendo_observacion',
+                ]));
+            } elseif ($tipoItem === 'mantencion') {
+                self::crearMovimientoInicialMantencion($producto, $request->only([
+                    'mantencion_estado',
+                    'mantencion_proveedor_nombre',
+                    'mantencion_documento_referencia',
+                    'mantencion_observacion',
+                ]));
+            }
+
+            return $producto;
+        });
 
         $producto->load('unidadMedida:id,abreviacion');
 
@@ -1698,5 +2040,22 @@ class AdminController extends Controller
             ->map(fn($row) => collect(array_values($row)));
 
         return $rows;
+    }
+
+    private function sicdPreEnlazadoValido(?int $sicdId, ?string $codigoSicd): bool
+    {
+        if (!$sicdId || !$codigoSicd) {
+            return false;
+        }
+
+        return Sicd::withoutGlobalScope('sin_temporales')
+            ->whereKey($sicdId)
+            ->where('codigo_sicd', strtoupper(trim($codigoSicd)))
+            ->where(function ($q) {
+                $q->whereNotNull('documento_blob')
+                    ->orWhereNotNull('documento_ruta');
+            })
+            ->whereDoesntHave('detalles')
+            ->exists();
     }
 }

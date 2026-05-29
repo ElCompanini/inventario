@@ -39,6 +39,8 @@ return [
         'base_url' => env('MP_BASE_URL', 'https://api.mercadopublico.cl/servicios/v1/publico'),
         'ticket'   => env('MP_TICKET'),
         'timeout'  => env('MP_TIMEOUT', 20),
+        'connect_timeout' => env('MP_CONNECT_TIMEOUT', 8),
+        'retries' => env('MP_RETRIES', 2),
     ],
 
 ];

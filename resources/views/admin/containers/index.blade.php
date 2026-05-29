@@ -247,7 +247,7 @@
 @endpush
 
 {{-- Modal de traslado de container --}}
-<div id="modalTrasladar" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+<div id="modalTrasladar" class="fixed inset-0 z-50 items-center justify-center bg-black/50" style="display:none">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-ct-in .25s cubic-bezier(.22,.68,0,1.2) both;">
         <h2 class="text-lg font-bold text-gray-800 mb-1">Trasladar productos de container</h2>
         <p class="text-sm text-gray-500 mb-4">
@@ -289,7 +289,7 @@
 </div>
 
 {{-- Modal de confirmación de eliminación --}}
-<div id="modalEliminar" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+<div id="modalEliminar" class="fixed inset-0 z-50 items-center justify-center bg-black/50" style="display:none">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-ct-in .25s cubic-bezier(.22,.68,0,1.2) both;">
         <h2 class="text-lg font-bold text-gray-800 mb-1">Desactivar container</h2>
         <p class="text-sm text-gray-500 mb-1">¿Confirmas que deseas desactivar <strong id="nombreContainer" class="text-gray-800"></strong>?</p>
@@ -347,14 +347,12 @@
             opt.hidden = parseInt(opt.value) === id;
         });
         const modal = document.getElementById('modalTrasladar');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        modal.style.display = 'flex';
     });
 
     function cerrarModalTrasladar() {
         const modal = document.getElementById('modalTrasladar');
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+        modal.style.display = 'none';
         document.getElementById('formTrasladar').reset();
     }
 
@@ -370,15 +368,13 @@
         formIdPendiente = id;
         document.getElementById('nombreContainer').textContent = nombre;
         const modal = document.getElementById('modalEliminar');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        modal.style.display = 'flex';
     }
 
     function cerrarModalEliminar() {
         formIdPendiente = null;
         const modal = document.getElementById('modalEliminar');
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+        modal.style.display = 'none';
     }
 
     document.getElementById('btnConfirmarEliminar').addEventListener('click', function () {

@@ -10,8 +10,10 @@ use App\Models\GastoMenor;
 use App\Models\HistorialCambio;
 use App\Models\Marca;
 use App\Models\OrdenCompra;
+use App\Models\PasswordResetRequest;
 use App\Models\Precio;
 use App\Models\Producto;
+use App\Models\OcItemPendiente;
 use App\Models\ReporteriaIndexada;
 use App\Models\Sicd;
 use App\Services\ReporteriaService;
@@ -35,6 +37,7 @@ class DashboardController extends Controller
         $stockStats = DB::table('productos')
             ->where('activo', true)
             ->where('es_servicio', false)
+            ->where(fn($q) => $q->whereNull('tipo_item')->orWhere('tipo_item', 'producto'))
             ->whereNotIn('categoria_id', fn($sub) => $sub->select('categorias.id')
                 ->from('categorias')
                 ->join('familias', 'familias.id', '=', 'categorias.familia_id')
@@ -63,6 +66,18 @@ class DashboardController extends Controller
                 SUM(CASE WHEN estado = 'recibido' THEN 1 ELSE 0 END) as recibidas,
                 SUM(CASE WHEN estado = 'validado' THEN 1 ELSE 0 END) as validadas
             ")->first();
+
+        $facturasPendientesQuery = OrdenCompra::whereDoesntHave('factura')
+            ->whereNotIn('estado', ['recibido', 'cerrado', 'cancelado', 'anulado']);
+
+        if ($user->tieneFiltroCC()) {
+            $prefix = strtoupper($user->centroCostoPrefix());
+            $facturasPendientesQuery->whereHas('sicds', function ($q) use ($prefix) {
+                $q->whereRaw("REGEXP_REPLACE(codigo_sicd, '[^A-Za-z].*', '') = ?", [$prefix]);
+            });
+        }
+
+        $facturasPendientesCount = (clone $facturasPendientesQuery)->count();
 
         // ── KPI 4: SICD ───────────────────────────────────────────────────────
         $sicdStats = Sicd::selectRaw("
@@ -127,6 +142,7 @@ class DashboardController extends Controller
 
         $piezasTotal = (int) DB::table('computador_componentes')
             ->join('computadores_armados', 'computador_componentes.computador_id', '=', 'computadores_armados.id')
+            ->where('computador_componentes.activo', true)
             ->whereNull('computador_componentes.deleted_at')
             ->whereNull('computadores_armados.deleted_at')
             ->sum('computador_componentes.cantidad');
@@ -140,6 +156,7 @@ class DashboardController extends Controller
             )
             ->where('productos.activo', true)
             ->where('productos.es_servicio', false)
+            ->where(fn($q) => $q->whereNull('productos.tipo_item')->orWhere('productos.tipo_item', 'producto'))
             ->when($ccId, fn($q) => $q->where('productos.centro_costo_id', $ccId))
             ->sum(DB::raw('FLOOR(productos.stock_actual * cp.avg_neto)'));
 
@@ -218,7 +235,7 @@ class DashboardController extends Controller
         // ── Alertas ────────────────────────────────────────────────────────────
         $alertasStockCritico = Producto::where('stock_actual', '<=', DB::raw('stock_critico'))
             ->where('stock_critico', '>', 0)
-            ->where('es_servicio', false)
+            ->soloFisicos()
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->with('centroCosto:id,acronimo')
             ->orderBy('stock_actual')
@@ -250,11 +267,11 @@ class DashboardController extends Controller
 
         // ── Total utilizado — métricas de stock ───────────────────────────────
         $tuMasStock    = Producto::withoutGlobalScope('activo')
-            ->where('activo', true)->where('stock_actual', '>', 0)->where('es_servicio', false)
+            ->where('activo', true)->where('stock_actual', '>', 0)->soloFisicos()
             ->orderByDesc('stock_actual')->first(['nombre', 'stock_actual']);
 
         $tuMenosStock  = Producto::withoutGlobalScope('activo')
-            ->where('activo', true)->where('stock_actual', '>', 0)->where('es_servicio', false)
+            ->where('activo', true)->where('stock_actual', '>', 0)->soloFisicos()
             ->orderBy('stock_actual')->take(4)
             ->get(['nombre', 'stock_actual']);
 
@@ -266,11 +283,19 @@ class DashboardController extends Controller
         $ultimasReporterias = ReporteriaIndexada::with('usuario:id,name')
             ->latest()->take(8)->get(['id', 'nombre', 'formato', 'modulo', 'usuario_id', 'usuario_nombre', 'tamaño_bytes', 'created_at']);
 
+        $passwordResetPendientes = PasswordResetRequest::where('status', 'pending')->count();
+
+        // ── OC Ítems pendientes de revisión ───────────────────────────────────
+        $ocItemsPendientesCount = OcItemPendiente::whereNull('resuelto_at')
+            ->whereNull('deleted_at')
+            ->count();
+
         return view('admin.dashboard.index', compact(
             'user',
             'stockStats',
             'solicitudesStats',
             'ocStats',
+            'facturasPendientesCount',
             'sicdStats',
             'gastosStats',
             'gastosUltimos',
@@ -304,6 +329,8 @@ class DashboardController extends Controller
             'tuMarcas',
             'tuMasStock',
             'tuMenosStock',
+            'passwordResetPendientes',
+            'ocItemsPendientesCount',
         ));
     }
 
@@ -540,17 +567,18 @@ class DashboardController extends Controller
                 SUM(CASE WHEN estado = 'desarmado'         THEN 1 ELSE 0 END) as desarmados
             ")->first();
 
-        // Piezas utilizadas en el período (suma cantidad de componentes de armados creados en rango)
-        $piezasPeriodo = (int) DB::table('computador_componentes')
-            ->join('computadores_armados', 'computador_componentes.computador_id', '=', 'computadores_armados.id')
-            ->whereNull('computador_componentes.deleted_at')
-            ->whereNull('computadores_armados.deleted_at')
-            ->whereBetween('computadores_armados.created_at', [$desde, $hasta])
-            ->sum('computador_componentes.cantidad');
+        // Piezas utilizadas en armado durante el período (salidas hacia equipos)
+        $piezasPeriodo = (int) DB::table('historial_cambios')
+            ->where('origen', 'computador_armado')
+            ->where('tipo', 'salida')
+            ->whereNull('deleted_at')
+            ->whereBetween('created_at', [$desde, $hasta])
+            ->sum(DB::raw('ABS(cantidad)'));
 
-        // Total histórico acumulado (independiente del filtro)
+        // Total histórico acumulado (independiente del filtro, solo activos)
         $piezasTotal = (int) DB::table('computador_componentes')
             ->join('computadores_armados', 'computador_componentes.computador_id', '=', 'computadores_armados.id')
+            ->where('computador_componentes.activo', true)
             ->whereNull('computador_componentes.deleted_at')
             ->whereNull('computadores_armados.deleted_at')
             ->sum('computador_componentes.cantidad');
@@ -562,11 +590,29 @@ class DashboardController extends Controller
             ->take(5)
             ->get(['id', 'codigo', 'nombre', 'estado', 'created_at']);
 
+        // Top piezas utilizadas en el período (via historial_cambios origen=computador_armado)
+        $topPiezas = DB::table('historial_cambios')
+            ->join('productos', 'historial_cambios.producto_id', '=', 'productos.id')
+            ->leftJoin('users', 'historial_cambios.usuario_id', '=', 'users.id')
+            ->where('historial_cambios.origen', 'computador_armado')
+            ->where('historial_cambios.tipo', 'salida')
+            ->whereBetween('historial_cambios.created_at', [$desde, $hasta])
+            ->groupBy('historial_cambios.producto_id', 'productos.id', 'productos.nombre')
+            ->select(
+                'productos.id',
+                'productos.nombre',
+                DB::raw('SUM(ABS(historial_cambios.cantidad)) as total_usado'),
+                DB::raw('COUNT(DISTINCT historial_cambios.origen_id) as en_equipos')
+            )
+            ->orderByDesc('total_usado')
+            ->get();
+
         return response()->json([
-            'stats'         => $stats,
+            'stats'          => $stats,
             'piezas_periodo' => $piezasPeriodo,
-            'piezas_total'  => $piezasTotal,
-            'equipos'       => $equipos->map(fn($eq) => [
+            'piezas_total'   => $piezasTotal,
+            'top_piezas'     => $topPiezas,
+            'equipos'        => $equipos->map(fn($eq) => [
                 'id'          => $eq->id,
                 'codigo'      => $eq->codigo,
                 'nombre'      => $eq->nombre,
@@ -595,7 +641,7 @@ class DashboardController extends Controller
             ->where('es_temporal', false)
             ->with([
                 'detalles',
-                'ordenesCompra' => fn($q) => $q->withTrashed()->select('ordenes_compra.id','api_total','api_impuestos','numero_oc','api_proveedor_nombre','api_proveedor_rut','estado'),
+                'ordenesCompra' => fn($q) => $q->withTrashed()->select('ordenes_compra.id','api_total','api_impuestos','numero_oc','api_proveedor_nombre','api_proveedor_rut','estado','tipo_adquisicion','tipo_adquisicion_origen','tipo_adquisicion_confianza'),
             ])
             ->whereBetween('created_at', [$desde, $hasta])
             ->when($estadoSicd, fn($q) => $q->where('estado', $estadoSicd))
@@ -633,6 +679,10 @@ class DashboardController extends Controller
                     'total'     => (float)($oc->api_total ?? 0),
                     'proveedor' => $oc->api_proveedor_nombre ?? '—',
                     'estado'    => $oc->estado,
+                    'tipo_adquisicion' => $oc->tipo_adquisicion ?? 'indeterminado',
+                    'tipo_adquisicion_label' => $oc->tipoAdquisicionLabel(),
+                    'tipo_adquisicion_origen' => $oc->tipoAdquisicionOrigenLabel(),
+                    'tipo_adquisicion_confianza' => $oc->tipo_adquisicion_confianza ?? 'baja',
                 ])->values()->toArray(),
             ];
         }

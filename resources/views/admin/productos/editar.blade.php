@@ -283,7 +283,7 @@
 
 
 {{-- Modal: confirmar cancelación --}}
-<div id="modalCancelarStock" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+<div id="modalCancelarStock" class="fixed inset-0 z-50 items-center justify-center bg-black/50" style="display:none">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-prod-in .25s cubic-bezier(.22,.68,0,1.2) both;">
         <h2 class="text-lg font-bold text-gray-800 mb-1">¿Cancelar modificación?</h2>
         <p class="text-sm text-gray-500 mb-6">Los datos ingresados se perderán. ¿Deseas volver al listado de productos?</p>
@@ -301,7 +301,7 @@
 </div>
 
 {{-- Modal: confirmar modificación de stock --}}
-<div id="modalStock" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+<div id="modalStock" class="fixed inset-0 z-50 items-center justify-center bg-black/50" style="display:none">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-prod-in .25s cubic-bezier(.22,.68,0,1.2) both;">
         <h2 class="text-lg font-bold text-gray-800 mb-1">Confirmar modificación de stock</h2>
         <p class="text-sm text-gray-500 mb-2">Esta acción se registrará en el historial de cambios y no puede deshacerse.</p>
@@ -320,7 +320,7 @@
 </div>
 
 {{-- Modal: confirmar traslado de container --}}
-<div id="modalTraslado" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+<div id="modalTraslado" class="fixed inset-0 z-50 items-center justify-center bg-black/50" style="display:none">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" style="animation: modal-prod-in .25s cubic-bezier(.22,.68,0,1.2) both;">
         <h2 class="text-lg font-bold text-gray-800 mb-1">Confirmar traslado de container</h2>
         <p class="text-sm text-gray-500 mb-6">El producto será movido al container seleccionado. Esta acción quedará registrada en el historial.</p>
@@ -470,14 +470,14 @@
         var motivo   = document.getElementById('motivo').value.trim();
         if (cantidad || motivo) {
             var m = document.getElementById('modalCancelarStock');
-            m.classList.remove('hidden'); m.classList.add('flex');
+            m.style.display = 'flex';
         } else {
             window.location = '{{ route('dashboard') }}';
         }
     }
     function cerrarModalCancelarStock() {
         var m = document.getElementById('modalCancelarStock');
-        m.classList.add('hidden'); m.classList.remove('flex');
+        m.style.display = 'none';
     }
     document.getElementById('modalCancelarStock').addEventListener('click', function(e) {
         if (e.target === this) cerrarModalCancelarStock();
@@ -509,11 +509,11 @@
         document.getElementById('modalStockResumen').textContent = resumen;
 
         var m = document.getElementById('modalStock');
-        m.classList.remove('hidden'); m.classList.add('flex');
+        m.style.display = 'flex';
     }
     function cerrarModalStock() {
         var m = document.getElementById('modalStock');
-        m.classList.add('hidden'); m.classList.remove('flex');
+        m.style.display = 'none';
     }
     document.getElementById('modalStock').addEventListener('click', function(e) {
         if (e.target === this) cerrarModalStock();
@@ -522,11 +522,11 @@
     // ── Traslado ──────────────────────────────────────────────────────────
     function abrirModalTraslado() {
         var m = document.getElementById('modalTraslado');
-        m.classList.remove('hidden'); m.classList.add('flex');
+        m.style.display = 'flex';
     }
     function cerrarModalTraslado() {
         var m = document.getElementById('modalTraslado');
-        m.classList.add('hidden'); m.classList.remove('flex');
+        m.style.display = 'none';
     }
     document.getElementById('modalTraslado').addEventListener('click', function(e) {
         if (e.target === this) cerrarModalTraslado();

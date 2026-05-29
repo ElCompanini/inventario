@@ -12,6 +12,8 @@ class MercadoPublicoService
     private string $baseUrl;
     private string $ticket;
     private int    $timeout;
+    private int    $connectTimeout;
+    private int    $retries;
 
     public function __construct()
     {
@@ -19,6 +21,8 @@ class MercadoPublicoService
             'https://api.mercadopublico.cl/servicios/v1/publico'), '/');
         $this->ticket  = config('services.mercadopublico.ticket', '');
         $this->timeout = (int) config('services.mercadopublico.timeout', 20);
+        $this->connectTimeout = (int) config('services.mercadopublico.connect_timeout', 8);
+        $this->retries = (int) config('services.mercadopublico.retries', 2);
     }
 
     // ─── Búsqueda combinada (OC o Licitación) ────────────────────────────────
@@ -89,17 +93,26 @@ class MercadoPublicoService
     public function consultarOC(string $codigo): ?array
     {
         $url = $this->baseUrl . '/ordenesdecompra.xml';
-        Log::debug('[MercadoPublico] consultarOC', ['codigo' => $codigo]);
 
         try {
             $response = Http::withOptions(['verify' => false])
                 ->timeout($this->timeout)
+                ->connectTimeout($this->connectTimeout)
+                ->retry($this->retries, 700, throw: false)
                 ->get($url, ['codigo' => $codigo, 'ticket' => $this->ticket]);
         } catch (ConnectionException $e) {
             Log::error('[MercadoPublico] Fallo de conexión OC', ['codigo' => $codigo, 'error' => $e->getMessage()]);
             throw new MercadoPublicoException(
                 'No se pudo conectar con la API de Mercado Público. ' . $e->getMessage(), 0, $e
             );
+        }
+
+        if (!$response->successful()) {
+            Log::warning('[MercadoPublico] HTTP OC no exitoso', [
+                'codigo' => $codigo,
+                'status' => $response->status(),
+            ]);
+            throw new MercadoPublicoException('Mercado Publico respondio con estado HTTP ' . $response->status() . '.');
         }
 
         $body = trim($response->body());
@@ -150,17 +163,26 @@ class MercadoPublicoService
     public function consultarLicitacion(string $codigo): ?array
     {
         $url = $this->baseUrl . '/licitaciones.xml';
-        Log::debug('[MercadoPublico] consultarLicitacion', ['codigo' => $codigo]);
 
         try {
             $response = Http::withOptions(['verify' => false])
                 ->timeout($this->timeout)
+                ->connectTimeout($this->connectTimeout)
+                ->retry($this->retries, 700, throw: false)
                 ->get($url, ['codigo' => $codigo, 'ticket' => $this->ticket]);
         } catch (ConnectionException $e) {
             Log::error('[MercadoPublico] Fallo de conexión Licitación', ['codigo' => $codigo, 'error' => $e->getMessage()]);
             throw new MercadoPublicoException(
                 'No se pudo conectar con la API de Mercado Público. ' . $e->getMessage(), 0, $e
             );
+        }
+
+        if (!$response->successful()) {
+            Log::warning('[MercadoPublico] HTTP Licitacion no exitoso', [
+                'codigo' => $codigo,
+                'status' => $response->status(),
+            ]);
+            throw new MercadoPublicoException('Mercado Publico respondio con estado HTTP ' . $response->status() . '.');
         }
 
         $body = trim($response->body());

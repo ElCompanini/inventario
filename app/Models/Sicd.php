@@ -15,6 +15,13 @@ class Sicd extends Model
         'boleta_id',
         'documento_blob',
         'documento_mime',
+        'documento_ruta',
+        'documento_nombre',
+        'documento_estado',
+        'documento_error',
+        'documento_intentos',
+        'documento_adjuntado_at',
+        'documento_adjuntado_por',
         'descripcion',
         'rut_proveedor',
         'proveedor_nombre',
@@ -23,6 +30,13 @@ class Sicd extends Model
         'es_temporal',
         'permite_mas_oc',
         'usuario_id',
+    ];
+
+    protected $casts = [
+        'documento_intentos' => 'integer',
+        'documento_adjuntado_at' => 'datetime',
+        'es_temporal' => 'boolean',
+        'permite_mas_oc' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -42,6 +56,16 @@ class Sicd extends Model
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');
+    }
+
+    public function usuarioDocumento()
+    {
+        return $this->belongsTo(User::class, 'documento_adjuntado_por');
+    }
+
+    public function tieneDocumentoPersistido(): bool
+    {
+        return !empty($this->documento_ruta) || !empty($this->documento_blob);
     }
 
     public function detalles()

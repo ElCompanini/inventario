@@ -34,8 +34,9 @@ class SicdExterno extends Model
      */
     public static function obtenerPdf(string $codigo): ?string
     {
+        $timeoutMs = (int) env('DB_SICD_QUERY_TIMEOUT_MS', 8000);
         $row = static::where('num_int_sol', $codigo)
-            ->selectRaw('pdf')
+            ->selectRaw("/*+ MAX_EXECUTION_TIME({$timeoutMs}) */ pdf")
             ->first();
 
         if (!$row || empty($row->pdf) || strlen($row->pdf) < 100) {

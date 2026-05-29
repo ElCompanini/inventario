@@ -109,7 +109,7 @@ class ComputadorController extends Controller
 
         $productos = Producto::where('categoria_id', $catId)
             ->where('activo', true)
-            ->where('es_servicio', false)
+            ->soloFisicos()
             ->with(['unidadMedida:id,abreviacion'])
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'stock_actual', 'unidad', 'categoria_id', 'unidad_medida_id']);
@@ -199,7 +199,7 @@ class ComputadorController extends Controller
         $categoria = \App\Models\Categoria::with('familia')->findOrFail($data['categoria_id']);
 
         // Bloquear servicios — no son componentes físicos
-        if ($producto->es_servicio) {
+        if (!$producto->isProducto()) {
             return back()->withErrors([
                 'producto_id' => "«{$producto->nombre}» es un servicio y no puede usarse como componente físico de un equipo.",
             ])->withInput();
@@ -232,8 +232,16 @@ class ComputadorController extends Controller
 
         $categoriaLabel = $categoria->nombre;
         $motivoStr      = strtoupper(trim($data['motivo']));
+        $errorMsg       = null;
 
-        DB::transaction(function () use ($computador, $producto, $categoria, $data, $categoriaLabel, $motivoStr) {
+        DB::transaction(function () use ($computador, $producto, $categoria, $data, $categoriaLabel, $motivoStr, &$errorMsg) {
+            $producto = Producto::whereKey($producto->id)->lockForUpdate()->firstOrFail();
+
+            if ($producto->stock_actual < (int) $data['cantidad']) {
+                $errorMsg = "Stock insuficiente. Disponible: {$producto->stock_actual}.";
+                return;
+            }
+
             ComputadorComponente::create([
                 'computador_id'          => $computador->id,
                 'producto_id'            => $producto->id,
@@ -252,25 +260,30 @@ class ComputadorController extends Controller
             $producto->actualizarFechasStock();
             $producto->save();
 
-            // BINCARD: SALIDA ARMAR EQUIPO
+            // BINCARD: SALIDA ARMADO EQUIPO
             HistorialCambio::create([
-                'producto_id'        => $producto->id,
-                'nombre_producto'    => $producto->nombre,
-                'contenedor_id'      => $producto->contenedor,
-                'cantidad'           => $data['cantidad'],
-                'tipo'               => 'salida',
-                'motivo'             => "SALIDA ARMAR EQUIPO · {$computador->codigo} · {$categoriaLabel} · Motivo: {$motivoStr}",
-                'aprobado_por'       => Auth::user()->name,
-                'usuario_id'         => Auth::id(),
-                'origen'             => 'computador_armado',
-                'origen_id'          => $computador->id,
-                'origen_tipo'        => 'computador_armado',
-                'doc_origen'         => 'COMP-' . str_pad($computador->id, 6, '0', STR_PAD_LEFT),
-                'stock_anterior'     => $stockAntes,
-                'stock_posterior'    => $producto->stock_actual,
-                'usuario_ejecutor_id'=> Auth::id(),
+                'producto_id'         => $producto->id,
+                'nombre_producto'     => $producto->nombre,
+                'contenedor_id'       => $producto->contenedor,
+                'cantidad'            => $data['cantidad'],
+                'tipo'                => 'salida',
+                'motivo'              => "Armado de equipo · {$computador->codigo} · {$categoriaLabel} · {$motivoStr}",
+                'aprobado_por'        => Auth::user()->name,
+                'usuario_id'          => Auth::id(),
+                'origen'              => 'computador_armado',
+                'origen_id'           => $computador->id,
+                'origen_tipo'         => 'computador_armado',
+                'doc_origen'          => 'ARM-' . str_pad($computador->id, 6, '0', STR_PAD_LEFT),
+                'doc_referencia'      => $computador->codigo,
+                'stock_anterior'      => $stockAntes,
+                'stock_posterior'     => $producto->stock_actual,
+                'usuario_ejecutor_id' => Auth::id(),
             ]);
         });
+
+        if ($errorMsg) {
+            return back()->withErrors(['producto_id' => $errorMsg])->withInput();
+        }
 
         return back()->with('success', "Componente «{$producto->nombre}» agregado a {$computador->codigo}.");
     }
@@ -296,6 +309,11 @@ class ComputadorController extends Controller
         $motivoRetiro = $data['motivo_retiro'] ?? 'sin motivo';
 
         DB::transaction(function () use ($computador, $componente, $producto, $data, $motivoRetiro) {
+            $componente = ComputadorComponente::whereKey($componente->id)
+                ->where('activo', true)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             // Marcar como retirado (historial permanente)
             $componente->update([
                 'activo'          => false,
@@ -306,27 +324,29 @@ class ComputadorController extends Controller
 
             // Devolver al stock
             if ($producto) {
+                $producto = Producto::withoutGlobalScopes()->whereKey($producto->id)->lockForUpdate()->firstOrFail();
                 $stockAntes = $producto->stock_actual;
                 $producto->stock_actual += $componente->cantidad;
                 $producto->actualizarFechasStock();
                 $producto->save();
 
                 HistorialCambio::create([
-                    'producto_id'        => $producto->id,
-                    'nombre_producto'    => $producto->nombre,
-                    'contenedor_id'      => $producto->contenedor,
-                    'cantidad'           => $componente->cantidad,
-                    'tipo'               => 'entrada',
-                    'motivo'             => "INGRESO DESMONTAJE · {$computador->codigo} · Retiro: " . strtoupper($motivoRetiro),
-                    'aprobado_por'       => Auth::user()->name,
-                    'usuario_id'         => Auth::id(),
-                    'origen'             => 'computador_armado',
-                    'origen_id'          => $computador->id,
-                    'origen_tipo'        => 'computador_armado',
-                    'doc_origen'         => 'COMP-' . str_pad($computador->id, 6, '0', STR_PAD_LEFT),
-                    'stock_anterior'     => $stockAntes,
-                    'stock_posterior'    => $producto->stock_actual,
-                    'usuario_ejecutor_id'=> Auth::id(),
+                    'producto_id'         => $producto->id,
+                    'nombre_producto'     => $producto->nombre,
+                    'contenedor_id'       => $producto->contenedor,
+                    'cantidad'            => $componente->cantidad,
+                    'tipo'                => 'entrada',
+                    'motivo'              => "Devolución desmontaje · {$computador->codigo} · " . strtoupper($motivoRetiro),
+                    'aprobado_por'        => Auth::user()->name,
+                    'usuario_id'          => Auth::id(),
+                    'origen'              => 'computador_armado',
+                    'origen_id'           => $computador->id,
+                    'origen_tipo'         => 'computador_armado',
+                    'doc_origen'          => 'ARM-' . str_pad($computador->id, 6, '0', STR_PAD_LEFT),
+                    'doc_referencia'      => $computador->codigo,
+                    'stock_anterior'      => $stockAntes,
+                    'stock_posterior'     => $producto->stock_actual,
+                    'usuario_ejecutor_id' => Auth::id(),
                 ]);
             }
         });
@@ -348,7 +368,21 @@ class ComputadorController extends Controller
         }
 
         DB::transaction(function () use ($computador) {
+            $computador = ComputadorArmado::with('componentesActivos')
+                ->whereKey($computador->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             foreach ($computador->componentesActivos as $componente) {
+                $componente = ComputadorComponente::whereKey($componente->id)
+                    ->where('activo', true)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$componente) {
+                    continue;
+                }
+
                 $componente->update([
                     'activo'           => false,
                     'fecha_retiro'     => now(),
@@ -358,27 +392,29 @@ class ComputadorController extends Controller
 
                 $producto = $componente->producto;
                 if ($producto) {
+                    $producto = Producto::withoutGlobalScopes()->whereKey($producto->id)->lockForUpdate()->firstOrFail();
                     $stockAntes = $producto->stock_actual;
                     $producto->stock_actual += $componente->cantidad;
                     $producto->actualizarFechasStock();
                     $producto->save();
 
                     HistorialCambio::create([
-                        'producto_id'        => $producto->id,
-                        'nombre_producto'    => $producto->nombre,
-                        'contenedor_id'      => $producto->contenedor,
-                        'cantidad'           => $componente->cantidad,
-                        'tipo'               => 'entrada',
-                        'motivo'             => "Desarmado completo del equipo {$computador->codigo}",
-                        'aprobado_por'       => Auth::user()->name,
-                        'usuario_id'         => Auth::id(),
-                        'origen'             => 'computador_armado',
-                        'origen_id'          => $computador->id,
-                        'origen_tipo'        => 'computador_armado',
-                        'doc_origen'         => 'COMP-' . str_pad($computador->id, 6, '0', STR_PAD_LEFT),
-                        'stock_anterior'     => $stockAntes,
-                        'stock_posterior'    => $producto->stock_actual,
-                        'usuario_ejecutor_id'=> Auth::id(),
+                        'producto_id'         => $producto->id,
+                        'nombre_producto'     => $producto->nombre,
+                        'contenedor_id'       => $producto->contenedor,
+                        'cantidad'            => $componente->cantidad,
+                        'tipo'                => 'entrada',
+                        'motivo'              => "Desarmado completo · {$computador->codigo}",
+                        'aprobado_por'        => Auth::user()->name,
+                        'usuario_id'          => Auth::id(),
+                        'origen'              => 'computador_armado',
+                        'origen_id'           => $computador->id,
+                        'origen_tipo'         => 'computador_armado',
+                        'doc_origen'          => 'ARM-' . str_pad($computador->id, 6, '0', STR_PAD_LEFT),
+                        'doc_referencia'      => $computador->codigo,
+                        'stock_anterior'      => $stockAntes,
+                        'stock_posterior'     => $producto->stock_actual,
+                        'usuario_ejecutor_id' => Auth::id(),
                     ]);
                 }
             }

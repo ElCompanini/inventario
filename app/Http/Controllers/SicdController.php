@@ -8,11 +8,13 @@ use App\Models\Familia;
 use App\Models\HistorialCambio;
 use App\Models\Producto;
 use App\Models\Sicd;
+use App\Models\SicdDetalle;
 use App\Models\SicdExterno;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -23,20 +25,20 @@ class SicdController extends Controller
         $input = trim($request->query('codigo', ''));
 
         if ($input === '') {
-            return response()->json(['valido' => false, 'mensaje' => 'Ingresa un código.']);
+            return response()->json(['valido' => false, 'mensaje' => 'Ingresa un cÃ³digo.']);
         }
 
         try {
-            // Si el input es numérico, buscar por id; si no, por num_int_sol
+            // Si el input es numÃ©rico, buscar por id; si no, por num_int_sol
             if (ctype_digit($input)) {
                 $solicitud = SicdExterno::find((int) $input);
 
-                // Fallback: podría ser num_sol_compra_aut (número de compra autorizada)
+                // Fallback: podrÃ­a ser num_sol_compra_aut (nÃºmero de compra autorizada)
                 if (!$solicitud) {
                     $anio = trim($request->query('anio', ''));
 
                     if ($anio !== '') {
-                        // Año ya seleccionado: resolver y devolver el código SICD
+                        // AÃ±o ya seleccionado: resolver y devolver el cÃ³digo SICD
                         $row = DB::connection('sicd_externa')
                             ->table('solicitud_full')
                             ->where('num_sol_compra_aut', (int) $input)
@@ -53,9 +55,9 @@ class SicdController extends Controller
                                 'codigo_resuelto' => $row->num_int_sol,
                             ]);
                         }
-                        // Si no encontró combinación válida → cae al "no encontrado" genérico
+                        // Si no encontrÃ³ combinaciÃ³n vÃ¡lida â†’ cae al "no encontrado" genÃ©rico
                     } else {
-                        // Sin año: obtener años distintos disponibles para ese número
+                        // Sin aÃ±o: obtener aÃ±os distintos disponibles para ese nÃºmero
                         $anios = DB::connection('sicd_externa')
                             ->table('solicitud_full')
                             ->where('num_sol_compra_aut', (int) $input)
@@ -71,7 +73,7 @@ class SicdController extends Controller
 
                         if (!empty($anios)) {
                             if (count($anios) === 1) {
-                                // Un solo año → resolver directamente sin pedir al usuario
+                                // Un solo aÃ±o â†’ resolver directamente sin pedir al usuario
                                 $row = DB::connection('sicd_externa')
                                     ->table('solicitud_full')
                                     ->where('num_sol_compra_aut', (int) $input)
@@ -83,13 +85,13 @@ class SicdController extends Controller
                                     $solicitud = SicdExterno::buscar($row->num_int_sol);
                                 }
                             } else {
-                                // Varios años → pedir selección
+                                // Varios aÃ±os â†’ pedir selecciÃ³n
                                 return response()->json([
                                     'valido'  => false,
                                     'tipo'    => 'num_sol_compra_aut',
                                     'num'     => $input,
                                     'anios'   => $anios,
-                                    'mensaje' => 'Número de compra encontrado. Selecciona el año.',
+                                    'mensaje' => 'NÃºmero de compra encontrado. Selecciona el aÃ±o.',
                                 ]);
                             }
                         }
@@ -103,19 +105,19 @@ class SicdController extends Controller
         }
 
         if (!$solicitud) {
-            return response()->json(['valido' => false, 'mensaje' => 'Código SICD no encontrado en el sistema.']);
+            return response()->json(['valido' => false, 'mensaje' => 'CÃ³digo SICD no encontrado en el sistema.']);
         }
 
-        // El código real siempre es num_int_sol del registro encontrado
+        // El cÃ³digo real siempre es num_int_sol del registro encontrado
         $codigoReal = $solicitud->num_int_sol;
 
-        // Filtro por centro de costo: usar el prefijo del código real
+        // Filtro por centro de costo: usar el prefijo del cÃ³digo real
         $user = auth()->user();
         if ($user && $user->tieneFiltroCC()) {
             $prefix  = strtoupper($user->centroCostoPrefix());
             $prefijo = strtoupper(trim(preg_replace('/[^A-Za-z].*$/u', '', $codigoReal)));
             if ($prefijo !== $prefix) {
-                return response()->json(['valido' => false, 'mensaje' => "Este código no pertenece a tu centro de costo ({$prefix})."]);
+                return response()->json(['valido' => false, 'mensaje' => "Este cÃ³digo no pertenece a tu centro de costo ({$prefix})."]);
             }
         }
 
@@ -127,7 +129,7 @@ class SicdController extends Controller
 
         return response()->json([
             'valido'          => true,
-            'mensaje'         => 'Código válido.',
+            'mensaje'         => 'CÃ³digo vÃ¡lido.',
             'codigo_resuelto' => $codigoReal,
             'centro_costo'    => $solicitud->centro_costo,
             'estado'          => $solicitud->estado,
@@ -138,7 +140,7 @@ class SicdController extends Controller
 
     public function verificarPdf(Request $request)
     {
-        abort_unless(auth()->check(), 403);
+        abort_unless(auth()->user()->tienePermiso('sicd'), 403);
         $codigo = strtoupper(trim($request->query('codigo', '')));
         if ($codigo === '') return response()->json(['tiene_pdf' => false]);
 
@@ -159,9 +161,17 @@ class SicdController extends Controller
 
     public function verPdfExterno(Request $request)
     {
-        abort_unless(auth()->check(), 403);
+        abort_unless(auth()->user()->tienePermiso('sicd'), 403);
         $codigo = strtoupper(trim($request->query('codigo', '')));
         abort_if($codigo === '', 400);
+
+        // SEC-02: verificar que el cÃ³digo pertenece al centro de costo del usuario
+        $user = auth()->user();
+        if ($user->tieneFiltroCC()) {
+            $prefix    = strtoupper($user->centroCostoPrefix());
+            $codPrefix = strtoupper(trim(preg_replace('/[^A-Za-z].*$/u', '', $codigo)));
+            abort_unless($codPrefix === $prefix, 403);
+        }
 
         $row = DB::connection('sicd_externa')
             ->table('solicitud_full')
@@ -187,7 +197,7 @@ class SicdController extends Controller
 
         if ($user->tieneFiltroCC()) {
             $prefix = $user->centroCostoPrefix();
-            // Extrae solo las letras iniciales del codigo_sicd (ignora paréntesis, / y números)
+            // Extrae solo las letras iniciales del codigo_sicd (ignora parÃ©ntesis, / y nÃºmeros)
             $query->whereRaw("REGEXP_REPLACE(codigo_sicd, '[^A-Za-z].*', '') = ?", [$prefix]);
         }
 
@@ -203,8 +213,8 @@ class SicdController extends Controller
 
     /**
      * Fase 1: valida, guarda archivos en temp, analiza el Excel.
-     * Si hay conflictos → redirige a la vista de resolución.
-     * Si todo concuerda → crea el SICD directamente.
+     * Si hay conflictos â†’ redirige a la vista de resoluciÃ³n.
+     * Si todo concuerda â†’ crea el SICD directamente.
      */
     public function store(Request $request)
     {
@@ -218,7 +228,7 @@ class SicdController extends Controller
             'archivo_sicd.mimes'     => 'El archivo SICD debe ser PDF, JPG o PNG.',
             'archivo_excel.required' => 'Debes adjuntar el Excel con el detalle de productos.',
             'archivo_excel.mimes'    => 'El archivo Excel debe ser XLSX, XLS o CSV.',
-            'codigo_sicd.required'   => 'El código SICD es obligatorio.',
+            'codigo_sicd.required'   => 'El cÃ³digo SICD es obligatorio.',
             'codigo_sicd.regex'      => 'El formato debe ser TIC(RAMO)/NUMERO (ej: TIC(RAMO)/12345).',
         ]);
 
@@ -271,7 +281,7 @@ class SicdController extends Controller
             }
         }
 
-        // Si hay conflictos → guardar estado en sesión y resolver
+        // Si hay conflictos â†’ guardar estado en sesiÃ³n y resolver
         if (!empty($conflictos)) {
             session([
                 'sicd_pendiente' => [
@@ -287,7 +297,7 @@ class SicdController extends Controller
             return redirect()->route('admin.sicd.resolver');
         }
 
-        // Sin conflictos → crear SICD directamente
+        // Sin conflictos â†’ crear SICD directamente
         Storage::disk('local')->move($rutaSicdTemp, 'documentos/sicd/' . basename($rutaSicdTemp));
         $rutaFinal = 'documentos/sicd/' . basename($rutaSicdTemp);
 
@@ -302,7 +312,7 @@ class SicdController extends Controller
         $pendiente = session('sicd_pendiente');
         if (!$pendiente) {
             return redirect()->route('admin.sicd.create')
-                ->with('error', 'Sesión expirada. Vuelve a cargar el SICD.');
+                ->with('error', 'SesiÃ³n expirada. Vuelve a cargar el SICD.');
         }
 
         $ccId      = auth()->user()->ccFiltro();
@@ -324,7 +334,7 @@ class SicdController extends Controller
         $pendiente = session('sicd_pendiente');
         if (!$pendiente) {
             return redirect()->route('admin.sicd.create')
-                ->with('error', 'Sesión expirada. Vuelve a cargar el SICD.');
+                ->with('error', 'SesiÃ³n expirada. Vuelve a cargar el SICD.');
         }
 
         $resoluciones = $request->input('resoluciones', []);
@@ -357,14 +367,13 @@ class SicdController extends Controller
         return $sicd;
     }
 
-    // ── Helpers privados ────────────────────────────────────────────────────
+    // â”€â”€ Helpers privados â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private function crearSicd(string $codigo, string $nombreOriginal, string $rutaTemp, ?string $descripcion, array $items)
     {
         $boletaId = null;
         if (Storage::disk('local')->exists($rutaTemp)) {
             $rutaAbsoluta = Storage::disk('local')->path($rutaTemp);
-            \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
             $boleta   = Boleta::create([
                 'archivo_nombre' => $nombreOriginal,
                 'archivo_blob'   => base64_encode(file_get_contents($rutaAbsoluta)),
@@ -402,9 +411,9 @@ class SicdController extends Controller
     }
 
     /**
-     * Recepción directa desde el modal de Inventario.
-     * modo=nuevo  → crea el SICD desde archivos, actualiza stock, marca recibido.
-     * modo=existente → usa un SICD ya creado, actualiza stock de sus detalles, marca recibido.
+     * RecepciÃ³n directa desde el modal de Inventario.
+     * modo=nuevo  â†’ crea el SICD desde archivos, actualiza stock, marca recibido.
+     * modo=existente â†’ usa un SICD ya creado, actualiza stock de sus detalles, marca recibido.
      */
     public function recibirDirecto(Request $request)
     {
@@ -423,30 +432,43 @@ class SicdController extends Controller
             $sicd = Sicd::with('detalles.producto')->findOrFail($request->sicd_existente_id);
 
             if ($sicd->estado === 'recibido') {
-                return back()->with('error', "El SICD {$sicd->codigo_sicd} ya está marcado como recibido.");
+                return back()->with('error', "El SICD {$sicd->codigo_sicd} ya estÃ¡ marcado como recibido.");
             }
 
             DB::transaction(function () use ($sicd) {
+                $sicd = Sicd::with('detalles')
+                    ->whereKey($sicd->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($sicd->estado === 'recibido') {
+                    return;
+                }
+
                 foreach ($sicd->detalles as $detalle) {
-                    if (!$detalle->producto_id || !$detalle->producto) continue;
+                    if (!$detalle->producto_id) continue;
                     $cantidad = $detalle->cantidad_solicitada;
                     if ($cantidad <= 0) continue;
+
+                    $detalle = \App\Models\SicdDetalle::whereKey($detalle->id)->lockForUpdate()->firstOrFail();
+                    $producto = Producto::withoutGlobalScopes()->whereKey($detalle->producto_id)->lockForUpdate()->first();
+                    if (!$producto) continue;
 
                     $detalle->cantidad_recibida = $cantidad;
                     $detalle->save();
 
-                    $stockAntes = $detalle->producto->stock_actual;
-                    $detalle->producto->stock_actual += $cantidad;
-                    $detalle->producto->actualizarFechasStock();
-                    $detalle->producto->save();
+                    $stockAntes = $producto->stock_actual;
+                    $producto->stock_actual += $cantidad;
+                    $producto->actualizarFechasStock();
+                    $producto->save();
 
                     HistorialCambio::create([
                         'producto_id'        => $detalle->producto_id,
-                        'nombre_producto'    => $detalle->producto->nombre,
-                        'contenedor_id'      => $detalle->producto->contenedor,
+                        'nombre_producto'    => $producto->nombre,
+                        'contenedor_id'      => $producto->contenedor,
                         'cantidad'           => $cantidad,
                         'tipo'               => 'entrada',
-                        'motivo'             => "Recepción directa – SICD {$sicd->codigo_sicd}",
+                        'motivo'             => "RecepciÃ³n directa â€“ SICD {$sicd->codigo_sicd}",
                         'aprobado_por'       => Auth::user()->name,
                         'usuario_id'         => Auth::id(),
                         'origen'             => 'sicd',
@@ -454,7 +476,7 @@ class SicdController extends Controller
                         'origen_tipo'        => 'sicd',
                         'doc_origen'         => 'SICD ' . $sicd->codigo_sicd,
                         'stock_anterior'     => $stockAntes,
-                        'stock_posterior'    => $detalle->producto->stock_actual,
+                        'stock_posterior'    => $producto->stock_actual,
                         'usuario_ejecutor_id'=> Auth::id(),
                     ]);
                 }
@@ -467,7 +489,7 @@ class SicdController extends Controller
                 ->with('success', "SICD {$sicd->codigo_sicd} marcado como recibido y stock actualizado.");
         }
 
-        // ── modo=nuevo ──────────────────────────────────────────────────────
+        // â”€â”€ modo=nuevo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         $data = $request->validate([
             'archivo_sicd'  => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'archivo_excel' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
@@ -478,7 +500,7 @@ class SicdController extends Controller
             'archivo_sicd.mimes'     => 'El archivo SICD debe ser PDF, JPG o PNG.',
             'archivo_excel.required' => 'Debes adjuntar el Excel con el detalle de productos.',
             'archivo_excel.mimes'    => 'El archivo Excel debe ser XLSX, XLS o CSV.',
-            'codigo_sicd.required'   => 'El código SICD es obligatorio.',
+            'codigo_sicd.required'   => 'El cÃ³digo SICD es obligatorio.',
             'codigo_sicd.regex'      => 'El formato debe ser TIC(RAMO)/NUMERO (ej: TIC(RAMO)/12345).',
         ]);
 
@@ -522,7 +544,6 @@ class SicdController extends Controller
         $boletaId = null;
         if (Storage::disk('local')->exists($rutaSicdTemp)) {
             $rutaAbsoluta = Storage::disk('local')->path($rutaSicdTemp);
-            \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
             $boleta   = Boleta::create([
                 'archivo_nombre' => $nombreOriginal,
                 'archivo_blob'   => base64_encode(file_get_contents($rutaAbsoluta)),
@@ -558,7 +579,7 @@ class SicdController extends Controller
                 ]);
 
                 if ($item['producto_id']) {
-                    $producto = Producto::find($item['producto_id']);
+                    $producto = Producto::withoutGlobalScopes()->whereKey($item['producto_id'])->lockForUpdate()->first();
                     if ($producto) {
                         $stockAntes = $producto->stock_actual;
                         $producto->stock_actual += $cantidad;
@@ -571,7 +592,7 @@ class SicdController extends Controller
                             'contenedor_id'      => $producto->contenedor,
                             'cantidad'           => $cantidad,
                             'tipo'               => 'entrada',
-                            'motivo'             => "Recepción directa – SICD {$codigo}",
+                            'motivo'             => "RecepciÃ³n directa â€“ SICD {$codigo}",
                             'aprobado_por'       => Auth::user()->name,
                             'usuario_id'         => Auth::id(),
                             'origen'             => 'sicd',
@@ -610,6 +631,32 @@ class SicdController extends Controller
         return view('admin.sicd.show', compact('sicd', 'familias'));
     }
 
+    public function resolverDetallePendiente(int $id, Request $request)
+    {
+        abort_unless(auth()->user()->tienePermiso('sicd'), 403);
+
+        $data = $request->validate([
+            'sicd_detalle_id' => ['required', 'integer', 'exists:sicd_detalles,id'],
+            'producto_id'     => ['required', 'integer', 'exists:productos,id'],
+        ], [
+            'producto_id.required' => 'Selecciona un producto del catálogo.',
+            'producto_id.exists'   => 'El producto seleccionado no existe.',
+        ]);
+
+        $detalle = SicdDetalle::where('sicd_id', $id)
+            ->where('clasificacion_pendiente', true)
+            ->findOrFail($data['sicd_detalle_id']);
+
+        $detalle->update([
+            'producto_id'             => $data['producto_id'],
+            'clasificacion_pendiente' => false,
+            'resuelto_user_id'        => Auth::id(),
+            'resuelto_at'             => now(),
+        ]);
+
+        return back()->with('success', 'Ítem pendiente resuelto y enlazado al producto correctamente.');
+    }
+
     public function descargar(int $id)
     {
         $sicd   = Sicd::with('boleta')->findOrFail($id);
@@ -629,7 +676,7 @@ class SicdController extends Controller
             return Storage::disk('local')->download($boleta->archivo_ruta, $boleta->archivo_nombre ?: basename($boleta->archivo_ruta));
         }
 
-        return back()->with('error', 'El archivo no está disponible.');
+        return back()->with('error', 'El archivo no estÃ¡ disponible.');
     }
 
     public function buscarPorCodigo(Request $request)
@@ -637,8 +684,26 @@ class SicdController extends Controller
         $codigo = strtoupper(trim($request->query('codigo', '')));
 
         // Include temporals so the flow can reuse an already-created temporal SICD.
-        $sicd = Sicd::withoutGlobalScope('sin_temporales')->where('codigo_sicd', $codigo)->whereNull('documento_blob')->latest()->first()
-             ?? Sicd::withoutGlobalScope('sin_temporales')->where('codigo_sicd', $codigo)->latest()->first();
+        $sicd = Sicd::withoutGlobalScope('sin_temporales')
+            ->where('codigo_sicd', $codigo)
+            ->where(function ($q) {
+                $q->whereNotNull('documento_blob')
+                    ->orWhereNotNull('documento_ruta');
+            })
+            ->whereDoesntHave('detalles')
+            ->latest()
+            ->first()
+            ?? Sicd::withoutGlobalScope('sin_temporales')
+                ->where('codigo_sicd', $codigo)
+                ->whereNull('documento_blob')
+                ->whereNull('documento_ruta')
+                ->whereDoesntHave('detalles')
+                ->latest()
+                ->first()
+            ?? Sicd::withoutGlobalScope('sin_temporales')
+                ->where('codigo_sicd', $codigo)
+                ->latest()
+                ->first();
 
         if (!$sicd) {
             return response()->json(['encontrado' => false]);
@@ -649,7 +714,7 @@ class SicdController extends Controller
         return response()->json([
             'encontrado'     => true,
             'id'             => $sicd->id,
-            'ya_enlazado'    => !empty($sicd->documento_blob),
+            'ya_enlazado'    => $sicd->tieneDocumentoPersistido(),
             'tiene_detalles' => $tieneDetalles,
             'estado'         => $sicd->estado,
             'url'            => route('admin.sicd.show', $sicd->id),
@@ -661,53 +726,86 @@ class SicdController extends Controller
     {
         $codigo = strtoupper(trim($request->input('codigo', '')));
         if ($codigo === '') {
-            return response()->json(['ok' => false, 'msg' => 'Código requerido.'], 422);
+            return response()->json(['ok' => false, 'msg' => 'Codigo requerido.'], 422);
         }
 
-        // Verificar que el código existe en el sistema externo
         try {
             $externa = SicdExterno::buscar($codigo);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('sicd_externa_buscar_error', [
+                'codigo_sicd' => $codigo,
+                'usuario_id' => Auth::id(),
+                'endpoint' => 'sicd.crear-y-enlazar',
+                'error' => $e->getMessage(),
+                'fecha_hora' => now()->toDateTimeString(),
+            ]);
             return response()->json(['ok' => false, 'msg' => 'No se pudo conectar al sistema externo.'], 500);
         }
+
         if (!$externa) {
-            return response()->json(['ok' => false, 'msg' => 'Código no encontrado en el sistema externo.'], 404);
+            return response()->json(['ok' => false, 'msg' => 'Codigo no encontrado en el sistema externo.'], 404);
         }
 
-        // Obtener o crear el SICD en la BD interna (incluir temporales para reutilizar)
-        $sicd = Sicd::withoutGlobalScope('sin_temporales')->where('codigo_sicd', $codigo)->whereNull('documento_blob')->latest()->first()
-             ?? Sicd::withoutGlobalScope('sin_temporales')->where('codigo_sicd', $codigo)->latest()->first();
+        $sicd = Sicd::withoutGlobalScope('sin_temporales')
+            ->where('codigo_sicd', $codigo)
+            ->whereNull('documento_blob')
+            ->whereNull('documento_ruta')
+            ->latest()
+            ->first()
+            ?? Sicd::withoutGlobalScope('sin_temporales')->where('codigo_sicd', $codigo)->latest()->first();
 
         if (!$sicd) {
-            $sicd = Sicd::withoutGlobalScope('sin_temporales')->create([
+            $sicd = DB::transaction(fn() => Sicd::withoutGlobalScope('sin_temporales')->create([
                 'codigo_sicd' => $codigo,
-                'estado'      => 'pendiente',
+                'estado' => 'pendiente',
                 'es_temporal' => true,
-                'usuario_id'  => Auth::id(),
-            ]);
+                'usuario_id' => Auth::id(),
+                'documento_estado' => 'pendiente',
+            ]));
         }
 
-        // Enlazar PDF si aún no tiene
-        if (!$sicd->documento_blob) {
+        if (!$sicd->tieneDocumentoPersistido()) {
+            $sicd->forceFill([
+                'documento_estado' => 'procesando',
+                'documento_error' => null,
+                'documento_intentos' => min(255, ((int) $sicd->documento_intentos) + 1),
+            ])->save();
+
             try {
                 $pdf = SicdExterno::obtenerPdf($codigo);
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
+                $sicd->forceFill([
+                    'documento_estado' => 'reintento_pendiente',
+                    'documento_error' => $e->getMessage(),
+                ])->save();
+                Log::error('sicd_pdf_obtener_error', [
+                    'sicd_id' => $sicd->id,
+                    'codigo_sicd' => $codigo,
+                    'usuario_id' => Auth::id(),
+                    'endpoint' => 'sicd.crear-y-enlazar',
+                    'estado_proceso' => 'error',
+                    'error' => $e->getMessage(),
+                    'fecha_hora' => now()->toDateTimeString(),
+                ]);
                 return response()->json(['ok' => false, 'msg' => 'Error al obtener el PDF externo.'], 500);
             }
 
             if (!$pdf) {
-                return response()->json(['ok' => false, 'msg' => 'No se encontró PDF en el sistema externo.'], 404);
+                $sicd->forceFill([
+                    'documento_estado' => 'reintento_pendiente',
+                    'documento_error' => 'No se encontro PDF en el sistema externo.',
+                ])->save();
+                return response()->json(['ok' => false, 'msg' => 'No se encontro PDF en el sistema externo.'], 404);
             }
 
             try {
-                \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
-                \DB::table('sicds')->where('id', $sicd->id)->update([
-                    'documento_blob' => base64_encode($pdf),
-                    'documento_mime' => 'application/pdf',
-                    'updated_at'     => now(),
+                $this->persistirPdfSicd($sicd, $pdf, 'sicd.crear-y-enlazar');
+            } catch (\Throwable $e) {
+                Log::error('crearYEnlazar: error guardando documento', [
+                    'id' => $sicd->id,
+                    'usuario_id' => Auth::id(),
+                    'error' => $e->getMessage(),
                 ]);
-            } catch (\Exception $e) {
-                \Log::error('crearYEnlazar: error guardando blob', ['id' => $sicd->id, 'error' => $e->getMessage()]);
                 return response()->json(['ok' => false, 'msg' => 'Error al guardar el documento.'], 500);
             }
         }
@@ -715,6 +813,8 @@ class SicdController extends Controller
         return response()->json([
             'ok' => true,
             'id' => $sicd->id,
+            'url' => route('admin.sicd.show', $sicd->id),
+            'estado_documento' => 'adjuntado',
         ]);
     }
 
@@ -722,37 +822,67 @@ class SicdController extends Controller
     {
         $sicd = Sicd::withoutGlobalScope('sin_temporales')->findOrFail($id);
 
-        if ($sicd->documento_blob) {
-            return response()->json(['ok' => true, 'ya_tenia' => true, 'msg' => 'Ya tiene documento SICD enlazado.']);
+        if ($sicd->tieneDocumentoPersistido()) {
+            return response()->json([
+                'ok' => true,
+                'id' => $sicd->id,
+                'url' => route('admin.sicd.show', $sicd->id),
+                'estado_documento' => 'adjuntado',
+                'ya_tenia' => true,
+                'msg' => 'Ya tiene documento SICD enlazado.',
+            ]);
         }
+
+        $sicd->forceFill([
+            'documento_estado' => 'procesando',
+            'documento_error' => null,
+            'documento_intentos' => min(255, ((int) $sicd->documento_intentos) + 1),
+        ])->save();
 
         try {
             $pdf = SicdExterno::obtenerPdf($sicd->codigo_sicd);
-        } catch (\Exception $e) {
-            \Log::error('enlazarPdf: error externo', ['id' => $id, 'error' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            $sicd->forceFill([
+                'documento_estado' => 'reintento_pendiente',
+                'documento_error' => $e->getMessage(),
+            ])->save();
+            Log::error('enlazarPdf: error externo', [
+                'id' => $id,
+                'usuario_id' => Auth::id(),
+                'endpoint' => 'sicd.enlazar-pdf',
+                'estado_proceso' => 'error',
+                'error' => $e->getMessage(),
+                'fecha_hora' => now()->toDateTimeString(),
+            ]);
             return response()->json(['ok' => false, 'msg' => 'No se pudo conectar al sistema externo: ' . $e->getMessage()], 500);
         }
 
         if (!$pdf) {
-            return response()->json(['ok' => false, 'msg' => 'No se encontró PDF en el sistema externo para "' . $sicd->codigo_sicd . '".'], 404);
+            $sicd->forceFill([
+                'documento_estado' => 'reintento_pendiente',
+                'documento_error' => 'No se encontro PDF en el sistema externo.',
+            ])->save();
+            return response()->json(['ok' => false, 'msg' => 'No se encontro PDF en el sistema externo para "' . $sicd->codigo_sicd . '".'], 404);
         }
 
         try {
-            $blob = base64_encode($pdf);
-            \DB::unprepared('SET GLOBAL max_allowed_packet=67108864');
-            \DB::table('sicds')->where('id', $id)->update([
-                'documento_blob' => $blob,
-                'documento_mime' => 'application/pdf',
-                'updated_at'     => now(),
+            $this->persistirPdfSicd($sicd, $pdf, 'sicd.enlazar-pdf');
+        } catch (\Throwable $e) {
+            Log::error('enlazarPdf: error guardando documento', [
+                'id' => $id,
+                'usuario_id' => Auth::id(),
+                'error' => $e->getMessage(),
             ]);
-        } catch (\Exception $e) {
-            \Log::error('enlazarPdf: error guardando blob', ['id' => $id, 'error' => $e->getMessage()]);
             return response()->json(['ok' => false, 'msg' => 'Error al guardar el documento: ' . $e->getMessage()], 500);
         }
 
-        return response()->json(['ok' => true, 'id' => $sicd->id]);
+        return response()->json([
+            'ok' => true,
+            'id' => $sicd->id,
+            'url' => route('admin.sicd.show', $sicd->id),
+            'estado_documento' => 'adjuntado',
+        ]);
     }
-
     public function updateDetalles(int $id, Request $request)
     {
         abort_unless(auth()->user()->tienePermiso('sicd'), 403);
@@ -796,16 +926,16 @@ class SicdController extends Controller
 
     public function cancelar(int $id)
     {
-        // Soft delete: preserva trazabilidad y auditoría.
+        // Soft delete: preserva trazabilidad y auditorÃ­a.
         // El modelo Sicd usa SoftDeletes (deleted_at), igual que Boleta.
         $sicd = Sicd::withoutGlobalScope('sin_temporales')->with('boleta')->findOrFail($id);
 
         $sicd->estado = 'cancelado';
         $sicd->save();
-        $sicd->delete(); // sets deleted_at, no elimina físicamente
+        $sicd->delete(); // sets deleted_at, no elimina fÃ­sicamente
 
         if ($sicd->boleta) {
-            $sicd->boleta->delete(); // soft delete también
+            $sicd->boleta->delete(); // soft delete tambiÃ©n
         }
 
         return response()->json(['ok' => true]);
@@ -815,7 +945,16 @@ class SicdController extends Controller
     {
         $sicd = Sicd::withoutGlobalScope('sin_temporales')->find($id);
 
-        // Prioridad 1: blob guardado internamente (temporal o permanente)
+        // Prioridad 1: archivo persistido en storage local.
+        if ($sicd && $sicd->documento_ruta && Storage::disk('local')->exists($sicd->documento_ruta)) {
+            $contenido = Storage::disk('local')->get($sicd->documento_ruta);
+            return response($contenido, 200)
+                ->header('Content-Type', $sicd->documento_mime ?: 'application/pdf')
+                ->header('Content-Disposition', 'inline; filename="' . ($sicd->documento_nombre ?: $sicd->codigo_sicd . '.pdf') . '"')
+                ->header('Content-Length', strlen($contenido));
+        }
+
+        // Prioridad 2: blob guardado internamente (temporal o permanente)
         if ($sicd && $sicd->documento_blob) {
             $contenido = base64_decode($sicd->documento_blob);
             $nombre    = $sicd->codigo_sicd . '.pdf';
@@ -825,7 +964,7 @@ class SicdController extends Controller
                 ->header('Content-Length', strlen($contenido));
         }
 
-        // Fallback: SICD aún no tiene blob interno — leer directo desde BD externa
+        // Fallback: SICD aÃºn no tiene blob interno â€” leer directo desde BD externa
         $codigo = $sicd?->codigo_sicd ?? '';
         if ($codigo !== '') {
             $row = DB::connection('sicd_externa')
@@ -853,7 +992,7 @@ class SicdController extends Controller
         $pdf = SicdExterno::obtenerPdf($sicd->codigo_sicd);
 
         if (!$pdf) {
-            return back()->with('error', 'No se encontró documento PDF en el sistema externo para este SICD.');
+            return back()->with('error', 'No se encontrÃ³ documento PDF en el sistema externo para este SICD.');
         }
 
         $nombre = $sicd->codigo_sicd . '.pdf';
@@ -877,5 +1016,61 @@ class SicdController extends Controller
             $resultado[$codigo] = SicdExterno::etiquetaEstado($num);
         }
         return response()->json($resultado);
+    }
+
+    private function persistirPdfSicd(Sicd $sicd, string $pdf, string $endpoint): void
+    {
+        if (strlen($pdf) < 100) {
+            throw new \RuntimeException('El PDF externo esta vacio o incompleto.');
+        }
+
+        $codigoSeguro = preg_replace('/[^A-Z0-9_\-]/i', '_', $sicd->codigo_sicd);
+        $nombre = "SICD_{$codigoSeguro}.pdf";
+        $ruta = "documentos/sicd/{$sicd->id}/{$nombre}";
+
+        Storage::disk('local')->put($ruta, $pdf);
+        if (!Storage::disk('local')->exists($ruta) || Storage::disk('local')->size($ruta) < 100) {
+            Storage::disk('local')->delete($ruta);
+            throw new \RuntimeException('El PDF SICD no quedo guardado fisicamente.');
+        }
+
+        try {
+            DB::transaction(function () use ($sicd, $pdf, $ruta, $nombre) {
+                $locked = Sicd::withoutGlobalScope('sin_temporales')->whereKey($sicd->id)->lockForUpdate()->firstOrFail();
+                $locked->forceFill([
+                    'documento_blob' => base64_encode($pdf),
+                    'documento_mime' => 'application/pdf',
+                    'documento_ruta' => $ruta,
+                    'documento_nombre' => $nombre,
+                    'documento_estado' => 'adjuntado',
+                    'documento_error' => null,
+                    'documento_adjuntado_at' => now(),
+                    'documento_adjuntado_por' => Auth::id(),
+                ])->save();
+            });
+        } catch (\Throwable $e) {
+            Storage::disk('local')->delete($ruta);
+            $sicd->forceFill([
+                'documento_estado' => 'reintento_pendiente',
+                'documento_error' => $e->getMessage(),
+            ])->save();
+            throw $e;
+        }
+
+        $verificado = Sicd::withoutGlobalScope('sin_temporales')->findOrFail($sicd->id);
+        if (!$verificado->documento_ruta || !Storage::disk('local')->exists($verificado->documento_ruta) || !$verificado->documento_blob) {
+            throw new \RuntimeException('El PDF SICD no quedo persistido correctamente.');
+        }
+
+        Log::info('sicd_pdf_enlazado', [
+            'accion' => 'sicd_pdf_enlazado',
+            'sicd_id' => $sicd->id,
+            'codigo_sicd' => $sicd->codigo_sicd,
+            'usuario_id' => Auth::id(),
+            'endpoint' => $endpoint,
+            'estado_proceso' => 'adjuntado',
+            'ruta' => $ruta,
+            'fecha_hora' => now()->toDateTimeString(),
+        ]);
     }
 }

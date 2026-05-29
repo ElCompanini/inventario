@@ -11,6 +11,13 @@
 .prod-avatar { background:#ede9fe; }
 html.dark .prod-avatar { background:rgba(109,40,217,.2); }
 html.dark .prod-avatar svg { color:#a78bfa !important; }
+/* ── Servicio show ── */
+html.dark .serv-card { background:#1e293b !important; border-color:#334155 !important; }
+html.dark .serv-info-label { color:#94a3b8 !important; }
+html.dark .serv-info-val { color:#e2e8f0 !important; }
+html.dark .serv-timeline-row:hover { background:#1e293b !important; }
+html.dark .serv-timeline-row { border-color:#334155 !important; }
+html.dark .serv-timeline-badge-ant { background:#334155 !important; color:#94a3b8 !important; }
 </style>
 @endpush
 
@@ -18,20 +25,33 @@ html.dark .prod-avatar svg { color:#a78bfa !important; }
 
 {{-- Breadcrumb --}}
 <div class="mb-4 flex items-center gap-2 text-sm text-gray-500">
-    <a href="{{ route('dashboard') }}" class="hover:text-indigo-600 transition">Productos</a>
+    <a href="{{ route('dashboard') }}" class="hover:text-indigo-600 transition">
+        {{ $producto->isArriendo() ? 'Arriendos' : ($producto->isMantencion() ? 'Mantención' : ($producto->esServicio() ? 'Servicios' : 'Productos')) }}
+    </a>
     <span>/</span>
     <span class="text-gray-800 font-medium">{{ $producto->nombre }}</span>
 </div>
 
-{{-- Header del producto --}}
+{{-- Header --}}
 <div class="bg-white rounded-xl shadow overflow-hidden mb-6">
     <div class="px-6 py-5 flex items-start justify-between gap-4">
         <div class="flex items-start gap-4">
             {{-- Avatar --}}
             <div class="prod-avatar" style="width:3.5rem;height:3.5rem;border-radius:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                @if($producto->isArriendo())
+                <svg style="width:1.75rem;height:1.75rem;color:#f97316;" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3M5 11h14M6 21h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                @elseif($producto->esServicio() || $producto->isMantencion())
+                <svg style="width:1.75rem;height:1.75rem;color:#7c3aed;" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                @else
                 <svg style="width:1.75rem;height:1.75rem;color:#7c3aed;" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                 </svg>
+                @endif
             </div>
             <div>
                 <h1 class="text-xl font-bold text-gray-900">{{ $producto->nombre }}</h1>
@@ -39,19 +59,41 @@ html.dark .prod-avatar svg { color:#a78bfa !important; }
                     @if($producto->categoria)
                         <span class="text-xs text-gray-500">{{ $producto->categoria->familia?->nombre }} › {{ $producto->categoria->nombre }}</span>
                     @endif
-                    @if($producto->unidadMedida || $producto->unidad)
+                    @if($producto->isProducto() && ($producto->unidadMedida || $producto->unidad))
                         <span class="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono">
                             {{ $producto->unidadMedida?->abreviacion ?? $producto->unidad }}
                         </span>
                     @endif
-                    <span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full
-                        {{ $producto->activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600' }}">
-                        {{ $producto->activo ? '● Activo' : '● Inactivo' }}
-                    </span>
+                    @if($producto->esServicio() || $producto->isMantencion())
+                        @php
+                            $ultimoSE   = $servicioEstados->last();
+                            $estadoActu = $ultimoSE?->estado ?? 'pendiente';
+                            $coloresH   = \App\Models\ServicioEstado::colores($estadoActu);
+                        @endphp
+                        <span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full"
+                              style="background:{{ $coloresH['bg'] }};color:{{ $coloresH['text'] }};">
+                            ● {{ \App\Models\ServicioEstado::label($estadoActu) }}
+                        </span>
+                    @elseif($producto->isArriendo())
+                        @php
+                            $ultimoArr = ($arriendoMovimientos ?? collect())->last();
+                            $estadoArr = $ultimoArr?->estado_nuevo ?? 'pendiente';
+                            $colArr = \App\Models\ArriendoMovimiento::colores($estadoArr);
+                        @endphp
+                        <span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full" style="background:{{ $colArr['bg'] }};color:{{ $colArr['text'] }};">
+                            {{ \App\Models\ArriendoMovimiento::label($estadoArr) }}
+                        </span>
+                    @else
+                        <span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full
+                            {{ $producto->activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600' }}">
+                            {{ $producto->activo ? '● Activo' : '● Inactivo' }}
+                        </span>
+                    @endif
                 </div>
             </div>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
+            @if($producto->isProducto())
             <a href="{{ route('admin.productos.editar', $producto->id) }}"
                style="padding:.4rem .9rem;font-size:.8rem;font-weight:600;color:#fff;background:#4f46e5;border-radius:.5rem;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;transition:background .15s;"
                onmouseover="this.style.background='#4338ca'" onmouseout="this.style.background='#4f46e5'">
@@ -60,14 +102,27 @@ html.dark .prod-avatar svg { color:#a78bfa !important; }
                 </svg>
                 Modificar stock
             </a>
+            @else
+            <a href="{{ route('dashboard') }}?tab={{ $producto->isMantencion() ? 'mantenciones' : ($producto->isArriendo() ? 'arriendos' : 'servicios') }}"
+               style="padding:.4rem .9rem;font-size:.8rem;font-weight:600;color:#4f46e5;background:#ede9fe;border-radius:.5rem;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;transition:background .15s;"
+               onmouseover="this.style.background='#ddd6fe'" onmouseout="this.style.background='#ede9fe'">
+                ← Dashboard
+            </a>
+            @endif
         </div>
     </div>
 
     {{-- Tabs --}}
     <div class="border-t border-gray-100 px-6 flex items-center gap-1 overflow-x-auto">
-        @php $tabs = ['general' => 'General', 'stock' => 'Stock', 'movimientos' => 'Movimientos', 'documentos' => 'Documentos']; @endphp
-        @if(auth()->user()->esAdmin())
-            @php $tabs['costos'] = 'Costos'; @endphp
+        @if($producto->esServicio() || $producto->isMantencion())
+            @php $tabs = ['general' => 'General', 'historial' => $producto->isMantencion() ? 'BINCARD mantención' : 'Historial de estados']; @endphp
+        @elseif($producto->isArriendo())
+            @php $tabs = ['general' => 'General', 'historial' => 'BINCARD arriendo']; @endphp
+        @else
+            @php $tabs = ['general' => 'General', 'stock' => 'Stock', 'movimientos' => 'Movimientos', 'documentos' => 'Documentos']; @endphp
+            @if(auth()->user()->esAdmin())
+                @php $tabs['costos'] = 'Costos'; @endphp
+            @endif
         @endif
         @foreach($tabs as $key => $label)
         <button onclick="switchTab('{{ $key }}')" id="tab-btn-{{ $key }}"
@@ -80,6 +135,111 @@ html.dark .prod-avatar svg { color:#a78bfa !important; }
 
 {{-- ═══════════════════ TAB: GENERAL ═══════════════════ --}}
 <div id="tab-general" class="tab-panel active">
+
+@if($producto->esServicio() || $producto->isMantencion())
+{{-- ──── GENERAL: versión SERVICIO ──── --}}
+@php
+    $ultimoSE   = $servicioEstados->last();
+    $estadoActu = $ultimoSE?->estado ?? 'pendiente';
+    $coloresG   = \App\Models\ServicioEstado::colores($estadoActu);
+    $progresoG  = \App\Models\ServicioEstado::progreso($estadoActu);
+@endphp
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2 serv-card bg-white rounded-xl shadow p-6 space-y-4">
+        <h2 class="text-sm font-semibold text-gray-700 serv-info-label border-b border-gray-100 pb-2">Información del Servicio</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide serv-info-label">ID Interno</p>
+                <p class="text-gray-800 font-mono font-semibold mt-0.5 serv-info-val">#{{ $producto->id }}</p>
+            </div>
+            <div>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide serv-info-label">Nombre</p>
+                <p class="text-gray-800 font-medium mt-0.5 serv-info-val">{{ $producto->nombre }}</p>
+            </div>
+            <div>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide serv-info-label">Familia</p>
+                <p class="text-gray-700 mt-0.5 serv-info-val">{{ $producto->categoria?->familia?->nombre ?? '—' }}</p>
+            </div>
+            <div>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide serv-info-label">Categoría</p>
+                <p class="text-gray-700 mt-0.5 serv-info-val">{{ $producto->categoria?->nombre ?? '—' }}</p>
+            </div>
+            <div>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide serv-info-label">Centro de Costo</p>
+                <p class="text-gray-700 mt-0.5 serv-info-val">{{ $producto->centroCosto?->nombre_completo ?? '—' }}</p>
+            </div>
+            <div>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide serv-info-label">Total transiciones</p>
+                <p class="text-gray-700 mt-0.5 serv-info-val">{{ $servicioEstados->count() }}</p>
+            </div>
+            @if($ultimoSE?->observacion)
+            <div class="col-span-2">
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide serv-info-label">Última observación</p>
+                <p class="text-gray-700 mt-0.5 serv-info-val italic">{{ $ultimoSE->observacion }}</p>
+            </div>
+            @endif
+        </div>
+    </div>
+    {{-- Estado actual --}}
+    <div class="space-y-4">
+        <div class="serv-card bg-white rounded-xl shadow p-5">
+            <h3 class="text-sm font-semibold text-gray-700 serv-info-label mb-4">Estado actual</h3>
+            <div class="rounded-xl px-4 py-3 mb-3" style="background:{{ $coloresG['bg'] }};">
+                <p class="text-sm font-bold" style="color:{{ $coloresG['text'] }};">
+                    ● {{ \App\Models\ServicioEstado::label($estadoActu) }}
+                </p>
+                @if($ultimoSE)
+                <p class="text-xs mt-1" style="color:{{ $coloresG['dot'] }};">
+                    {{ $ultimoSE->created_at->format('d/m/Y H:i') }} · {{ $ultimoSE->usuario?->name ?? '—' }}
+                </p>
+                @endif
+            </div>
+            <div class="space-y-1">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-400 serv-info-label">Progreso</span>
+                    <span class="text-xs font-bold" style="color:{{ $coloresG['barra'] }};">{{ $progresoG }}%</span>
+                </div>
+                <div class="h-2 rounded-full overflow-hidden" style="background:#e5e7eb;">
+                    <div class="h-full rounded-full" style="width:{{ $progresoG }}%;background:{{ $coloresG['barra'] }};"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@elseif($producto->isArriendo())
+@php
+    $ultimoArr = ($arriendoMovimientos ?? collect())->last();
+    $estadoArr = $ultimoArr?->estado_nuevo ?? 'pendiente';
+    $colArr = \App\Models\ArriendoMovimiento::colores($estadoArr);
+@endphp
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2 bg-white rounded-xl shadow p-6 space-y-4">
+        <h2 class="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-2">Informacion del Arriendo</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">ID Interno</p><p class="text-gray-800 font-mono font-semibold mt-0.5">#{{ $producto->id }}</p></div>
+            <div><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Nombre</p><p class="text-gray-800 font-medium mt-0.5">{{ $producto->nombre }}</p></div>
+            <div><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Proveedor</p><p class="text-gray-700 mt-0.5">{{ $ultimoArr?->proveedor_nombre ?? '—' }}</p></div>
+            <div><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Centro de Costo</p><p class="text-gray-700 mt-0.5">{{ $producto->centroCosto?->nombre_completo ?? '—' }}</p></div>
+            <div><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Fecha inicio</p><p class="text-gray-700 mt-0.5">{{ $ultimoArr?->fecha_inicio?->format('d/m/Y') ?? '—' }}</p></div>
+            <div><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Fecha termino</p><p class="text-gray-700 mt-0.5">{{ $ultimoArr?->fecha_termino?->format('d/m/Y') ?? 'Abierto' }}</p></div>
+            <div><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Duracion</p><p class="text-gray-700 mt-0.5">{{ $ultimoArr?->duracion ? $ultimoArr->duracion . ' ' . ($ultimoArr->unidad_tiempo ?? 'dias') : '—' }}</p></div>
+            <div><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Documento</p><p class="text-indigo-600 font-mono mt-0.5">{{ $ultimoArr?->documento_referencia ?? '—' }}</p></div>
+        </div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5">
+        <h3 class="text-sm font-semibold text-gray-700 mb-4">Estado actual</h3>
+        <div class="rounded-xl px-4 py-3" style="background:{{ $colArr['bg'] }};">
+            <p class="text-sm font-bold" style="color:{{ $colArr['text'] }};">{{ \App\Models\ArriendoMovimiento::label($estadoArr) }}</p>
+            <p class="text-xs mt-1" style="color:{{ $colArr['text'] }};">{{ $ultimoArr?->created_at?->format('d/m/Y H:i') ?? 'Sin movimientos' }}</p>
+        </div>
+        <div class="mt-4 text-sm">
+            <p class="text-gray-400 text-xs uppercase font-semibold">Monto total estimado</p>
+            <p class="text-lg font-bold text-gray-800">{{ $ultimoArr?->monto_total ? '$' . number_format((float) $ultimoArr->monto_total, 0, ',', '.') : '—' }}</p>
+        </div>
+    </div>
+</div>
+@else
+{{-- ──── GENERAL: versión PRODUCTO ──── --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {{-- Información principal --}}
         <div class="lg:col-span-2 bg-white rounded-xl shadow p-6 space-y-4">
@@ -217,8 +377,137 @@ html.dark .prod-avatar svg { color:#a78bfa !important; }
             </div>
         </div>
     </div>
+@endif
 </div>
 
+{{-- ═══════════════════ TAB: HISTORIAL (solo servicios) ═══════════════════ --}}
+@if($producto->esServicio())
+<div id="tab-historial" class="tab-panel">
+    @if($servicioEstados->isEmpty())
+    <div class="bg-white rounded-xl shadow py-16 text-center serv-card">
+        <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <p class="text-sm text-gray-400">Sin historial de estados registrado.</p>
+    </div>
+    @else
+    <div class="bg-white rounded-xl shadow overflow-hidden serv-card">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+            <thead>
+                <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Fecha</th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Movimiento</th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Estado anterior</th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Estado nuevo</th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Responsable</th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Doc. referencia</th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Observación</th>
+                    <th class="px-4 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Avance</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($servicioEstados as $se)
+                @php
+                    $col = \App\Models\ServicioEstado::colores($se->estado);
+                    $colAnt = \App\Models\ServicioEstado::colores($se->estado_anterior ?? 'pendiente');
+                @endphp
+                <tr class="serv-timeline-row" style="border-bottom:1px solid #f1f5f9;">
+                    <td class="px-4 py-3 text-gray-500 whitespace-nowrap serv-info-val">{{ $se->created_at->format('d/m/Y H:i') }}</td>
+                    <td class="px-4 py-3 font-medium text-gray-700 serv-info-val">
+                        {{ \App\Models\ServicioEstado::transicionLabel($se->estado_anterior, $se->estado) }}
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full serv-timeline-badge-ant"
+                              style="background:{{ $colAnt['bg'] }};color:{{ $colAnt['text'] }};">
+                            {{ \App\Models\ServicioEstado::label($se->estado_anterior ?? 'pendiente') }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full"
+                              style="background:{{ $col['bg'] }};color:{{ $col['text'] }};">
+                            ● {{ \App\Models\ServicioEstado::label($se->estado) }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 serv-info-val">{{ $se->usuario?->name ?? '—' }}</td>
+                    <td class="px-4 py-3 serv-info-val">
+                        @if($se->documento_referencia)
+                            <span class="font-mono font-semibold text-indigo-700 text-xs">{{ $se->documento_referencia }}</span>
+                        @else
+                            <span class="text-gray-400">—</span>
+                        @endif
+                    </td>
+                    <td class="px-4 py-3 text-gray-500 italic serv-info-val">{{ $se->observacion ?? '—' }}</td>
+                    <td class="px-4 py-3 text-center">
+                        @php $prog = \App\Models\ServicioEstado::progreso($se->estado); @endphp
+                        <div class="flex items-center gap-2 justify-center">
+                            <div class="h-1.5 rounded-full overflow-hidden" style="width:60px;background:#e5e7eb;">
+                                <div class="h-full rounded-full" style="width:{{ $prog }}%;background:{{ $col['barra'] }};"></div>
+                            </div>
+                            <span class="text-xs font-semibold" style="color:{{ $col['barra'] }};">{{ $prog }}%</span>
+                        </div>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+    @endif
+</div>
+@endif
+
+@if($producto->isArriendo())
+<div id="tab-historial" class="tab-panel">
+    @if(($arriendoMovimientos ?? collect())->isEmpty())
+    <div class="bg-white rounded-xl shadow py-16 text-center serv-card">
+        <p class="text-sm text-gray-400">Sin movimientos de arriendo registrados.</p>
+    </div>
+    @else
+    <div class="bg-white rounded-xl shadow overflow-hidden serv-card">
+        <div class="overflow-x-auto">
+            <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+                <thead>
+                    <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Fecha</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Movimiento</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Estado anterior</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Estado nuevo</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Periodo</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Proveedor</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Documento</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Responsable</th>
+                        <th class="px-4 py-3 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Monto</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Observacion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($arriendoMovimientos as $movArr)
+                    @php
+                        $colAnt = \App\Models\ArriendoMovimiento::colores($movArr->estado_anterior ?? 'pendiente');
+                        $colNew = \App\Models\ArriendoMovimiento::colores($movArr->estado_nuevo);
+                        $periodo = ($movArr->fecha_inicio?->format('d/m/Y') ?? 'Sin inicio') . ' - ' . ($movArr->fecha_termino?->format('d/m/Y') ?? 'Abierto');
+                    @endphp
+                    <tr class="serv-timeline-row" style="border-bottom:1px solid #f1f5f9;">
+                        <td class="px-4 py-3 text-gray-500 whitespace-nowrap serv-info-val">{{ $movArr->created_at->format('d/m/Y H:i') }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-700 serv-info-val">{{ \App\Models\ArriendoMovimiento::transicionLabel($movArr->estado_anterior, $movArr->estado_nuevo) }}</td>
+                        <td class="px-4 py-3"><span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full" style="background:{{ $colAnt['bg'] }};color:{{ $colAnt['text'] }};">{{ \App\Models\ArriendoMovimiento::label($movArr->estado_anterior ?? 'pendiente') }}</span></td>
+                        <td class="px-4 py-3"><span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full" style="background:{{ $colNew['bg'] }};color:{{ $colNew['text'] }};">{{ \App\Models\ArriendoMovimiento::label($movArr->estado_nuevo) }}</span></td>
+                        <td class="px-4 py-3 text-gray-600 serv-info-val">{{ $periodo }}<br><span class="text-xs text-gray-400">{{ $movArr->duracion ? $movArr->duracion . ' ' . ($movArr->unidad_tiempo ?? 'dias') : '' }}</span></td>
+                        <td class="px-4 py-3 text-gray-600 serv-info-val">{{ $movArr->proveedor_nombre ?? '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-indigo-700 text-xs">{{ $movArr->documento_referencia ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-600 serv-info-val">{{ $movArr->responsable?->name ?? $movArr->ejecutor?->name ?? '—' }}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-700">{{ $movArr->monto_total ? '$' . number_format((float) $movArr->monto_total, 0, ',', '.') : '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500 italic serv-info-val">{{ $movArr->observacion ?? '—' }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
+</div>
+@endif
+
+@if($producto->isProducto())
 {{-- ═══════════════════ TAB: STOCK ═══════════════════ --}}
 <div id="tab-stock" class="tab-panel">
     @php $estado = $producto->estadoStock(); @endphp
@@ -607,6 +896,7 @@ html.dark .prod-avatar svg { color:#a78bfa !important; }
         @endif
     </div>
 </div>
+@endif
 
 @push('scripts')
 <script>

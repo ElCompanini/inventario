@@ -5,12 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Categoria;
 use App\Models\Container;
 use App\Models\Familia;
+use App\Models\HistorialCambio;
 use App\Models\Marca;
 use App\Models\Producto;
+use App\Models\ArriendoMovimiento;
+use App\Models\ServicioEstado;
 use App\Models\UnidadMedida;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class CatalogoController extends Controller
 {
@@ -20,6 +25,11 @@ class CatalogoController extends Controller
         // usamos el CC real del usuario — así los productos creados por devs
         // quedan asignados a su CC y son visibles para otros usuarios del mismo CC.
         return auth()->user()->centro_costo_id ?? null;
+    }
+
+    private function tipoItemValido(?string $tipo): string
+    {
+        return in_array($tipo, ['producto', 'servicio', 'mantencion', 'arriendo'], true) ? $tipo : 'producto';
     }
 
     public function index(Request $request)
@@ -63,8 +73,8 @@ class CatalogoController extends Controller
                 ->get();
         }
 
-        $familiasBienes    = $familias->filter(fn($f) => $f->esBien())->values();
-        $familiasServicios = $familias->filter(fn($f) => $f->esServicioCatalogo())->values();
+        $familiasBienes    = $familias->filter(fn($f) => ($f->tipo_item ?? 'producto') === 'producto')->values();
+        $familiasServicios = $familias->filter(fn($f) => ($f->tipo_item ?? null) !== 'producto')->values();
 
         return view('admin.productos.catalogo', compact(
             'familias', 'familiasBienes', 'familiasServicios',
@@ -81,15 +91,19 @@ class CatalogoController extends Controller
         $data = $request->validate([
             'nombre' => [
                 'required', 'string', 'max:100',
-                Rule::unique('familias', 'nombre')->where('centro_costo_id', $ccId),
+                Rule::unique('familias', 'nombre')->where('centro_costo_id', $ccId)->where('tipo_item', $this->tipoItemValido($request->input('tipo_item'))),
             ],
+            'tipo_item' => ['nullable', Rule::in(['producto', 'servicio', 'mantencion', 'arriendo'])],
         ], [
             'nombre.unique' => 'Ya existe una familia con ese nombre en tu centro de costo.',
         ]);
+        $tipoItem = $this->tipoItemValido($data['tipo_item'] ?? 'producto');
 
         $familia = Familia::create([
             'nombre'          => strtoupper(trim($data['nombre'])),
             'centro_costo_id' => $ccId,
+            'tipo_item'       => $tipoItem,
+            'tipo_catalogo'   => $tipoItem === 'producto' ? 'bien' : 'servicio',
         ]);
 
         if ($request->ajax()) {
@@ -115,9 +129,19 @@ class CatalogoController extends Controller
             'nombre'     => ['required', 'string', 'max:150',
                              Rule::unique('categorias')->where('familia_id', $request->familia_id)],
             'familia_id' => ['required', 'integer', 'exists:familias,id'],
+            'tipo_item'  => ['nullable', Rule::in(['producto', 'servicio', 'mantencion', 'arriendo'])],
         ], [
             'nombre.unique' => 'Ya existe una categoría con ese nombre en esta familia.',
         ]);
+
+        $familia = Familia::findOrFail($data['familia_id']);
+        $tipoItem = $this->tipoItemValido($data['tipo_item'] ?? $familia->tipo_item ?? 'producto');
+        if (($familia->tipo_item ?? 'producto') !== $tipoItem) {
+            $err = 'La categorÃ­a debe pertenecer al mismo tipo de Ã­tem que la familia.';
+            return $request->ajax()
+                ? response()->json(['ok' => false, 'error' => $err], 422)
+                : back()->withErrors(['tipo_item' => $err]);
+        }
 
         if ($this->esFamiliaProtegida((int) $data['familia_id'])) {
             $err = 'La familia "Partes y Piezas" está protegida. Sus categorías no pueden ser modificadas.';
@@ -127,6 +151,7 @@ class CatalogoController extends Controller
         }
 
         $data['nombre'] = strtoupper(trim($data['nombre']));
+        $data['tipo_item'] = $tipoItem;
         $categoria = Categoria::create($data);
 
         if ($request->ajax()) {
@@ -226,21 +251,43 @@ class CatalogoController extends Controller
         // Pre-check: is this category in the SERVICIOS family?
         $categoriaObj      = Categoria::with('familia')->find($request->input('categoria_id'));
         $esFamiliaServicios = $categoriaObj?->familia?->tipo === 'servicios';
+        $tipoSolicitado = $request->input('tipo_item')
+            ?: ($request->boolean('es_servicio', false) ? 'servicio' : ($esFamiliaServicios ? 'servicio' : 'producto'));
+        $tipoSolicitado = $this->tipoItemValido($tipoSolicitado);
+        if ($categoriaObj && (($categoriaObj->tipo_item ?? 'producto') !== $tipoSolicitado || (($categoriaObj->familia?->tipo_item ?? 'producto') !== $tipoSolicitado))) {
+            $err = 'El tipo de Ã­tem no coincide con la familia y categorÃ­a seleccionadas.';
+            return $request->ajax()
+                ? response()->json(['ok' => false, 'errors' => ['tipo_item' => [$err]]], 422)
+                : back()->withErrors(['tipo_item' => $err]);
+        }
+        $esNoFisico = in_array($tipoSolicitado, ['servicio', 'mantencion', 'arriendo'], true);
 
         $data = $request->validate([
             'nombre'               => ['required', 'string', 'max:200'],
             'categoria_id'         => ['required', 'integer', 'exists:categorias,id'],
             'marca_id'             => ['nullable', 'integer', 'exists:marcas,id'],
-            'stock_minimo'         => $esFamiliaServicios ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
-            'stock_critico'        => $esFamiliaServicios ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
-            'contenedor'           => $esFamiliaServicios ? ['nullable', 'integer', 'exists:containers,id'] : ['required', 'integer', 'exists:containers,id'],
-            'unidad_medida_id'     => $esFamiliaServicios ? ['nullable', 'integer', 'exists:unidades_medida,id'] : ['required', 'integer', 'exists:unidades_medida,id'],
+            'stock_minimo'         => $esNoFisico ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
+            'stock_critico'        => $esNoFisico ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
+            'contenedor'           => ($esNoFisico || $request->filled('codigo_barras')) ? ['nullable', 'integer', 'exists:containers,id'] : ['required', 'integer', 'exists:containers,id'],
+            'unidad_medida_id'     => ($esNoFisico || $request->filled('codigo_barras')) ? ['nullable', 'integer', 'exists:unidades_medida,id'] : ['required', 'integer', 'exists:unidades_medida,id'],
             'codigo_barras'        => ['nullable', 'string', 'max:100', 'unique:productos,codigo_barras'],
             'es_servicio'          => ['nullable', 'boolean'],
+            'tipo_item'            => ['nullable', 'in:producto,servicio,mantencion,arriendo'],
             'maneja_presentacion'  => ['nullable', 'boolean'],
             'tipo_presentacion'    => ['nullable', 'string', 'max:50'],
             'cantidad_presentacion'=> ['nullable', 'integer', 'min:2', 'max:9999'],
             'unidad_base'          => ['nullable', 'string', 'max:50'],
+            'proveedor_nombre'     => ['nullable', 'string', 'max:255'],
+            'estado_operacional'   => ['nullable', 'string', Rule::in(['pendiente', 'aprobado', 'en_proceso', 'ejecutado', 'validado', 'cerrado', 'cancelado'])],
+            'fecha_ejecucion'      => ['nullable', 'date'],
+            'documento_referencia' => ['nullable', 'string', 'max:100'],
+            'observacion'          => ['nullable', 'string', 'max:2000'],
+            'fecha_inicio'         => ['nullable', 'date'],
+            'fecha_termino'        => ['nullable', 'date', 'after_or_equal:fecha_inicio'],
+            'condicion_termino'    => ['nullable', Rule::in(['con_fecha', 'sin_fecha'])],
+            'unidad_tiempo'        => ['nullable', 'string', 'max:20'],
+            'monto_periodo'        => ['nullable', 'numeric', 'min:0'],
+            'monto_total'          => ['nullable', 'numeric', 'min:0'],
         ], [
             'nombre.required'              => 'El nombre del producto es obligatorio.',
             'codigo_barras.unique'         => 'Ese código de barras ya está asignado a otro producto.',
@@ -253,7 +300,11 @@ class CatalogoController extends Controller
         // SERVICIOS family: force es_servicio=true and use SIN MARCA — skip brand validation
         if ($esFamiliaServicios) {
             $marcaId    = $sinMarcaId;
-            $esServicio = true;
+            $tipoItem   = $request->input('tipo_item') ?: 'servicio';
+            if (!in_array($tipoItem, ['producto', 'servicio', 'mantencion', 'arriendo'], true)) {
+                $tipoItem = 'servicio';
+            }
+            $esServicio = $tipoItem === 'servicio';
         } else {
             // Validate brand belongs to category (skip check for SIN MARCA)
             $marcaId = ($data['marca_id'] ?? null) ?: $sinMarcaId;
@@ -266,30 +317,108 @@ class CatalogoController extends Controller
                         : back()->withErrors(['marca_id' => $err]);
                 }
             }
-            $esServicio = $request->boolean('es_servicio', false);
+            $tipoItem = $request->input('tipo_item') ?: ($request->boolean('es_servicio', false) ? 'servicio' : 'producto');
+            if (!in_array($tipoItem, ['producto', 'servicio', 'mantencion', 'arriendo'], true)) {
+                $tipoItem = 'producto';
+            }
+            $esServicio = $tipoItem === 'servicio';
         }
 
         $ccId = $this->ccId();
 
-        $manejaPresentacion = !$esServicio && $request->boolean('maneja_presentacion', false);
+        $manejaPresentacion = $tipoItem === 'producto' && $request->boolean('maneja_presentacion', false);
 
-        $producto = Producto::create([
+        if ($tipoItem === 'mantencion') {
+            $request->validate([
+                'proveedor_nombre' => ['required', 'string', 'max:255'],
+            ], [
+                'proveedor_nombre.required' => 'Debes indicar el proveedor de la mantenciÃ³n.',
+            ]);
+        }
+
+        if ($tipoItem === 'arriendo') {
+            $request->validate([
+                'proveedor_nombre'     => ['required', 'string', 'max:255'],
+                'fecha_inicio'         => ['required', 'date'],
+                'condicion_termino'    => ['required', Rule::in(['con_fecha', 'sin_fecha'])],
+                'fecha_termino'        => [Rule::requiredIf($request->input('condicion_termino') === 'con_fecha'), 'nullable', 'date', 'after_or_equal:fecha_inicio'],
+                'monto_periodo'        => ['required', 'numeric', 'min:0'],
+                'monto_total'          => ['required', 'numeric', 'min:0'],
+                'documento_referencia' => ['required', 'string', 'max:100'],
+            ], [
+                'proveedor_nombre.required'     => 'Debes indicar el proveedor del arriendo.',
+                'fecha_inicio.required'         => 'Debes indicar la fecha de inicio.',
+                'condicion_termino.required'    => 'Debes indicar la condiciÃ³n de tÃ©rmino.',
+                'fecha_termino.required'        => 'Debes indicar la fecha de tÃ©rmino.',
+                'monto_periodo.required'        => 'Debes indicar el monto del perÃ­odo.',
+                'monto_total.required'          => 'Debes indicar el monto total estimado.',
+                'documento_referencia.required' => 'Debes indicar el documento de referencia.',
+            ]);
+        }
+
+        $producto = DB::transaction(function () use ($data, $tipoItem, $manejaPresentacion, $marcaId, $ccId, $esServicio, $request) {
+            $producto = Producto::create([
             'nombre'                => strtoupper(trim($data['nombre'])),
             'codigo_barras'         => $data['codigo_barras'] ?? null,
-            'stock_actual'          => 0,
-            'stock_minimo'          => $data['stock_minimo'] ?? 0,
-            'stock_critico'         => $data['stock_critico'] ?? 0,
-            'contenedor'            => $data['contenedor'] ?? null,
-            'unidad_medida_id'      => $data['unidad_medida_id'] ?? null,
+            'stock_actual'          => $tipoItem === 'producto' ? (int) ($request->stock_inicial ?? 0) : 0,
+            'stock_minimo'          => $tipoItem === 'producto' ? ($data['stock_minimo'] ?? 0) : 0,
+            'stock_critico'         => $tipoItem === 'producto' ? ($data['stock_critico'] ?? 0) : 0,
+            'contenedor'            => $tipoItem === 'producto' ? ($data['contenedor'] ?? null) : null,
+            'unidad_medida_id'      => $tipoItem === 'producto' ? ($data['unidad_medida_id'] ?? null) : null,
             'categoria_id'          => $data['categoria_id'],
-            'marca_id'              => $marcaId,
+            'marca_id'              => $tipoItem === 'producto' ? $marcaId : null,
             'centro_costo_id'       => $ccId,
             'es_servicio'           => $esServicio,
+            'tipo_item'             => $tipoItem,
             'maneja_presentacion'   => $manejaPresentacion,
             'tipo_presentacion'     => $manejaPresentacion ? ($data['tipo_presentacion'] ?? null) : null,
             'cantidad_presentacion' => $manejaPresentacion ? ($data['cantidad_presentacion'] ?? null) : null,
             'unidad_base'           => $manejaPresentacion ? ($data['unidad_base'] ?? null) : null,
-        ]);
+            ]);
+
+            if (in_array($tipoItem, ['servicio', 'mantencion'], true)) {
+                $observacion = trim((string) $request->input('observacion', ''));
+                if ($tipoItem === 'mantencion' && $request->filled('fecha_ejecucion')) {
+                    $observacion = trim($observacion . "\nFecha ejecuciÃ³n: " . $request->input('fecha_ejecucion'));
+                }
+
+                ServicioEstado::create([
+                    'producto_id'          => $producto->id,
+                    'estado'               => $request->input('estado_operacional', 'pendiente'),
+                    'estado_anterior'      => null,
+                    'usuario_id'           => auth()->id(),
+                    'observacion'          => $observacion ?: null,
+                    'documento_referencia' => $request->input('documento_referencia'),
+                    'proveedor_nombre'     => $request->input('proveedor_nombre'),
+                ]);
+            }
+
+            if ($tipoItem === 'arriendo') {
+                $fechaInicio = $request->date('fecha_inicio');
+                $fechaTermino = $request->input('condicion_termino') === 'con_fecha' ? $request->date('fecha_termino') : null;
+                $duracion = ($fechaInicio && $fechaTermino) ? $fechaInicio->diffInDays($fechaTermino) + 1 : null;
+
+                ArriendoMovimiento::create([
+                    'producto_id'          => $producto->id,
+                    'proveedor_nombre'     => $request->input('proveedor_nombre'),
+                    'estado_anterior'      => null,
+                    'estado_nuevo'         => 'pendiente',
+                    'fecha_inicio'         => $fechaInicio,
+                    'fecha_termino'        => $fechaTermino,
+                    'condicion_termino'    => $request->input('condicion_termino'),
+                    'duracion'             => $duracion,
+                    'unidad_tiempo'        => $request->input('unidad_tiempo', 'dia'),
+                    'monto_periodo'        => $request->input('monto_periodo'),
+                    'monto_total'          => $request->input('monto_total'),
+                    'responsable_id'       => auth()->id(),
+                    'ejecutado_por'        => auth()->id(),
+                    'observacion'          => $request->input('observacion'),
+                    'documento_referencia' => $request->input('documento_referencia'),
+                ]);
+            }
+
+            return $producto;
+        });
 
         if ($request->ajax()) {
             return response()->json([
@@ -337,24 +466,39 @@ class CatalogoController extends Controller
             'stock_critico'        => ['required', 'integer', 'min:0'],
             'contenedor'           => ['nullable', 'integer', 'exists:containers,id'],
             'marca_id'             => ['nullable', 'integer', 'exists:marcas,id'],
+            'unidad_medida_id'     => ['nullable', 'integer', 'exists:unidades_medida,id'],
+            'tipo_item'            => ['nullable', 'in:producto,servicio,mantencion,arriendo'],
             'maneja_presentacion'  => ['nullable', 'boolean'],
             'tipo_presentacion'    => ['nullable', 'string', 'max:50'],
             'cantidad_presentacion'=> ['nullable', 'integer', 'min:2', 'max:9999'],
             'unidad_base'          => ['nullable', 'string', 'max:50'],
         ]);
 
-        $manejaPresentacion = !$producto->es_servicio && $request->boolean('maneja_presentacion', false);
+        $tipoItem = $request->input('tipo_item') ?: ($producto->tipo_item ?? ($producto->es_servicio ? 'servicio' : 'producto'));
+        if (!in_array($tipoItem, ['producto', 'servicio', 'mantencion', 'arriendo'], true)) {
+            $tipoItem = 'producto';
+        }
 
-        $producto->update([
-            'stock_minimo'          => $data['stock_minimo'],
-            'stock_critico'         => $data['stock_critico'],
-            'contenedor'            => $data['contenedor'] ?? null,
+        $manejaPresentacion = $tipoItem === 'producto' && $request->boolean('maneja_presentacion', false);
+
+        $updateData = [
+            'tipo_item'             => $tipoItem,
+            'es_servicio'           => $tipoItem === 'servicio',
+            'stock_minimo'          => $tipoItem === 'producto' ? $data['stock_minimo'] : 0,
+            'stock_critico'         => $tipoItem === 'producto' ? $data['stock_critico'] : 0,
+            'contenedor'            => $tipoItem === 'producto' ? ($data['contenedor'] ?? null) : null,
             'marca_id'              => $data['marca_id'] ?? $producto->marca_id,
             'maneja_presentacion'   => $manejaPresentacion,
             'tipo_presentacion'     => $manejaPresentacion ? ($data['tipo_presentacion'] ?? null) : null,
             'cantidad_presentacion' => $manejaPresentacion ? ($data['cantidad_presentacion'] ?? null) : null,
             'unidad_base'           => $manejaPresentacion ? ($data['unidad_base'] ?? null) : null,
-        ]);
+        ];
+        if ($tipoItem === 'producto' && !empty($data['unidad_medida_id'])) {
+            $updateData['unidad_medida_id'] = $data['unidad_medida_id'];
+        } elseif ($tipoItem !== 'producto') {
+            $updateData['unidad_medida_id'] = null;
+        }
+        $producto->update($updateData);
 
         if ($request->ajax()) {
             return response()->json(['ok' => true]);
@@ -411,13 +555,23 @@ class CatalogoController extends Controller
                 'required', 'string', 'max:100',
                 Rule::unique('marcas', 'nombre')->where('categoria_id', $categoria->id)->whereNull('deleted_at'),
             ],
+            'tipo_item' => ['nullable', Rule::in(['producto', 'servicio', 'mantencion', 'arriendo'])],
         ], [
             'nombre.unique' => 'Ya existe una marca con ese nombre en esta categoría.',
         ]);
 
+        $tipoItem = $this->tipoItemValido($data['tipo_item'] ?? $categoria->tipo_item ?? 'producto');
+        if (($categoria->tipo_item ?? 'producto') !== $tipoItem || $tipoItem !== 'producto') {
+            return response()->json([
+                'ok' => false,
+                'errors' => ['tipo_item' => ['Las marcas solo aplican a categorÃ­as de productos.']],
+            ], 422);
+        }
+
         $marca = Marca::create([
             'nombre'      => strtoupper(trim($data['nombre'])),
             'categoria_id' => $categoria->id,
+            'tipo_item'   => $tipoItem,
         ]);
 
         if ($request->ajax()) {
@@ -455,5 +609,310 @@ class CatalogoController extends Controller
         }
 
         return back();
+    }
+
+    public function importarProductosMasivo(Request $request): \Illuminate\Http\JsonResponse
+    {
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
+
+        $request->validate([
+            'excel_catalogo'         => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
+            'categoria_id'           => ['required', 'integer', 'exists:categorias,id'],
+            'contenedor_id'          => ['nullable', 'integer', 'exists:containers,id'],
+            'marca_id'               => ['nullable', 'integer', 'exists:marcas,id'],
+            'maneja_presentacion'    => ['nullable', 'boolean'],
+            'tipo_presentacion'      => ['nullable', 'string', 'max:50'],
+            'cantidad_presentacion'  => ['nullable', 'integer', 'min:1', 'max:9999'],
+            'unidad_base'            => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $rawRows = $this->leerExcelCatalogo($request->file('excel_catalogo'));
+
+        if ($rawRows->isEmpty()) {
+            return response()->json(['ok' => false, 'error' => 'El archivo Excel está vacío o no tiene filas de datos.']);
+        }
+
+        // Validate header row
+        $encabezado = $rawRows->first()->map(fn($v) => strtolower(trim((string) $v)))->values();
+        $esperados  = ['descripcion', 'unidad', 'cantidad', 'minimo', 'critico'];
+        foreach ($esperados as $i => $col) {
+            if (($encabezado[$i] ?? '') !== $col) {
+                return response()->json([
+                    'ok'    => false,
+                    'error' => 'El archivo debe contener las columnas: descripcion, unidad, cantidad, minimo, critico (fila 1 como encabezado).',
+                ]);
+            }
+        }
+
+        $dataRows = $rawRows->slice(1)->values();
+
+        $categoria    = Categoria::findOrFail($request->categoria_id);
+        $ccId         = $this->ccId();
+        $contenedorId = $request->filled('contenedor_id') ? (int) $request->contenedor_id : null;
+        $marcaId      = $request->filled('marca_id')      ? (int) $request->marca_id      : Marca::idSinMarca();
+
+        $manejaPres = $request->boolean('maneja_presentacion', false);
+        $tipoPres   = $manejaPres ? trim($request->input('tipo_presentacion', '')) : null;
+        $cantPres   = $manejaPres ? (int) $request->input('cantidad_presentacion', 0) : null;
+        $unidBase   = $manejaPres ? trim($request->input('unidad_base', '')) : null;
+
+        if ($manejaPres && (!$tipoPres || $cantPres < 1 || !$unidBase)) {
+            return response()->json([
+                'ok'    => false,
+                'error' => 'Si los productos manejan paquetes, completa tipo, cantidad (≥ 1) y unidad base.',
+            ]);
+        }
+
+        // Build unit lookup index
+        $unidades = UnidadMedida::activas()->get(['id', 'nombre', 'abreviacion']);
+        $unidIdx  = [];
+        foreach ($unidades as $u) {
+            $unidIdx[$this->normalizarTextoCatalogo($u->nombre)]      = $u->id;
+            $unidIdx[$this->normalizarTextoCatalogo($u->abreviacion)] = $u->id;
+        }
+
+        $creados = 0;
+        $errores = [];
+
+        foreach ($dataRows as $i => $row) {
+            $filaExcel = $i + 2;
+
+            $desc     = strtoupper(trim((string) ($row[0] ?? '')));
+            $unidTxt  = trim((string) ($row[1] ?? ''));
+            $cantidad = is_numeric($row[2] ?? '') ? (int) $row[2] : null;
+            $minimo   = is_numeric($row[3] ?? '') ? (int) $row[3] : null;
+            $critico  = is_numeric($row[4] ?? '') ? (int) $row[4] : null;
+
+            if ($desc === '') continue;
+
+            if ($unidTxt === '') {
+                $errores[] = "Fila {$filaExcel}: la columna 'unidad' está vacía.";
+                continue;
+            }
+            if ($cantidad === null || $cantidad < 0) {
+                $errores[] = "Fila {$filaExcel}: 'cantidad' debe ser un número >= 0.";
+                continue;
+            }
+            if ($minimo === null || $minimo < 0) {
+                $errores[] = "Fila {$filaExcel}: 'minimo' debe ser un número >= 0.";
+                continue;
+            }
+            if ($critico === null || $critico < 0) {
+                $errores[] = "Fila {$filaExcel}: 'critico' debe ser un número >= 0.";
+                continue;
+            }
+
+            $unidMedidaId = $unidIdx[$this->normalizarTextoCatalogo($unidTxt)] ?? null;
+            $stockInicial = $manejaPres ? ($cantidad * $cantPres) : $cantidad;
+
+            try {
+                DB::transaction(function () use (
+                    $desc, $unidTxt, $unidMedidaId, $stockInicial, $cantidad, $minimo, $critico,
+                    $contenedorId, $categoria, $marcaId, $ccId,
+                    $manejaPres, $tipoPres, $cantPres, $unidBase,
+                    &$creados
+                ) {
+                    $producto = Producto::create([
+                        'nombre'                => $desc,
+                        'stock_actual'          => $stockInicial,
+                        'stock_minimo'          => $minimo,
+                        'stock_critico'         => $critico,
+                        'contenedor'            => $contenedorId,
+                        'unidad_medida_id'      => $unidMedidaId,
+                        'unidad'                => $unidMedidaId ? null : $unidTxt,
+                        'categoria_id'          => $categoria->id,
+                        'marca_id'              => $marcaId,
+                        'centro_costo_id'       => $ccId,
+                        'es_servicio'           => false,
+                        'tipo_item'             => 'producto',
+                        'maneja_presentacion'   => $manejaPres,
+                        'tipo_presentacion'     => $manejaPres ? $tipoPres : null,
+                        'cantidad_presentacion' => $manejaPres ? $cantPres : null,
+                        'unidad_base'           => $manejaPres ? $unidBase : null,
+                    ]);
+
+                    if ($stockInicial > 0) {
+                        HistorialCambio::create([
+                            'producto_id'    => $producto->id,
+                            'nombre_producto' => $producto->nombre,
+                            'usuario_id'     => Auth::id(),
+                            'tipo'           => 'entrada',
+                            'origen'         => 'catalogo',
+                            'cantidad'       => $stockInicial,
+                            'contenedor_id'  => $contenedorId,
+                            'stock_anterior' => 0,
+                            'stock_posterior'=> $stockInicial,
+                        ]);
+                    }
+
+                    $creados++;
+                });
+            } catch (\Throwable $e) {
+                $errores[] = "Fila {$filaExcel}: " . $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'ok'      => true,
+            'creados' => $creados,
+            'errores' => $errores,
+        ]);
+    }
+
+    public function previewCargaMasiva(Request $request): \Illuminate\Http\JsonResponse
+    {
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
+
+        $request->validate([
+            'excel_catalogo' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
+        ]);
+
+        $rawRows = $this->leerExcelCatalogo($request->file('excel_catalogo'));
+
+        if ($rawRows->isEmpty()) {
+            return response()->json(['ok' => false, 'error' => 'El archivo Excel está vacío.']);
+        }
+
+        $encabezado = $rawRows->first()->map(fn($v) => strtolower(trim((string) $v)))->values();
+        $esperados  = ['descripcion', 'unidad', 'cantidad', 'minimo', 'critico'];
+        foreach ($esperados as $i => $col) {
+            if (($encabezado[$i] ?? '') !== $col) {
+                return response()->json([
+                    'ok'    => false,
+                    'error' => 'El archivo debe tener las columnas: descripcion, unidad, cantidad, minimo, critico (fila 1 encabezado).',
+                ]);
+            }
+        }
+
+        $rows = [];
+        foreach ($rawRows->slice(1)->values() as $idx => $row) {
+            $desc = strtoupper(trim((string) ($row[0] ?? '')));
+            if ($desc === '') continue;
+            $rows[] = [
+                'fila'        => $idx + 2,
+                'descripcion' => $desc,
+                'unidad'      => trim((string) ($row[1] ?? '')),
+                'cantidad'    => is_numeric($row[2] ?? null) ? max(0, (int) $row[2]) : 0,
+                'minimo'      => is_numeric($row[3] ?? null) ? max(0, (int) $row[3]) : 0,
+                'critico'     => is_numeric($row[4] ?? null) ? max(0, (int) $row[4]) : 0,
+            ];
+        }
+
+        if (empty($rows)) {
+            return response()->json(['ok' => false, 'error' => 'No se encontraron productos en el archivo (el cuerpo está vacío).']);
+        }
+
+        return response()->json(['ok' => true, 'rows' => $rows]);
+    }
+
+    public function confirmarCargaMasiva(Request $request): \Illuminate\Http\JsonResponse
+    {
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
+
+        $contenedorId = $request->filled('contenedor_id') ? (int) $request->contenedor_id : null;
+        $items        = $request->input('items', []);
+        $ccId         = $this->ccId();
+
+        $unidades = UnidadMedida::activas()->get(['id', 'nombre', 'abreviacion']);
+        $unidIdx  = [];
+        foreach ($unidades as $u) {
+            $unidIdx[$this->normalizarTextoCatalogo($u->nombre)]      = $u->id;
+            $unidIdx[$this->normalizarTextoCatalogo($u->abreviacion)] = $u->id;
+        }
+
+        $creados = 0;
+        $errores = [];
+
+        foreach ($items as $i => $item) {
+            $fila        = (int) ($item['fila'] ?? ($i + 2));
+            $nombre      = strtoupper(trim((string) ($item['nombre'] ?? '')));
+            $unidTxt     = trim((string) ($item['unidad'] ?? ''));
+            $cantidad    = max(0, (int) ($item['cantidad'] ?? 0));
+            $minimo      = max(0, (int) ($item['minimo'] ?? 0));
+            $critico     = max(0, (int) ($item['critico'] ?? 0));
+            $catId       = !empty($item['categoria_id']) ? (int) $item['categoria_id'] : null;
+            $marcaId     = !empty($item['marca_id'])     ? (int) $item['marca_id']     : Marca::idSinMarca();
+            $itemContId  = !empty($item['contenedor_id']) ? (int) $item['contenedor_id'] : $contenedorId;
+            $tipoItem    = in_array($item['tipo_item'] ?? '', ['producto','servicio','mantencion','arriendo'])
+                           ? $item['tipo_item'] : 'producto';
+            $manejaPres  = !empty($item['maneja_presentacion']);
+            $tipoPres    = trim((string) ($item['tipo_presentacion'] ?? ''));
+            $cantPres    = $manejaPres ? max(1, (int) ($item['cantidad_presentacion'] ?? 1)) : null;
+            $unidBase    = $manejaPres ? trim((string) ($item['unidad_base'] ?? '')) : null;
+
+            if ($nombre === '') { $errores[] = "Fila {$fila}: nombre vacío."; continue; }
+            if ($unidTxt === '') { $errores[] = "Fila {$fila}: unidad vacía."; continue; }
+
+            $unidMedidaId = $unidIdx[$this->normalizarTextoCatalogo($unidTxt)] ?? null;
+
+            try {
+                DB::transaction(function () use (
+                    $nombre, $unidTxt, $unidMedidaId, $cantidad, $minimo, $critico,
+                    $itemContId, $catId, $marcaId, $ccId, $tipoItem,
+                    $manejaPres, $tipoPres, $cantPres, $unidBase, &$creados
+                ) {
+                    $producto = Producto::create([
+                        'nombre'                  => $nombre,
+                        'stock_actual'            => $cantidad,
+                        'stock_minimo'            => $minimo,
+                        'stock_critico'           => $critico,
+                        'contenedor'              => $itemContId,
+                        'unidad_medida_id'        => $unidMedidaId,
+                        'unidad'                  => $unidMedidaId ? null : $unidTxt,
+                        'categoria_id'            => $catId,
+                        'marca_id'                => $marcaId,
+                        'centro_costo_id'         => $ccId,
+                        'es_servicio'             => $tipoItem !== 'producto',
+                        'tipo_item'               => $tipoItem,
+                        'maneja_presentacion'     => $manejaPres,
+                        'tipo_presentacion'       => $manejaPres ? $tipoPres : null,
+                        'cantidad_presentacion'   => $cantPres,
+                        'unidad_base'             => $unidBase,
+                    ]);
+
+                    if ($cantidad > 0) {
+                        HistorialCambio::create([
+                            'producto_id'     => $producto->id,
+                            'nombre_producto' => $producto->nombre,
+                            'usuario_id'      => Auth::id(),
+                            'tipo'            => 'entrada',
+                            'origen'          => 'catalogo',
+                            'cantidad'        => $cantidad,
+                            'contenedor_id'   => $itemContId,
+                            'stock_anterior'  => 0,
+                            'stock_posterior' => $cantidad,
+                        ]);
+                    }
+                    $creados++;
+                });
+            } catch (\Throwable $e) {
+                $errores[] = "Fila {$fila} ({$nombre}): " . $e->getMessage();
+            }
+        }
+
+        return response()->json(['ok' => true, 'creados' => $creados, 'errores' => $errores]);
+    }
+
+    private function leerExcelCatalogo(\Illuminate\Http\UploadedFile $file): \Illuminate\Support\Collection
+    {
+        $path   = $file->getRealPath();
+        $reader = IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+
+        $spreadsheet = $reader->load($path);
+        $sheet       = $spreadsheet->getActiveSheet();
+        $rawRows     = $sheet->toArray(null, true, true, false);
+
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
+
+        return collect($rawRows)->map(fn($row) => collect(array_values($row)));
+    }
+
+    private function normalizarTextoCatalogo(string $s): string
+    {
+        $s = mb_strtolower(trim($s), 'UTF-8');
+        $s = str_replace(['á','é','í','ó','ú','ü','ñ'], ['a','e','i','o','u','u','n'], $s);
+        return preg_replace('/[^a-z0-9]/', '', $s);
     }
 }

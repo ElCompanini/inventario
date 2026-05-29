@@ -59,6 +59,9 @@
                                     @if($sicd->permite_mas_oc)
                                         <span style="font-size:0.65rem; font-weight:700; padding:1px 7px; border-radius:9999px; background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; white-space:nowrap;">+ OC</span>
                                     @endif
+                                    @if($sicd->pendientes_count > 0)
+                                        <span style="font-size:0.65rem; font-weight:700; padding:1px 7px; border-radius:9999px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; white-space:nowrap;">⚠ {{ $sicd->pendientes_count }} pendiente{{ $sicd->pendientes_count > 1 ? 's' : '' }}</span>
+                                    @endif
                                 </div>
                                 <p class="text-xs text-gray-400 mt-0.5">
                                     {{ $sicd->detalles->count() }} producto(s) ·
@@ -146,17 +149,20 @@
     <div id="seccion-productos-oc" style="display:none; margin-top:1.5rem;">
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                    <h2 class="text-sm font-semibold text-gray-700">Productos asociados a esta OC</h2>
-                    <p class="text-xs text-gray-400 mt-0.5">Selecciona qué productos y cantidades pertenecen a esta Orden de Compra específica.</p>
-                </div>
-                <div style="display:flex;align-items:center;gap:0.75rem;">
+                <div style="display:flex;align-items:center;gap:1rem;">
+                    <div>
+                        <h2 class="text-sm font-semibold text-gray-700">Productos asociados a esta OC</h2>
+                        <p class="text-xs text-gray-400 mt-0.5">Selecciona qué productos y cantidades pertenecen a esta Orden de Compra específica.</p>
+                    </div>
                     <button type="button" id="btn-sel-todos-oc" onclick="seleccionarTodosOc()"
-                            style="font-size:0.72rem;font-weight:600;color:#4f46e5;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;">
-                        Seleccionar todos
+                            style="flex-shrink:0;display:inline-flex;align-items:center;gap:0.35rem;font-size:0.75rem;font-weight:600;color:#4f46e5;background:#eef2ff;border:1.5px solid #c7d2fe;border-radius:0.5rem;cursor:pointer;padding:0.3rem 0.75rem;transition:background .15s,border-color .15s,transform .1s;"
+                            onmouseover="this.style.background='#e0e7ff';this.style.borderColor='#6366f1';this.style.transform='translateY(-1px)';"
+                            onmouseout="this.style.background='#eef2ff';this.style.borderColor='#c7d2fe';this.style.transform='';">
+                        <svg style="width:0.8rem;height:0.8rem;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                        <span id="btn-sel-todos-oc-label">Seleccionar todos</span>
                     </button>
-                    <span id="badge-prods-asignados" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700"></span>
                 </div>
+                <span id="badge-prods-asignados" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700"></span>
             </div>
 
             @error('oc_detalles')
@@ -304,15 +310,17 @@ html.dark .mp-success-txt { color:#86efac; }
 {{-- Datos de SICD detalles con disponibilidad para JS --}}
 <script id="sicd-detalles-data" type="application/json">
 {!! json_encode($sicdsPendientes->map(fn($s) => [
-    'sicd_id'     => $s->id,
-    'codigo_sicd' => $s->codigo_sicd,
-    'detalles'    => $s->detalles->map(fn($d) => [
+    'sicd_id'         => $s->id,
+    'codigo_sicd'     => $s->codigo_sicd,
+    'pendientes_count'=> (int) ($s->pendientes_count ?? 0),
+    'detalles'        => $s->detalles->map(fn($d) => [
         'id'                  => $d->id,
         'nombre'              => $d->nombre_producto_excel,
         'cantidad_solicitada' => $d->cantidad_solicitada,
         'ya_asignado'         => (int) $d->ocDetalles->sum('cantidad_asignada'),
         'disponible'          => max(0, $d->cantidad_solicitada - (int) $d->ocDetalles->sum('cantidad_asignada')),
         'precio_neto'         => $d->precio_neto ? (int) $d->precio_neto : null,
+        'pendiente'           => (bool) $d->clasificacion_pendiente,
     ])->values(),
 ])->values()) !!}
 </script>
@@ -406,9 +414,39 @@ function renderProductosOc(sicdIds) {
 
         sicd.detalles.forEach(function(det) {
             const disponible   = det.disponible;
-            const adjudicado   = disponible <= 0;   // ya asignado completamente a otras OC
-            const rowBgAdjud   = dm ? 'rgba(51,65,85,0.5)'  : '#f8fafc';
-            const txtAdjud     = dm ? '#475569'              : '#9ca3af';
+            const adjudicado   = disponible <= 0 && !det.pendiente;
+            const rowBgAdjud   = dm ? 'rgba(51,65,85,0.5)'    : '#f8fafc';
+            const txtAdjud     = dm ? '#475569'                : '#9ca3af';
+            const rowBgPend    = dm ? 'rgba(69,26,3,0.5)'     : '#fffbeb';
+            const bdPend       = dm ? '#92400e'                : '#fde68a';
+            const txtPend      = dm ? '#fcd34d'                : '#92400e';
+
+            if (det.pendiente) {
+                // ── Ítem pendiente de clasificación — misma estructura que fila normal ──
+                html += '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 1.25rem;'
+                      + 'border-bottom:1px solid ' + oc.rowBorder + ';'
+                      + 'background:' + rowBgPend + ';'
+                      + 'border-left:3px solid ' + bdPend + ';">'
+                      // ── Icono en lugar de checkbox ──
+                      + '<div style="flex-shrink:0;display:flex;align-items:center;justify-content:center;width:20px;">'
+                      + '<span title="Pendiente de clasificación" style="color:' + txtPend + ';font-size:0.85rem;">⚠</span>'
+                      + '</div>'
+                      // ── Nombre + badge inline ──
+                      + '<div style="flex:2;min-width:0;">'
+                      + '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">'
+                      + '<p style="font-size:0.82rem;font-weight:600;color:' + txtPend + ';'
+                      + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;">' + esc(det.nombre) + '</p>'
+                      + '<span style="flex-shrink:0;font-size:0.62rem;font-weight:700;padding:1px 6px;border-radius:9999px;'
+                      + 'background:' + bdPend + ';color:' + txtPend + ';white-space:nowrap;">⚠ Pendiente</span>'
+                      + '</div>'
+                      + '<div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.2rem;flex-wrap:wrap;">'
+                      + '<span style="font-size:0.7rem;color:' + txtPend + ';opacity:0.75;">Total SICD: <strong>' + det.cantidad_solicitada + '</strong></span>'
+                      + '<span style="font-size:0.7rem;color:' + txtPend + ';opacity:0.75;">· Sin clasificar — resuelve en el SICD</span>'
+                      + '</div>'
+                      + '</div>'
+                      + '</div>';
+                return;
+            }
 
             html += '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 1.25rem;'
                   + 'border-bottom:1px solid ' + oc.rowBorder + ';'
@@ -420,7 +458,6 @@ function renderProductosOc(sicdIds) {
                   + '<div style="flex-shrink:0;display:flex;align-items:center;justify-content:center;width:20px;">';
 
             if (adjudicado) {
-                // Candado — completamente adjudicado a otras OC
                 html += '<span title="Totalmente asignado a otra(s) OC" style="color:' + txtAdjud + ';font-size:0.9rem;">🔒</span>';
             } else {
                 html += '<input type="checkbox" class="oc-det-check" data-det-id="' + det.id + '"'
@@ -444,8 +481,7 @@ function renderProductosOc(sicdIds) {
                   + '</div>'
 
                   // ── Panel cantidad (oculto hasta marcar checkbox) ─────
-                  + '<div id="cant-wrap-' + det.id + '" style="width:170px;flex-shrink:0;'
-                  + (adjudicado ? 'display:none;' : 'display:none;') + '">'
+                  + '<div id="cant-wrap-' + det.id + '" style="width:170px;flex-shrink:0;display:none;">'
                   + '<label style="display:block;font-size:0.7rem;color:' + oc.txtSecundary + ';margin-bottom:0.2rem;">Cantidad a asignar:</label>'
                   + '<input type="number"'
                   + '  name="oc_detalles[' + det.id + '][cantidad_asignada]"'
@@ -459,7 +495,6 @@ function renderProductosOc(sicdIds) {
                   + '  style="border:1px solid ' + oc.inputNorBd + ';background:' + oc.inputNorBg + ';'
                   + 'color:' + oc.inputTx + ';outline:none;"'
                   + '  oninput="validarCantOc(this)">'
-                  // Hidden sicd_detalle_id — también deshabilitado hasta marcar
                   + '<input type="hidden" name="oc_detalles[' + det.id + '][sicd_detalle_id]"'
                   + '  id="oc-hidden-' + det.id + '" value="' + det.id + '" disabled>'
                   + '</div>'
@@ -505,12 +540,12 @@ function seleccionarTodosOc() {
     var sinMarcar = document.querySelectorAll('.oc-det-check:not(:checked)');
     if (sinMarcar.length > 0) {
         sinMarcar.forEach(function(chk) { chk.checked = true; toggleProdOc(chk); });
-        var btn = document.getElementById('btn-sel-todos-oc');
-        if (btn) btn.textContent = 'Deseleccionar todos';
+        var lbl = document.getElementById('btn-sel-todos-oc-label');
+        if (lbl) lbl.textContent = 'Deseleccionar todos';
     } else {
         document.querySelectorAll('.oc-det-check:checked').forEach(function(chk) { chk.checked = false; toggleProdOc(chk); });
-        var btn = document.getElementById('btn-sel-todos-oc');
-        if (btn) btn.textContent = 'Seleccionar todos';
+        var lbl = document.getElementById('btn-sel-todos-oc-label');
+        if (lbl) lbl.textContent = 'Seleccionar todos';
     }
 }
 
@@ -1001,13 +1036,29 @@ function actualizarSubmit() {
     if (!btn) return;
 
     var primeraOC  = _ocEntradas.find(function(e) { return e.estado === 'oc'; });
-    var sicdCount  = getSicdIds().length;
+    var sicdIds    = getSicdIds();
+    var sicdCount  = sicdIds.length;
+
+    // SICDs seleccionados con ítems pendientes (informativo)
+    var sicdConPendientes = SICD_DETALLES_DATA.filter(function(s) {
+        return sicdIds.includes(String(s.sicd_id)) && s.pendientes_count > 0;
+    });
+
+    // ¿Hay algún producto no-pendiente con disponible > 0 en los SICDs seleccionados?
+    var hayAsignables = SICD_DETALLES_DATA.some(function(s) {
+        return sicdIds.includes(String(s.sicd_id)) && s.detalles.some(function(d) {
+            return !d.pendiente && d.disponible > 0;
+        });
+    });
+
     // Al menos un checkbox marcado con cantidad válida
-    var prodsOk    = [...document.querySelectorAll('.oc-det-check:checked')].some(function(chk) {
+    var prodsOk = [...document.querySelectorAll('.oc-det-check:checked')].some(function(chk) {
         var cant = document.getElementById('oc-cant-' + chk.dataset.detId);
         return cant && (parseInt(cant.value) || 0) > 0;
     });
-    var valid      = !!(primeraOC && sicdCount > 0 && prodsOk);
+
+    // Solo exigir producto seleccionado si hay productos asignables; si todos son pendientes, se permite avanzar
+    var valid = !!(primeraOC && sicdCount > 0 && (prodsOk || !hayAsignables));
 
     var hiddenOC = $el('hidden-numero-oc');
     if (hiddenOC) hiddenOC.value = primeraOC ? primeraOC.codigo : '';
@@ -1017,19 +1068,29 @@ function actualizarSubmit() {
         btn.style.background = '#16a34a';
         btn.style.cursor     = 'pointer';
         btn.style.opacity    = '1';
-        if (hint) hint.textContent = '';
+        if (hint) {
+            if (sicdConPendientes.length > 0) {
+                var nombres = sicdConPendientes.map(function(s) { return s.codigo_sicd; }).join(', ');
+                hint.textContent = '⚠ ' + nombres + ': ítems pendientes no incluidos en esta OC';
+                hint.style.color = '#b45309';
+            } else {
+                hint.textContent = '';
+                hint.style.color = '';
+            }
+        }
     } else {
         btn.style.background = '#9ca3af';
         btn.style.cursor     = 'not-allowed';
         btn.style.opacity    = '0.65';
         if (hint) {
+            hint.style.color = '';
             if (sicdCount === 0 && _ocEntradas.length === 0) {
                 hint.textContent = 'Selecciona SICDs y agrega una OC';
             } else if (sicdCount === 0) {
                 hint.textContent = 'Selecciona al menos un SICD';
             } else if (!primeraOC) {
                 hint.textContent = 'Agrega y valida al menos una OC';
-            } else if (!prodsOk) {
+            } else if (hayAsignables && !prodsOk) {
                 hint.textContent = 'Asigna al menos un producto con cantidad > 0';
             }
         }

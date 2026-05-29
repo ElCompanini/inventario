@@ -277,7 +277,7 @@ class BincardExport implements FromArray, WithTitle, WithEvents, WithColumnWidth
                         'A' => $fila['fecha'],
                         'B' => $fila['tipo_movimiento'],
                         'C' => $fila['tipo_documento'],
-                        'D' => $fila['n_documento'],
+                        'D' => trim(($fila['n_documento'] ?? '') . (!empty($fila['n_referencia']) ? "\nRef: " . $fila['n_referencia'] : '') . (!empty($fila['metadata_documental']) ? "\nTipo adquisicion: " . $fila['metadata_documental'] : '')),
                         'E' => $fila['rut_proveedor'],
                         'F' => $fila['proveedor'],
                         'G' => $fila['entrada'],
@@ -306,7 +306,8 @@ class BincardExport implements FromArray, WithTitle, WithEvents, WithColumnWidth
                     // Alineaciones específicas
                     $sheet->getStyle("G{$row}:M{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                     $sheet->getStyle("A{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                    $sheet->getRowDimension($row)->setRowHeight(16);
+                    $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+                    $sheet->getRowDimension($row)->setRowHeight(!empty($fila['metadata_documental']) || !empty($fila['n_referencia']) ? 32 : 16);
 
                     // Formato números
                     foreach (['G', 'H', 'I'] as $nc) {

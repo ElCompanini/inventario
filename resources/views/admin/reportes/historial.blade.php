@@ -122,11 +122,11 @@
                         'tipo'        => $r->filtros['tipo'] ?? null,
                     ]);
                     $fmtClass = match($r->formato) {
-                        'EXCEL' => 'bg-green-100 text-green-700',
-                        'PDF'   => 'bg-red-100 text-red-700',
-                        'CSV'   => 'bg-blue-100 text-blue-700',
-                        'HTML'  => 'bg-violet-100 text-violet-700',
-                        default => 'bg-gray-100 text-gray-600',
+                        'EXCEL' => 'reporte-formato-badge formato-excel bg-green-100 text-green-700',
+                        'PDF'   => 'reporte-formato-badge formato-pdf bg-red-100 text-red-700',
+                        'CSV'   => 'reporte-formato-badge formato-csv bg-blue-100 text-blue-700',
+                        'HTML'  => 'reporte-formato-badge formato-consulta bg-violet-100 text-violet-700',
+                        default => 'reporte-formato-badge formato-default bg-gray-100 text-gray-600',
                     };
                     $fmtLabel = match($r->formato) {
                         'HTML'  => 'CONSULTA',
@@ -319,6 +319,11 @@
     @keyframes hist-in {
         from { opacity:0; transform:scale(.94); }
         to   { opacity:1; transform:scale(1); }
+    }
+    html.dark .reporte-formato-badge.formato-consulta {
+        background:#312e81 !important;
+        color:#ddd6fe !important;
+        border:1px solid rgba(167,139,250,.35);
     }
 </style>
 @endpush

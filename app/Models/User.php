@@ -7,6 +7,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use App\Models\Solicitud;
 use App\Models\HistorialCambio;
+use App\Models\PasswordResetRequest;
 
 class User extends Authenticatable
 {
@@ -33,18 +34,20 @@ class User extends Authenticatable
         'computadores'        => 'Armado de Computadoras',
         'catalogo'            => 'Catálogo de Productos',
         'usuarios'            => 'Gestión de Usuarios',
+        'stock'               => 'Modificar stock manualmente',
     ];
 
     public const PERMISOS_GRUPOS = [
         'Flujo de Solicitudes' => ['historial', 'solicitudes', 'aprobar_solicitudes', 'rechazadas'],
         'Logística y Compras'  => ['sicd', 'ordenes', 'containers', 'gastos_menores'],
-        'Administración'       => ['reportes', 'computadores', 'catalogo', 'usuarios'],
+        'Administración'       => ['reportes', 'computadores', 'catalogo', 'usuarios', 'stock'],
     ];
 
     protected $fillable = [
         'name',
         'email',
         'password',
+        'password_reset_status',
         'rol',
         'centro_costo_id',
         'permisos',
@@ -66,6 +69,11 @@ class User extends Authenticatable
         return $this->rol >= 2;
     }
 
+    public function esSuperAdministrador(): bool
+    {
+        return $this->rol === 2;
+    }
+
     public function centroCosto()
     {
         return $this->belongsTo(\App\Models\CentroCosto::class, 'centro_costo_id');
@@ -84,7 +92,7 @@ class User extends Authenticatable
 
     /**
      * True si el usuario tiene restricción de centro de costo.
-     * Aplica a cualquier usuario con centro_costo_id asignado, excepto dev.
+     * Aplica a cualquier usuario con centro_costo_id asignado, excepto Super Administrador.
      */
     public function tieneFiltroCC(): bool
     {
@@ -94,9 +102,9 @@ class User extends Authenticatable
 
     /**
      * ID a usar en filtros de CC:
-     * - dev          → null  (sin filtro, ve todo)
+     * - super administrador → null  (sin filtro, ve todo)
      * - tiene CC     → su centro_costo_id
-     * - sin CC y no dev → -1  (ID imposible, no ve nada)
+     * - sin CC y no super administrador → -1  (ID imposible, no ve nada)
      */
     public function ccFiltro(): ?int
     {
@@ -129,6 +137,16 @@ class User extends Authenticatable
         return $this->hasMany(HistorialCambio::class, 'usuario_id');
     }
 
+    public function passwordResetRequests()
+    {
+        return $this->hasMany(PasswordResetRequest::class);
+    }
+
+    public function pendingPasswordResetRequest()
+    {
+        return $this->hasOne(PasswordResetRequest::class)->where('status', 'pending')->latestOfMany();
+    }
+
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -149,6 +167,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
+            'password_reset_status' => 'integer',
             'permisos'          => 'array',
             'rol'               => 'integer',
         ];

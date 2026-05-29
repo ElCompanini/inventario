@@ -542,7 +542,7 @@
 </div>
 
 {{-- Modal de rechazo con motivo --}}
-<div id="modalRechazo" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+<div id="modalRechazo" class="fixed inset-0 z-50 items-center justify-center bg-black/50" style="display:none">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
         <h2 class="text-lg font-bold text-gray-800 mb-1">Rechazar solicitud</h2>
         <p class="text-sm text-gray-500 mb-4">Ingresa el motivo del rechazo para informar al solicitante.</p>
@@ -580,7 +580,7 @@
 </div>
 
 {{-- Modal de aprobación --}}
-<div id="modalAprobacion" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+<div id="modalAprobacion" class="fixed inset-0 z-50 items-center justify-center bg-black/50" style="display:none">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
         <h2 class="text-lg font-bold text-gray-800 mb-1">Aprobar solicitud</h2>
         <p class="text-sm text-gray-500 mb-6">¿Confirmas que deseas aprobar esta solicitud? El stock se actualizará de inmediato.</p>
@@ -816,14 +816,12 @@
     function abrirModalAprobacion(id, url) {
         const modal = document.getElementById('modalAprobacion');
         document.getElementById('formAprobacion').action = url;
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        modal.style.display = 'flex';
     }
 
     function cerrarModalAprobacion() {
         const modal = document.getElementById('modalAprobacion');
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+        modal.style.display = 'none';
     }
 
     document.getElementById('modalAprobacion').addEventListener('click', function(e) {
@@ -836,15 +834,13 @@
         form.action = url || `/admin/solicitudes/${id}/rechazar`;
         document.getElementById('motivo_rechazo').value = '';
         limpiarErrorRechazo();
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        modal.style.display = 'flex';
         setTimeout(function() { document.getElementById('motivo_rechazo').focus(); }, 50);
     }
 
     function cerrarModalRechazo() {
         const modal = document.getElementById('modalRechazo');
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+        modal.style.display = 'none';
         limpiarErrorRechazo();
     }
 

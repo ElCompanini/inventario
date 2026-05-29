@@ -48,6 +48,11 @@ class SolicitudController extends Controller
 
         if ($data['tipo'] === 'salida') {
             $producto = Producto::findOrFail($data['producto_id']);
+            if (!$producto->isProducto()) {
+                return back()->withErrors([
+                    'producto_id' => 'Solo los productos fisicos pueden solicitarse como salida de stock.',
+                ])->withInput();
+            }
             if ($producto->stock_actual < $data['cantidad']) {
                 return back()->withErrors([
                     'cantidad' => 'La cantidad solicitada supera el stock disponible (' . $producto->stock_actual . ').',
@@ -81,8 +86,8 @@ class SolicitudController extends Controller
         }
 
         $producto = $solicitud->producto;
-        if (!$producto || $producto->es_servicio) {
-            return back()->with('error', 'Los servicios no tienen devolución de stock físico.');
+        if (!$producto || !$producto->isProducto()) {
+            return back()->with('error', 'Este item no tiene devolucion de stock fisico.');
         }
 
         // Ya devuelto: solo devoluciones aprobadas (impactan stock)

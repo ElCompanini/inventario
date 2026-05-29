@@ -20,6 +20,13 @@
                   focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
 </div>
 
+@if(($filtroFactura ?? null) === 'pendiente')
+<div class="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+    <span class="font-semibold text-amber-800">Mostrando OC con factura pendiente por subir.</span>
+    <a href="{{ route('admin.ordenes.index') }}" class="text-xs font-bold text-amber-700 hover:underline">Limpiar filtro</a>
+</div>
+@endif
+
 @if($ordenes->isEmpty())
 <div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-gray-100 dark:border-slate-700
             flex flex-col items-center justify-center text-center gap-5 mb-6"
@@ -46,6 +53,7 @@
                 <th class="px-4 py-3 font-semibold text-gray-600">SICDs</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Estado</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Mercado Público</th>
+                <th class="px-4 py-3 font-semibold text-gray-600">Tipo adquisicion</th>
                 <th class="px-4 py-3 font-semibold text-gray-600 text-center">Factura</th>
                 <th class="px-4 py-3 font-semibold text-gray-600 text-center">Guía</th>
                 <th class="px-4 py-3 font-semibold text-gray-600">Creado por</th>
@@ -70,8 +78,8 @@
                             @endphp
                             <div class="flex items-center gap-1.5 mb-0.5">
                                 <span class="font-mono text-xs text-indigo-600">{{ $s->codigo_sicd }}</span>
-                                <span class="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                                      style="background:{{ $et['bg'] }}; color:{{ $et['color'] }};">
+                                <span class="sicd-externo-badge text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                                      style="--sicd-bg:{{ $et['bg'] }}; --sicd-color:{{ $et['color'] }}; --sicd-dark-bg:{{ $et['dark_bg'] }}; --sicd-dark-color:{{ $et['dark_color'] }}; background:var(--sicd-bg); color:var(--sicd-color);">
                                     {{ $et['texto'] }}
                                 </span>
                             </div>
@@ -110,8 +118,23 @@
                             @endif
                         @endif
                     </td>
+                    <td class="px-4 py-2">
+                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold {{ $oc->tipoAdquisicionBadgeClasses() }}"
+                              title="{{ $oc->tipo_adquisicion_observacion }}">
+                            {{ $oc->tipoAdquisicionLabel() }}
+                        </span>
+                        <div class="text-[10px] text-gray-400 mt-0.5">
+                            {{ $oc->tipoAdquisicionOrigenLabel() }} · {{ $oc->tipo_adquisicion_confianza ?? 'baja' }}
+                        </div>
+                    </td>
                     <td class="px-4 py-2 text-center">
-                        <span class="w-2.5 h-2.5 rounded-full inline-block {{ $tieneFactura ? 'bg-green-500' : 'bg-gray-300' }}"></span>
+                        @if($tieneFactura)
+                            <span class="w-2.5 h-2.5 rounded-full inline-block bg-green-500"></span>
+                        @elseif($oc->facturaPendiente())
+                            <span class="inline-flex items-center bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full">Pendiente</span>
+                        @else
+                            <span class="w-2.5 h-2.5 rounded-full inline-block bg-gray-300"></span>
+                        @endif
                     </td>
                     <td class="px-4 py-2 text-center">
                         <span class="w-2.5 h-2.5 rounded-full inline-block {{ $tieneGuia ? 'bg-green-500' : 'bg-gray-300' }}"></span>
@@ -146,6 +169,15 @@
     .dt-btn:hover { background:#1d4ed8; transform:translateY(-1px); animation:btn-breathe-blue 1.6s ease-in-out infinite; }
     .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s,transform .15s; }
     .dt-btn-pdf:hover { background:#b91c1c; transform:translateY(-1px); animation:btn-breathe-red 1.6s ease-in-out infinite; }
+    html.dark .sicd-externo-badge {
+        background: var(--sicd-dark-bg) !important;
+        color: var(--sicd-dark-color) !important;
+        border: 1px solid color-mix(in srgb, var(--sicd-dark-color) 32%, transparent);
+    }
+    html.dark .bg-amber-50 { background:rgba(120,53,15,0.25) !important; }
+    html.dark .border-amber-200 { border-color:rgba(245,158,11,0.45) !important; }
+    html.dark .text-amber-700,
+    html.dark .text-amber-800 { color:#fcd34d !important; }
 </style>
 @endpush
 
@@ -158,7 +190,7 @@ const CSRF_TOKEN       = '{{ csrf_token() }}';
 $(document).ready(function () {
     const table = $('#tabla-ordenes').DataTable({
         language: { url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json' },
-        order: [[7, 'desc']],
+        order: [[8, 'desc']],
         paging: false,
         layout: { topStart: 'buttons', topEnd: null, bottomStart: null, bottomEnd: null },
         buttons: [

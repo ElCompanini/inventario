@@ -12,25 +12,45 @@ class SearchController extends Controller
 {
     private function query(string $q): array
     {
-        $like  = "%{$q}%";
-        $user  = auth()->user();
-        $ccId  = $user->ccFiltro();
+        $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+        $id   = ctype_digit($q) ? (int) $q : null;
+        $user = auth()->user();
+        $ccId = $user->ccFiltro();
 
         $productos = Producto::with('container')
-            ->where(fn($w) => $w->where('id', $q)->orWhere('nombre', 'LIKE', $like)->orWhere('descripcion', 'LIKE', $like))
+            ->where(fn($w) => $w
+                ->when($id !== null, fn($qId) => $qId->where('id', $id))
+                ->orWhere('nombre', 'LIKE', $like))
             ->when($ccId, fn($q2) => $q2->where('centro_costo_id', $ccId))
             ->orderBy('nombre')->limit(20)->get();
 
+        // SEC-05: filtrar SICDs y OrdeneCompra por centro de costo igual que en sus controladores
         $sicds = Sicd::with('usuario')
-            ->where(fn($w) => $w->where('id', $q)->orWhere('codigo_sicd', 'LIKE', $like)->orWhere('descripcion', 'LIKE', $like))
+            ->where(fn($w) => $w
+                ->when($id !== null, fn($qId) => $qId->where('id', $id))
+                ->orWhere('codigo_sicd', 'LIKE', $like)
+                ->orWhere('descripcion', 'LIKE', $like))
+            ->when($user->tieneFiltroCC(), function ($q2) use ($user) {
+                $prefix = strtoupper($user->centroCostoPrefix());
+                $q2->where('codigo_sicd', 'LIKE', $prefix . '%');
+            })
             ->orderByDesc('created_at')->limit(20)->get();
 
         $ordenes = OrdenCompra::with('usuario')
-            ->where(fn($w) => $w->where('id', $q)->orWhere('numero_oc', 'LIKE', $like))
+            ->where(fn($w) => $w
+                ->when($id !== null, fn($qId) => $qId->where('id', $id))
+                ->orWhere('numero_oc', 'LIKE', $like))
+            ->when($user->tieneFiltroCC(), function ($q2) use ($user) {
+                $prefix = strtoupper($user->centroCostoPrefix());
+                $q2->whereHas('sicds', fn($sq) => $sq->where('codigo_sicd', 'LIKE', $prefix . '%'));
+            })
             ->orderByDesc('created_at')->limit(20)->get();
 
         $historial = HistorialCambio::with(['producto', 'usuario'])
-            ->where(fn($w) => $w->where('id', $q)->orWhere('motivo', 'LIKE', $like)->orWhere('aprobado_por', 'LIKE', $like)
+            ->where(fn($w) => $w
+                ->when($id !== null, fn($qId) => $qId->where('id', $id))
+                ->orWhere('motivo', 'LIKE', $like)
+                ->orWhere('aprobado_por', 'LIKE', $like)
                 ->orWhereHas('producto', fn($p) => $p->where('nombre', 'LIKE', $like))
                 ->orWhereHas('usuario',  fn($u) => $u->where('name',  'LIKE', $like)))
             ->when($ccId, fn($q2) => $q2->whereHas('producto', fn($p) => $p->where('centro_costo_id', $ccId)))
@@ -64,8 +84,6 @@ class SearchController extends Controller
         }
 
         $data = $this->query($q);
-        $like = "%{$q}%";
-
         $items = [];
 
         foreach ($data['productos'] as $p) {

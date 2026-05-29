@@ -54,6 +54,8 @@ class HistorialCambio extends Model
                         => 'MOV-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT),
                     $tipo === 'retiro_directo'
                         => 'RET-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT),
+                    $tipo === 'computador_armado' || $mov->origen === 'computador_armado'
+                        => 'ARM-' . str_pad($mov->origen_id ?? $mov->id, 6, '0', STR_PAD_LEFT),
                     // Legacy fallback (origen_tipo not set on old records)
                     $tipo === null && $mov->tipo === 'devolucion' && $mov->origen === 'solicitud' && $mov->origen_id
                         => 'DEV-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT),

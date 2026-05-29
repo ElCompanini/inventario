@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ config('app.name') }} — @yield('title', 'Inicio')</title>
+    <title>
+    @if(config('app.name'))
+        {{ config('app.name') }} —
+    @endif
+    @yield('title', 'Inicio')
+</title>
     <link rel="icon" type="image/jpeg" href="{{ asset('images/hospital.jpg') }}">
     {{-- Dark mode: apply class before paint to avoid flash --}}
     <script>if(localStorage.getItem('darkMode')==='1')document.documentElement.classList.add('dark');</script>
@@ -342,6 +347,26 @@
     button.btn-ghost:active, a.btn-ghost:active {
         transform: scale(.96);
     }
+
+    @keyframes password-default-button-in {
+        from { opacity: 0; transform: translateY(10px) scale(.96); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .password-default-action {
+        min-width: 270px;
+        min-height: 56px;
+        padding: 0.9rem 1.75rem;
+        animation: password-default-button-in .28s ease-out both;
+        transition: transform .14s ease, box-shadow .18s ease, background-color .15s ease;
+    }
+    .password-default-action:hover {
+        transform: translateY(-2px) scale(1.03);
+        box-shadow: 0 12px 26px rgba(0,0,0,.24);
+    }
+    .password-default-action:active {
+        transform: translateY(0) scale(.97);
+        box-shadow: none;
+    }
 </style>
 </head>
 <body class="bg-gray-100 font-sans" style="overflow-x:hidden;">
@@ -379,7 +404,7 @@
             </div>
             <div class="sb-footer-text flex-1 overflow-hidden" style="min-width:0;">
                 <p class="text-sm font-medium truncate leading-tight" style="color:#818cf8;">{{ $u->name }}</p>
-                <p class="text-xs text-slate-400 truncate leading-tight">{{ $u->esDev() ? 'Super Administrador' : ($u->esAdmin() ? 'Administrador' : 'Usuario') }}</p>
+                <p class="text-xs text-slate-400 truncate leading-tight">{{ $u->esSuperAdministrador() ? 'Super Administrador' : ($u->esAdmin() ? 'Administrador' : 'Usuario') }}</p>
                 @if($u->centroCosto)
                     <p class="text-[10px] text-slate-500 leading-tight" style="white-space:normal;word-break:break-word;">{{ $u->centroCosto->nombre_completo }}</p>
                 @endif
@@ -681,6 +706,61 @@
             </div>
         @endif
 
+        @if(auth()->user()?->password_reset_status === 1 && !session('password_default_warning_dismissed'))
+            <div id="passwordDefaultModal" class="fixed inset-0 z-50 items-center justify-center bg-black/50" style="display:flex">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full mx-4 border border-gray-100 dark:border-slate-700" style="max-width:720px; min-height:360px; padding:3.25rem 3rem 3rem; display:flex; flex-direction:column;">
+                    <div style="margin-top:0.25rem;">
+                        <div class="flex items-center gap-4 mb-4">
+                            <svg class="w-8 h-8 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                            </svg>
+                            <h2 class="text-2xl font-bold text-orange-500 dark:text-orange-400">Tu cuenta tiene la contraseña por defecto</h2>
+                        </div>
+                        @php $mostrarFormularioPasswordDefault = $errors->has('password'); @endphp
+                        <p class="text-base text-gray-500 dark:text-gray-400" style="line-height:1.75;">Por seguridad, no podrás realizar ninguna acción si tu contraseña no se ha actualizado, actualiza tu contraseña para poder continuar.</p>
+                    </div>
+
+                    <div id="passwordDefaultQuestion" class="justify-center gap-2" style="display:{{ $mostrarFormularioPasswordDefault ? 'none' : 'flex' }}; margin-top:6.75rem;">
+
+                        <button type="button" onclick="showPasswordDefaultForm()"
+                                class="password-default-action btn-primary text-lg font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+                            Ingresar nueva contraseña
+                        </button>
+                    </div>
+
+                    <form id="passwordDefaultForm" method="POST" action="{{ route('password.change.update') }}" class="space-y-4" style="display:{{ $mostrarFormularioPasswordDefault ? 'block' : 'none' }}">
+                        @csrf
+                        @method('PUT')
+
+                        <div>
+                            <label for="modal-password" class="block text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Nueva contrasena</label>
+                            <input id="modal-password" type="password" name="password" required autocomplete="new-password"
+                                   placeholder="Nueva contrasena"
+                                   class="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-3 text-base bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            @error('password') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="modal-password-confirmation" class="block text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Confirmar contrasena</label>
+                            <input id="modal-password-confirmation" type="password" name="password_confirmation" required autocomplete="new-password"
+                                   placeholder="Confirmar contrasena"
+                                   class="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-3 text-base bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                        </div>
+
+                        <div class="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-900/60 border border-gray-200 dark:border-slate-700 rounded-lg p-4">
+                            Debe tener minimo 8 caracteres, una mayuscula, un numero y un caracter especial.
+                        </div>
+
+                        <div class="flex justify-center gap-2"> 
+                            <button type="submit" class="password-default-action btn-primary text-lg font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+                                Guardar contrasena
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+
         @yield('content')
     </main>
 </div>
@@ -753,6 +833,27 @@ function sbCloseMobile() {
         });
     });
 })();
+
+function dismissPasswordDefaultModal() {
+    var modal = document.getElementById('passwordDefaultModal');
+    if (modal) modal.style.display = 'none';
+    fetch('{{ route('password.default.dismiss') }}', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json'
+        }
+    }).catch(function () {});
+}
+
+function showPasswordDefaultForm() {
+    var question = document.getElementById('passwordDefaultQuestion');
+    var form = document.getElementById('passwordDefaultForm');
+    var password = document.getElementById('modal-password');
+    if (question) question.style.display = 'none';
+    if (form) form.style.display = 'block';
+    if (password) password.focus();
+}
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>

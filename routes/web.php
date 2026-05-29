@@ -21,6 +21,7 @@ use App\Http\Controllers\ReporteriaIndexController;
 use App\Http\Controllers\MarcaController;
 use App\Http\Controllers\UnidadMedidaController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\OcItemPendienteController;
 
 // Raíz → login
 Route::get('/', fn() => redirect()->route('login'));
@@ -29,6 +30,8 @@ Route::get('/', fn() => redirect()->route('login'));
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->name('login.post')->middleware('throttle:5,1');
+    Route::get('/recuperar-contrasena', [AuthController::class, 'showForgotPassword'])->name('password.forgot');
+    Route::post('/recuperar-contrasena', [AuthController::class, 'submitForgotPassword'])->name('password.forgot.submit')->middleware('throttle:5,1');
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
@@ -46,6 +49,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/solicitudes', [SolicitudController::class, 'store'])->name('solicitudes.store');
     Route::post('/solicitudes/{id}/solicitar-devolucion', [SolicitudController::class, 'solicitarDevolucion'])->name('solicitudes.solicitar-devolucion');
     Route::get('/api/sel-productos', [ProductoController::class, 'apiSeleccion'])->name('api.sel.productos');
+    Route::get('/cambiar-contrasena', [AuthController::class, 'showChangePassword'])->name('password.change');
+    Route::put('/cambiar-contrasena', [AuthController::class, 'updateOwnPassword'])->name('password.change.update');
+    Route::post('/contrasena-default/ocultar', [AuthController::class, 'dismissDefaultPasswordWarning'])->name('password.default.dismiss');
 
     // Retiro de piezas (todos los usuarios autenticados)
     Route::get('/retiro', [RetiroController::class, 'form'])->name('retiro.form');
@@ -77,6 +83,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/historial', [AdminController::class, 'historial'])->name('historial');
     // Rutas estáticas de productos PRIMERO (antes del wildcard {id})
     Route::post('/productos/carga-masiva', [AdminController::class, 'cargaMasiva'])->name('productos.carga.masiva');
+    Route::get('/productos/buscar-enlace', [AdminController::class, 'buscarProductoParaEnlace'])->name('productos.buscar-enlace');
     Route::get('/productos/carga-masiva/resolver', [AdminController::class, 'resolverCargaMasiva'])->name('productos.carga.masiva.resolver');
     Route::post('/productos/carga-masiva/confirmar', [AdminController::class, 'confirmarCargaMasiva'])->name('productos.carga.masiva.confirmar');
     Route::get('/productos/carga-masiva/contenedores', [AdminController::class, 'asignarContenedoresMasiva'])->name('productos.carga.masiva.contenedores');
@@ -91,6 +98,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/productos/{id}/trasladar', [AdminController::class, 'trasladarContainer'])->name('productos.trasladar');
     Route::patch('/productos/{id}/deshabilitar', [AdminController::class, 'deshabilitarProducto'])->name('productos.deshabilitar');
     Route::post('/productos/{id}/gestionar-estado', [ProductoController::class, 'gestionarEstado'])->name('productos.gestionar-estado');
+    Route::post('/productos/{id}/gestionar-arriendo', [ProductoController::class, 'gestionarArriendo'])->name('productos.gestionar-arriendo');
 
     // SICD
     Route::get('/sicd/validar', [SicdController::class, 'validarCodigo'])->name('sicd.validar');
@@ -106,6 +114,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/sicd/estados-externos', [SicdController::class, 'estadosExternos'])->name('sicd.estados-externos');
     Route::post('/sicd/crear-y-enlazar', [SicdController::class, 'crearYEnlazar'])->name('sicd.crear-y-enlazar');
     Route::post('/sicd/{id}/enlazar-pdf', [SicdController::class, 'enlazarPdf'])->name('sicd.enlazar-pdf');
+    Route::post('/sicd/{id}/resolver-detalle-pendiente', [SicdController::class, 'resolverDetallePendiente'])->name('sicd.resolver-detalle-pendiente');
     Route::put('/sicd/{id}/detalles', [SicdController::class, 'updateDetalles'])->name('sicd.detalles.update');
     Route::delete('/sicd/{id}/cancelar', [SicdController::class, 'cancelar'])->name('sicd.cancelar');
     Route::get('/sicd/{id}/ver-documento', [SicdController::class, 'verDocumento'])->name('sicd.ver-documento');
@@ -121,8 +130,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/ordenes/api-status', [OrdenCompraController::class, 'estadoApi'])->name('ordenes.api-status');
     Route::post('/ordenes/buscar-mp', [OrdenCompraController::class, 'buscarEnMercadoPublico'])->name('ordenes.buscar-mp');
     Route::post('/ordenes/{orden}/validar-mp', [OrdenCompraController::class, 'validarMercadoPublico'])->name('ordenes.validar-mp');
+    Route::patch('/ordenes/{orden}/tipo-adquisicion', [OrdenCompraController::class, 'actualizarTipoAdquisicion'])->name('ordenes.tipo-adquisicion.update');
+    Route::post('/ordenes/{orden}/tipo-adquisicion/recalcular', [OrdenCompraController::class, 'recalcularTipoAdquisicion'])->name('ordenes.tipo-adquisicion.recalcular');
     Route::get('/ordenes/{id}', [OrdenCompraController::class, 'show'])->name('ordenes.show');
     Route::post('/ordenes/{id}/factura', [OrdenCompraController::class, 'subirFactura'])->name('ordenes.factura.subir');
+    Route::post('/ordenes/{id}/factura-pendiente', [OrdenCompraController::class, 'marcarFacturaPendiente'])->name('ordenes.factura.pendiente');
     Route::post('/ordenes/{id}/guia', [OrdenCompraController::class, 'subirGuia'])->name('ordenes.guia.subir');
     Route::get('/ordenes/{id}/recepcion', [OrdenCompraController::class, 'recepcion'])->name('ordenes.recepcion');
     Route::post('/ordenes/{id}/recepcion', [OrdenCompraController::class, 'procesarRecepcion'])->name('ordenes.recepcion.procesar');
@@ -130,7 +142,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/ordenes/{id}/descargar-guia', [OrdenCompraController::class, 'descargarGuia'])->name('ordenes.guia.descargar');
     Route::get('/ordenes/{id}/descargar', [OrdenCompraController::class, 'descargarOc'])->name('ordenes.descargar');
 
-    // Centros de Costo (solo dev)
+    // OC Ítems Pendientes de Revisión
+    Route::get('/oc-pendientes/buscar-producto', [OcItemPendienteController::class, 'buscarProducto'])->name('oc-pendientes.buscar-producto');
+    Route::get('/oc-pendientes', [OcItemPendienteController::class, 'index'])->name('oc-pendientes.index');
+    Route::post('/ordenes/{oc}/items-pendientes', [OcItemPendienteController::class, 'store'])->name('oc-pendientes.store');
+    Route::post('/oc-pendientes/{id}/resolver', [OcItemPendienteController::class, 'resolver'])->name('oc-pendientes.resolver');
+    Route::delete('/oc-pendientes/{id}', [OcItemPendienteController::class, 'destroy'])->name('oc-pendientes.destroy');
+
+    // Centros de Costo (solo Super Administrador; rutas internas admin.dev.* se mantienen por compatibilidad)
     Route::get('/centros-costo/verificar', [CentroCostoController::class, 'verificar'])->name('dev.centros-costo.verificar');
     Route::post('/centros-costo', [CentroCostoController::class, 'store'])->name('dev.centros-costo.store');
 
@@ -140,6 +159,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
     Route::get('/usuarios/{id}/editar', [UsuarioController::class, 'edit'])->name('usuarios.edit');
     Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])->name('usuarios.update');
+    Route::post('/usuarios/{id}/resetear-contrasena', [UsuarioController::class, 'resetPasswordDefault'])->name('usuarios.reset-password');
     Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
 
     // Gastos Menores
@@ -167,6 +187,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/reportes/bincard/excel',      [ReporteController::class, 'exportExcel'])->name('reportes.bincard.excel');
     Route::get('/reportes/bincard/pdf',        [ReporteController::class, 'exportPdf'])->name('reportes.bincard.pdf');
     Route::get('/reportes/bincard-servicio',   [ReporteController::class, 'bincardServicio'])->name('reportes.bincard.servicio');
+    Route::get('/reportes/bincard-mantencion', [ReporteController::class, 'bincardMantencion'])->name('reportes.bincard.mantencion');
+    Route::get('/reportes/bincard-arriendo',   [ReporteController::class, 'bincardArriendo'])->name('reportes.bincard.arriendo');
 
     // Armado de Computadoras
     Route::get('/computadores',                                                  [ComputadorController::class, 'index'])->name('computadores.index');
@@ -207,6 +229,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/catalogo/barcode', [CatalogoController::class, 'buscarBarcode'])->name('catalogo.barcode');
     Route::patch('/catalogo/productos/{producto}/barcode', [CatalogoController::class, 'asociarBarcode'])->name('catalogo.productos.asociar-barcode');
     Route::delete('/catalogo/productos/{producto}', [CatalogoController::class, 'destroyProducto'])->name('catalogo.productos.destroy');
+    Route::post('/catalogo/carga-masiva', [CatalogoController::class, 'importarProductosMasivo'])->name('catalogo.carga-masiva.store');
+    Route::post('/catalogo/carga-masiva/preview', [CatalogoController::class, 'previewCargaMasiva'])->name('catalogo.carga-masiva.preview');
+    Route::post('/catalogo/carga-masiva/confirmar', [CatalogoController::class, 'confirmarCargaMasiva'])->name('catalogo.carga-masiva.confirmar');
 
     // Containers
     Route::get('/containers', [ContainerController::class, 'index'])->name('containers.index');
