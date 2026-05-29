@@ -383,22 +383,6 @@
                     </div>
                 </label>
 
-                {{-- Opción 4: Dejar como pendiente --}}
-                <label class="cm-opt-label cm-opt-hover-amber" style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem; border-radius:0.5rem; border:1px solid; cursor:pointer; transition:background .15s; margin-top:0.5rem;">
-                    <input type="radio" name="resoluciones[{{ $i }}][accion]" value="pendiente"
-                           class="shrink-0"
-                           style="accent-color:#d97706;"
-                           data-idx="{{ $i }}"
-                           onchange="onRadioPendiente({{ $i }})">
-                    <div class="flex-1">
-                        <p style="font-size:0.85rem; font-weight:600; margin:0;" class="cm-opt-title-amber">Dejar como pendiente</p>
-                        <p style="font-size:0.72rem; margin:0.1rem 0 0;" class="cm-opt-sub">Se guardará sin clasificar. Debe resolverse antes de generar una Orden de Compra.</p>
-                    </div>
-                    <svg style="width:1rem;height:1rem;flex-shrink:0;color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                    </svg>
-                </label>
-
             </div>{{-- /padding --}}
         </div>{{-- /cm-card --}}
 
@@ -697,10 +681,10 @@
 .dark-title { color:#1e293b; }
 .dark-sub   { color:#64748b; }
 
-.cm-exactos-box   { background:#f0fdf4; border:1px solid #bbf7d0; }
-.cm-exactos-title { color:#15803d; }
-.cm-exactos-list  { color:#16a34a; }
-.cm-exactos-qty   { color:#86efac; }
+.cm-exactos-box   { background:#eff6ff; border:1px solid #bfdbfe; }
+.cm-exactos-title { color:#1d4ed8; }
+.cm-exactos-list  { color:#2563eb; }
+.cm-exactos-qty   { color:#93c5fd; }
 
 .cm-card        { background:#fff; }
 .cm-card-header { }
@@ -774,10 +758,10 @@ html.dark .cm-warn-icon { color:#fb923c; }
 html.dark .dark-title { color:#f1f5f9; }
 html.dark .dark-sub   { color:#94a3b8; }
 
-html.dark .cm-exactos-box   { background:#052e16; border-color:#166534; }
-html.dark .cm-exactos-title { color:#86efac; }
-html.dark .cm-exactos-list  { color:#4ade80; }
-html.dark .cm-exactos-qty   { color:#166534; }
+html.dark .cm-exactos-box   { background:#0c1a2e; border-color:#1e40af; }
+html.dark .cm-exactos-title { color:#93c5fd; }
+html.dark .cm-exactos-list  { color:#60a5fa; }
+html.dark .cm-exactos-qty   { color:#1e3a8a; }
 
 html.dark .cm-card   { background:#1e293b; }
 html.dark .cm-desc   { color:#f1f5f9; }
