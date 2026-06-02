@@ -80,9 +80,12 @@ class CatalogoController extends Controller
         $familiasBienes    = $familias->filter(fn($f) => ($f->tipo_catalogo ?? 'bien') === 'bien')->values();
         $familiasServicios = $familias->filter(fn($f) => ($f->tipo_catalogo ?? 'bien') === 'servicio')->values();
 
+        $todosCentrosCosto = \App\Models\CentroCosto::orderBy('acronimo')->get(['id', 'acronimo']);
+
         return view('admin.productos.catalogo', compact(
             'familias', 'familiasBienes', 'familiasServicios',
-            'containers', 'unidades', 'familiaActiva', 'categoriasActivas'
+            'containers', 'unidades', 'familiaActiva', 'categoriasActivas',
+            'todosCentrosCosto'
         ));
     }
 
@@ -356,6 +359,11 @@ class CatalogoController extends Controller
         }
 
         $ccId = $this->ccId();
+        // Admin/dev sin CC propio puede elegir el CC desde el formulario
+        if (is_null($ccId) && $request->filled('centro_costo_id')) {
+            $submitted = (int) $request->input('centro_costo_id');
+            if ($submitted > 0) $ccId = $submitted;
+        }
 
         $manejaPresentacion = $tipoItem === 'producto' && $request->boolean('maneja_presentacion', false);
 
@@ -853,6 +861,11 @@ class CatalogoController extends Controller
         $contenedorId = $request->filled('contenedor_id') ? (int) $request->contenedor_id : null;
         $items        = $request->input('items', []);
         $ccId         = $this->ccId();
+        // Admin/dev sin CC propio puede elegir el CC desde el modal
+        if (is_null($ccId) && $request->filled('centro_costo_id')) {
+            $submitted = (int) $request->input('centro_costo_id');
+            if ($submitted > 0) $ccId = $submitted;
+        }
 
         $unidades = UnidadMedida::activas()->get(['id', 'nombre', 'abreviacion']);
         $unidIdx  = [];

@@ -38,6 +38,10 @@ class HistorialCambioObserver
         }
 
         if ($movimiento->tipo === 'entrada') {
+            // Las recepciones de OC envían un único correo agregado desde OrdenCompraController
+            if ($movimiento->origen_tipo === 'sicd' && $movimiento->orden_compra_id) {
+                return null;
+            }
             return 'ingreso_stock';
         }
 

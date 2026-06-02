@@ -304,14 +304,29 @@
                                             <span style="display:inline-flex; align-items:center; gap:3px; font-size:0.68rem; font-weight:700; background:#fef3c7; color:#92400e; border:1px solid #fde68a; border-radius:9999px; padding:2px 8px; white-space:nowrap;">
                                                 ⏳ En revisión
                                             </span>
+                                        @elseif((int)$det->cantidad_recibida >= (int)$det->cantidad_solicitada)
+                                            <span style="display:inline-flex; align-items:center; gap:3px; font-size:0.68rem; font-weight:700; background:#dcfce7; color:#15803d; border:1px solid #86efac; border-radius:9999px; padding:2px 8px; white-space:nowrap;">
+                                                ✓ Recibido
+                                            </span>
                                         @else
-                                            <button type="button"
-                                                    onclick='abrirModalPendShow({{ $det->id }}, {!! json_encode($nombreDet, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) !!})'
-                                                    style="display:inline-flex; align-items:center; gap:3px; font-size:0.72rem; font-weight:600; color:#92400e; background:#fef3c7; border:1px solid #fde68a; border-radius:0.4rem; padding:0.25rem 0.55rem; cursor:pointer; white-space:nowrap;"
-                                                    onmouseover="this.style.background='#fde68a'"
-                                                    onmouseout="this.style.background='#fef3c7'">
-                                                ⚠ Pendiente
-                                            </button>
+                                            <div style="display:flex; flex-direction:column; gap:4px; align-items:center;">
+                                                <form method="POST" action="{{ route('admin.oc-pendientes.confirmar', [$oc->id, $det->id]) }}">
+                                                    @csrf
+                                                    <button type="submit"
+                                                            style="display:inline-flex; align-items:center; gap:3px; font-size:0.72rem; font-weight:600; color:#fff; background:#16a34a; border:none; border-radius:0.4rem; padding:0.25rem 0.55rem; cursor:pointer; white-space:nowrap;"
+                                                            onmouseover="this.style.background='#15803d'"
+                                                            onmouseout="this.style.background='#16a34a'">
+                                                        ✓ Confirmar recibimiento
+                                                    </button>
+                                                </form>
+                                                <button type="button"
+                                                        onclick='abrirModalPendShow({{ $det->id }}, {!! json_encode($nombreDet, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) !!})'
+                                                        style="display:inline-flex; align-items:center; gap:3px; font-size:0.72rem; font-weight:600; color:#92400e; background:#fef3c7; border:1px solid #fde68a; border-radius:0.4rem; padding:0.25rem 0.55rem; cursor:pointer; white-space:nowrap;"
+                                                        onmouseover="this.style.background='#fde68a'"
+                                                        onmouseout="this.style.background='#fef3c7'">
+                                                    ⚠ Dejar pendiente
+                                                </button>
+                                            </div>
                                         @endif
                                     @else
                                         <span class="text-xs text-gray-300">—</span>

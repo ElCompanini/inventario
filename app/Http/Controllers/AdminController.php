@@ -1531,8 +1531,9 @@ class AdminController extends Controller
         }
 
         $ccId = auth()->user()->centro_costo_id;
+        $batchProductos = [];
 
-        DB::transaction(function () use ($items, $motivo, $sicd, $vincularOc, &$actualizados, $ccId) {
+        DB::transaction(function () use ($items, $motivo, $sicd, $vincularOc, &$actualizados, $ccId, &$batchProductos) {
             foreach ($items as $item) {
                 $productoId = $item['producto_id'] ?? null;
 
@@ -1664,28 +1665,52 @@ class AdminController extends Controller
                 }
 
                 if (!$producto->isMantencion() && !$producto->isArriendo()) {
-                HistorialCambio::create([
-                    'producto_id'        => $producto->id,
-                    'nombre_producto'    => $producto->nombre,
-                    'contenedor_id'      => $producto->contenedor,
-                    'cantidad'           => $cantidadReal,
-                    'tipo'               => 'entrada',
-                    'motivo'             => $sicd ? "Carga masiva – SICD {$sicd->codigo_sicd}" : $motivo,
-                    'aprobado_por'       => Auth::user()->name,
-                    'usuario_id'         => Auth::id(),
-                    'origen'             => $sicd ? 'sicd' : null,
-                    'origen_id'          => $sicd ? $sicd->id : null,
-                    'origen_tipo'        => $sicd ? 'sicd' : 'entrada_manual',
-                    'doc_origen'         => $sicd ? 'SICD ' . $sicd->codigo_sicd : null,
-                    'stock_anterior'     => $stockAntes,
-                    'stock_posterior'    => $producto->stock_actual,
-                    'usuario_ejecutor_id'=> Auth::id(),
-                ]);
+                    HistorialCambio::withoutObservers(function () use ($producto, $cantidadReal, $sicd, $motivo, $stockAntes) {
+                        HistorialCambio::create([
+                            'producto_id'        => $producto->id,
+                            'nombre_producto'    => $producto->nombre,
+                            'contenedor_id'      => $producto->contenedor,
+                            'cantidad'           => $cantidadReal,
+                            'tipo'               => 'entrada',
+                            'motivo'             => $sicd ? "Carga masiva – SICD {$sicd->codigo_sicd}" : $motivo,
+                            'aprobado_por'       => Auth::user()->name,
+                            'usuario_id'         => Auth::id(),
+                            'origen'             => $sicd ? 'sicd' : null,
+                            'origen_id'          => $sicd ? $sicd->id : null,
+                            'origen_tipo'        => $sicd ? 'sicd' : 'entrada_manual',
+                            'doc_origen'         => $sicd ? 'SICD ' . $sicd->codigo_sicd : null,
+                            'stock_anterior'     => $stockAntes,
+                            'stock_posterior'    => $producto->stock_actual,
+                            'usuario_ejecutor_id'=> Auth::id(),
+                        ]);
+                    });
+                    $batchProductos[] = [
+                        'nombre'   => $producto->nombre,
+                        'cantidad' => $cantidadReal,
+                        'stock'    => $stockAntes . ' → ' . $producto->stock_actual,
+                    ];
                 }
 
                 $actualizados++;
             }
         });
+
+        // Despachar UN solo correo resumen si hubo ingresos de stock
+        if (!empty($batchProductos) && !$vincularOc) {
+            \App\Events\EventoErpNotificable::dispatch(
+                'carga_masiva',
+                null,
+                null,
+                [
+                    'evento'         => 'carga_masiva',
+                    'codigo_sicd'    => $sicd?->codigo_sicd,
+                    'centro_costo_id'=> auth()->user()->centro_costo_id,
+                    'usuario'        => Auth::user()->name,
+                    'productos'      => $batchProductos,
+                    'total'          => count($batchProductos),
+                ]
+            );
+        }
 
         if ($vincularOc && $sicd) {
             $msg = "SICD {$sicd->codigo_sicd} creado con {$sicd->detalles()->count()} producto(s). Stock pendiente — asígnalo a una Orden de Compra para recibirlo.";
@@ -2075,7 +2100,6 @@ class AdminController extends Controller
                 $q->whereNotNull('documento_blob')
                     ->orWhereNotNull('documento_ruta');
             })
-            ->whereDoesntHave('detalles')
             ->exists();
     }
 }

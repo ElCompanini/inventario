@@ -160,17 +160,29 @@
     html.dark #modal-vp [style*="background:#f8fafc"] { background:#0f172a !important; }
     html.dark #modal-vp [style*="background:#fff"] { background:#1e293b !important; }
 
-    html.dark .oc-pend-alerta { background: #1e293b !important; border-color: rgba(217,119,6,0.4) !important; }
+    @keyframes oc-pend-tilt {
+        0%, 100% { box-shadow: 0 0 0 rgba(217,119,6,0); border-color: rgba(217,119,6,0.22); }
+        50% { box-shadow: 0 0 0 3px rgba(217,119,6,0.16), 0 0 18px rgba(217,119,6,0.32); border-color: rgba(217,119,6,0.7); }
+    }
+    .oc-pend-alerta {
+        animation: oc-pend-tilt 1.15s ease-in-out infinite;
+    }
+    .oc-pend-alerta .oc-pend-cantidad,
+    .oc-pend-alerta .oc-pend-texto,
+    .oc-pend-alerta .oc-pend-icono {
+        animation: factura-text-tilt 1.15s ease-in-out infinite;
+    }
+    html.dark .oc-pend-alerta { background: #1e293b !important; }
     html.dark .oc-pend-alerta p[style*="color:#d97706"] { color: #fbbf24 !important; }
     html.dark .oc-pend-alerta span[style*="color:#d97706"] { color: #fbbf24 !important; }
 
     @keyframes factura-pendiente-tilt {
         0%, 100% { box-shadow: 0 0 0 rgba(249,115,22,0); border-color: rgba(249,115,22,0.22); }
-        45% { box-shadow: 0 0 0 3px rgba(249,115,22,0.16), 0 0 18px rgba(249,115,22,0.32); border-color: rgba(249,115,22,0.7); }
+        50% { box-shadow: 0 0 0 3px rgba(249,115,22,0.16), 0 0 18px rgba(249,115,22,0.32); border-color: rgba(249,115,22,0.7); }
     }
     @keyframes factura-text-tilt {
-        0%, 100% { opacity: 1; }
-        50% { opacity: .45; }
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 1; }
     }
     .factura-pendiente-alerta {
         animation: factura-pendiente-tilt 1.15s ease-in-out infinite;
@@ -214,7 +226,7 @@
 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
 
     {{-- FACTURAS PENDIENTES --}}
-    <a href="{{ route('admin.ordenes.index', ['factura' => 'pendiente']) }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 {{ $facturasPendientesCount > 0 ? 'factura-pendiente-alerta' : '' }}">
+    <a href="{{ route('admin.ordenes.index', ['factura' => 'pendiente']) }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border p-4 {{ $facturasPendientesCount > 0 ? 'factura-pendiente-alerta' : 'border-gray-100 dark:border-slate-700' }}" style="{{ $facturasPendientesCount > 0 ? 'border-color:rgba(217,119,6,0.6);' : '' }}">
         <div class="flex items-center justify-between mb-2">
             <span class="dash-section-title">Facturas Pendientes</span>
             <div class="factura-alerta-icono w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-900/25 flex items-center justify-center">
@@ -233,18 +245,18 @@
     <a href="{{ route('admin.oc-pendientes.index') }}" class="kpi-card block bg-white rounded-xl shadow-sm border p-4 {{ $ocItemsPendientesCount > 0 ? 'oc-pend-alerta' : 'border-gray-100' }}" style="{{ $ocItemsPendientesCount > 0 ? 'border-color:rgba(217,119,6,0.35);' : '' }}">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem;">
             <span class="dash-section-title">Productos a revisar</span>
-            <div style="width:2rem; height:2rem; border-radius:0.5rem; background:#fef3c7; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <div class="oc-pend-icono" style="width:2rem; height:2rem; border-radius:0.5rem; background:#fef3c7; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
                 <svg style="width:1rem;height:1rem;" fill="none" stroke="#d97706" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
             </div>
         </div>
-        <p style="font-size:1.5rem; font-weight:700; color:{{ $ocItemsPendientesCount > 0 ? '#d97706' : '#111827' }};">
+        <p class="oc-pend-cantidad" style="font-size:1.5rem; font-weight:700; color:{{ $ocItemsPendientesCount > 0 ? '#d97706' : '#111827' }};">
             {{ $num($ocItemsPendientesCount) }}
         </p>
         <p style="font-size:0.75rem; color:#6b7280; margin-top:0.125rem;">de OC sin asignar</p>
         <div style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid #f1f5f9;">
-            <span style="font-size:0.75rem; font-weight:600; color:{{ $ocItemsPendientesCount > 0 ? '#d97706' : '#6b7280' }};">
+            <span class="oc-pend-texto" style="font-size:0.75rem; font-weight:600; color:{{ $ocItemsPendientesCount > 0 ? '#d97706' : '#6b7280' }};">
                 {{ $ocItemsPendientesCount > 0 ? 'Requieren atención →' : 'Todo al día ✓' }}
             </span>
         </div>

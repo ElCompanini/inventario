@@ -105,7 +105,7 @@ class SicdController extends Controller
         }
 
         if (!$solicitud) {
-            return response()->json(['valido' => false, 'mensaje' => 'CÃ³digo SICD no encontrado en el sistema.']);
+            return response()->json(['valido' => false, 'mensaje' => 'Código SICD no encontrado en el sistema.']);
         }
 
         // El cÃ³digo real siempre es num_int_sol del registro encontrado

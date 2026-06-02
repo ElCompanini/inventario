@@ -1718,12 +1718,27 @@ function escHtmlGm(str) {
                             </p>
                         </div>
 
-                        <div>
-                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                Nombre del Proveedor <span style="color:#ef4444;">*</span>
-                            </label>
-                            <input type="text" name="proveedor_nombre" id="ai-prov-nombre" placeholder="Ej: COMERCIALIZADORA TECNO SUR SPA"
-                                style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; text-transform:uppercase;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Nombre del Proveedor <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="text" name="proveedor_nombre" id="ai-prov-nombre" placeholder="Ej: COMERCIALIZADORA TECNO SUR SPA"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; text-transform:uppercase;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Centro de costo
+                                </label>
+                                <select id="ai-cc-sel" name="centro_costo_id"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; background:#fff;"
+                                    onchange="aiCcFiltrarProductos()">
+                                    <option value="">— Todos —</option>
+                                    @foreach($todosCentrosCosto as $cc)
+                                    <option value="{{ $cc->id }}" {{ auth()->user()->centro_costo_id == $cc->id ? 'selected' : '' }}>{{ $cc->acronimo }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
 
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
@@ -1806,14 +1821,15 @@ function escHtmlGm(str) {
                             </p>
                         </div>
 
-                        {{-- Código SICD --}}
-                        <div>
-                            <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
-                                Código SICD <span style="color:#ef4444;">*</span>
-                            </label>
-                            <input type="text" name="codigo_sicd" id="ai-codigo-sicd" placeholder="Ej: TIC(S)/81"
-                                style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
-                            <span id="ai-codigo-hint" style="font-size:0.7rem; margin-top:0.35rem; display:flex; align-items:center; gap:0.3rem;"></span>
+                        {{-- Código SICD + Centro de costo --}}
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Código SICD <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="text" name="codigo_sicd" id="ai-codigo-sicd" placeholder="Ej: TIC(S)/81"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box;">
+                                <span id="ai-codigo-hint" style="font-size:0.7rem; margin-top:0.35rem; display:flex; align-items:center; gap:0.3rem;"></span>
                             {{-- Advertencia leve: SICD ya ingresada --}}
                             <div id="ai-sicd-ya-ingresada" class="ai-warn-ya-ingresada" style="display:none; margin-top:0.4rem;">
                                 <svg style="width:14px;height:14px;flex-shrink:0;color:#d97706;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -1822,7 +1838,20 @@ function escHtmlGm(str) {
                                 <span style="font-size:0.72rem; font-weight:500;">Esta SICD ya fue ingresada · Estado: <strong id="ai-sicd-ya-estado-leve"></strong></span>
                             </div>
                             <div id="ai-sicd-info" style="display:none; margin-top:0.4rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.4rem; padding:0.35rem 0.6rem; font-size:0.72rem; color:#166534;"></div>
-                        </div>
+                            </div>{{-- /Código SICD --}}
+                            <div>
+                                <label style="display:block; font-size:0.75rem; font-weight:600; color:#374151; margin-bottom:0.25rem;">
+                                    Centro de costo
+                                </label>
+                                <select id="ai-cc-sel-ext" name="centro_costo_id_ext"
+                                    style="width:100%; border:1px solid #d1d5db; border-radius:0.5rem; padding:0.4rem 0.65rem; font-size:0.8rem; box-sizing:border-box; background:#fff;">
+                                    <option value="">— Todos —</option>
+                                    @foreach($todosCentrosCosto as $cc)
+                                    <option value="{{ $cc->id }}" {{ auth()->user()->centro_costo_id == $cc->id ? 'selected' : '' }}>{{ $cc->acronimo }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>{{-- /grid Código SICD + CC --}}
 
 
                         {{-- Sección de carga — oculta hasta que el código SICD sea válido --}}
@@ -2093,11 +2122,18 @@ function escHtmlGm(str) {
     .dt-btn-pdf { background:#dc2626; color:#fff; padding:0.375rem 0.75rem; font-size:0.75rem; font-weight:600; border-radius:0.5rem; transition:background .2s, transform .15s; }
     .dt-btn-pdf:hover { background:#b91c1c; transform:translateY(-1px); animation:btn-breathe-red 1.6s ease-in-out infinite; }
 
+    /* ── Centro de costo selector — dark mode ── */
+    html.dark #ai-cc-sel,
+    html.dark #ai-cc-sel-ext {
+        background: #1e293b; border-color: #475569; color: #e2e8f0;
+    }
+
     /* ── Buscador manual (carga manual) dark mode ── */
     html.dark #ai-buscador-manual {
         background: #1e293b; border-color: #475569; color: #e2e8f0;
     }
     html.dark #ai-buscador-manual::placeholder { color: #64748b; }
+    html.dark #ai-resultados,
     html.dark #ai-resultados-manual {
         background: #1e293b !important; border-color: #334155 !important;
         box-shadow: 0 4px 16px rgba(0,0,0,.45) !important;
@@ -3371,6 +3407,7 @@ $aiProductosJson = json_encode(
         'id'             => $p->id,
         'nombre'         => $p->nombre,
         'stock'          => $p->stock_actual,
+        'cc_id'          => $p->centro_costo_id,
         'contenedor_id'    => $p->contenedor,
         'contenedor_nombre'=> $p->container?->nombre ?? '—',
         'unidad'           => $p->unidadMedida?->abreviacion ?? $p->unidad ?? '',
@@ -4279,16 +4316,26 @@ document.getElementById('ai-codigo-sicd').addEventListener('input', function() {
     }
 });
 
+function aiCcFiltrarProductos() {
+    var buscador = document.getElementById('ai-buscador');
+    if (buscador && buscador.value.trim().length >= 1) buscador.dispatchEvent(new Event('input'));
+}
+
 document.getElementById('ai-buscador').addEventListener('input', function() {
     var qOrig = this.value.trim();
     var q     = qOrig.toLowerCase();
     var res   = document.getElementById('ai-resultados');
     if (q.length < 1) { res.style.display = 'none'; return; }
+    var ccSel = document.getElementById('ai-cc-sel');
+    var ccId  = ccSel ? (parseInt(ccSel.value) || null) : null;
     var matches = aiProductos.filter(function(p) {
-        return p.nombre.toLowerCase().indexOf(q) >= 0;
+        var nameOk = p.nombre.toLowerCase().indexOf(q) >= 0;
+        var ccOk   = !ccId || p.cc_id == ccId;
+        return nameOk && ccOk;
     }).slice(0, 10);
 
     var _dm        = document.documentElement.classList.contains('dark');
+    var rowBg      = _dm ? '#1e293b'  : '';
     var rowBorder  = _dm ? '#334155'  : '#f3f4f6';
     var rowHover   = _dm ? '#312e81'  : '#fef3c7';
     var rowText    = _dm ? '#e2e8f0'  : '#1f2937';
@@ -4300,8 +4347,8 @@ document.getElementById('ai-buscador').addEventListener('input', function() {
 
     var html = matches.map(function(p) {
         return '<div onclick="aiAgregar(' + p.id + ',\'' + p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')"'
-            + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid ' + rowBorder + ';"'
-            + ' onmouseover="this.style.background=\'' + rowHover + '\'" onmouseout="this.style.background=\'\'">'
+            + ' style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid ' + rowBorder + ';background:' + rowBg + ';"'
+            + ' onmouseover="this.style.background=\'' + rowHover + '\'" onmouseout="this.style.background=\'' + rowBg + '\'">'
             + '<p style="font-size:0.8rem;font-weight:600;color:' + rowText + ';">' + escHtmlAi(p.nombre) + '</p>'
             + '<p style="font-size:0.72rem;color:' + rowSub + ';">Stock: ' + p.stock + '</p>'
             + '</div>';

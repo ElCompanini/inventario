@@ -63,6 +63,28 @@ class OcItemPendienteController extends Controller
         return back()->with('success', 'Ítem marcado como pendiente de revisión.');
     }
 
+    /** POST /admin/ordenes/{oc}/detalles/{det}/confirmar — confirmar recibimiento de un ítem */
+    public function confirmarDetalle(Request $request, int $ocId, int $detId)
+    {
+        abort_unless(auth()->user()->tienePermiso('ordenes'), 403);
+
+        $oc      = OrdenCompra::with('sicds')->findOrFail($ocId);
+        $sicdIds = $oc->sicds->pluck('id');
+
+        $det = \App\Models\SicdDetalle::whereIn('sicd_id', $sicdIds)->findOrFail($detId);
+
+        if ((int) $det->cantidad_recibida >= (int) $det->cantidad_solicitada) {
+            return back()->with('error', 'Este ítem ya fue confirmado.');
+        }
+
+        $det->update([
+            'cantidad_recibida'       => $det->cantidad_solicitada,
+            'clasificacion_pendiente' => false,
+        ]);
+
+        return back()->with('success', 'Ítem confirmado como recibido correctamente.');
+    }
+
     /** GET /admin/oc-pendientes — página de resolución */
     public function index()
     {

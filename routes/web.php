@@ -146,6 +146,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/oc-pendientes/buscar-producto', [OcItemPendienteController::class, 'buscarProducto'])->name('oc-pendientes.buscar-producto');
     Route::get('/oc-pendientes', [OcItemPendienteController::class, 'index'])->name('oc-pendientes.index');
     Route::post('/ordenes/{oc}/items-pendientes', [OcItemPendienteController::class, 'store'])->name('oc-pendientes.store');
+    Route::post('/ordenes/{oc}/detalles/{det}/confirmar', [OcItemPendienteController::class, 'confirmarDetalle'])->name('oc-pendientes.confirmar');
     Route::post('/oc-pendientes/{id}/resolver', [OcItemPendienteController::class, 'resolver'])->name('oc-pendientes.resolver');
     Route::delete('/oc-pendientes/{id}', [OcItemPendienteController::class, 'destroy'])->name('oc-pendientes.destroy');
 

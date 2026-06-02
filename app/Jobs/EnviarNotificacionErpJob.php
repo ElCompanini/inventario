@@ -116,12 +116,68 @@ class EnviarNotificacionErpJob implements ShouldQueue
             ->where('tipo_correo', $this->tipoCorreo)
             ->when($this->historialCambioId, fn($q) => $q->where('historial_cambio_id', $this->historialCambioId))
             ->when($this->solicitudId, fn($q) => $q->where('solicitud_id', $this->solicitudId))
+            ->when(
+                $this->tipoCorreo === 'recepcion_oc' && !empty($this->metadata['orden_compra_id']),
+                fn($q) => $q->where('metadata->orden_compra_id', $this->metadata['orden_compra_id'])
+            )
             ->whereIn('estado', ['pendiente', 'enviado'])
             ->exists();
     }
 
     private function resolverContexto(): ?array
     {
+        // Carga masiva: el contexto viene completo en metadata
+        if ($this->tipoCorreo === 'carga_masiva') {
+            $meta = $this->metadata;
+            if (empty($meta['centro_costo_id'])) return null;
+            return [
+                'tipo_correo'    => 'carga_masiva',
+                'tipo_label'     => 'Carga masiva de stock',
+                'centro_costo_id'=> $meta['centro_costo_id'],
+                'usuario'        => $meta['usuario'] ?? '—',
+                'codigo_sicd'    => $meta['codigo_sicd'] ?? null,
+                'productos'      => $meta['productos'] ?? [],
+                'total'          => $meta['total'] ?? 0,
+                'fecha'          => now(),
+                'documento'      => $meta['codigo_sicd'] ? 'SICD ' . $meta['codigo_sicd'] : null,
+                'producto'       => null,
+                'cantidad'       => null,
+                'container'      => null,
+                'centro_costo'   => null,
+                'motivo'         => null,
+                'referencia'     => null,
+                'stock_anterior' => null,
+                'stock_posterior'=> null,
+            ];
+        }
+
+        // Recepción de Orden de Compra: un único correo con todos los productos
+        if ($this->tipoCorreo === 'recepcion_oc') {
+            $meta = $this->metadata;
+            if (empty($meta['centro_costo_id'])) return null;
+            $cc = \App\Models\CentroCosto::find($meta['centro_costo_id']);
+            return [
+                'tipo_correo'     => 'recepcion_oc',
+                'tipo_label'      => 'Recepción de Orden de Compra',
+                'centro_costo_id' => $meta['centro_costo_id'],
+                'centro_costo'    => $cc?->acronimo,
+                'numero_oc'       => $meta['numero_oc'] ?? null,
+                'usuario'         => $meta['usuario'] ?? '—',
+                'productos'       => $meta['productos'] ?? [],
+                'total'           => $meta['total'] ?? 0,
+                'pendientes'      => $meta['pendientes'] ?? [],
+                'fecha'           => now(),
+                'documento'       => $meta['numero_oc'] ? 'OC ' . $meta['numero_oc'] : null,
+                'producto'        => null,
+                'cantidad'        => null,
+                'container'       => null,
+                'motivo'          => null,
+                'referencia'      => null,
+                'stock_anterior'  => null,
+                'stock_posterior' => null,
+            ];
+        }
+
         if ($this->historialCambioId) {
             $mov = HistorialCambio::withTrashed()
                 ->with([
@@ -273,6 +329,8 @@ class EnviarNotificacionErpJob implements ShouldQueue
             'retiro_productos' => 'Retiro de productos',
             'armado_equipos' => 'Armado de equipos',
             'ingreso_stock' => 'Ingreso de stock',
+            'carga_masiva'  => 'Carga masiva de stock',
+            'recepcion_oc'  => 'Recepción de Orden de Compra',
             'devolucion_productos' => 'Devolucion de productos',
             'stock_minimo' => 'Stock minimo',
             'stock_critico' => 'Stock critico',

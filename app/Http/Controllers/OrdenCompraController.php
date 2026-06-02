@@ -36,7 +36,10 @@ class OrdenCompraController extends Controller
 
         if ($filtroFactura === 'pendiente') {
             $query->whereDoesntHave('factura')
-                ->whereNotIn('estado', ['recibido', 'cerrado', 'cancelado', 'anulado']);
+                ->where(function ($q) {
+                    $q->whereNotIn('estado', ['recibido', 'cerrado', 'cancelado', 'anulado'])
+                      ->orWhere('factura_pendiente', true);
+                });
         }
 
         if ($user->tieneFiltroCC()) {
@@ -271,7 +274,9 @@ class OrdenCompraController extends Controller
         if (count($idsEstaOc) > 0) {
             $pendientesIds = $pendientesOcItems->keys()->toArray();
             $ocDetSinProducto = $oc->detalles->filter(fn($d) =>
-                !$d->sicdDetalle?->producto_id && !in_array($d->sicd_detalle_id, $pendientesIds)
+                !$d->sicdDetalle?->producto_id &&
+                !in_array($d->sicd_detalle_id, $pendientesIds) &&
+                (int)($d->sicdDetalle?->cantidad_recibida ?? 0) < (int)($d->sicdDetalle?->cantidad_solicitada ?? 1)
             )->count();
         }
 
@@ -386,7 +391,9 @@ class OrdenCompraController extends Controller
                 ->pluck('sicd_detalle_id')
                 ->toArray();
             $sinDefinir = $oc->detalles->filter(fn($d) =>
-                !$d->sicdDetalle?->producto_id && !in_array($d->sicd_detalle_id, $pendientesIds)
+                !$d->sicdDetalle?->producto_id &&
+                !in_array($d->sicd_detalle_id, $pendientesIds) &&
+                (int)($d->sicdDetalle?->cantidad_recibida ?? 0) < (int)($d->sicdDetalle?->cantidad_solicitada ?? 1)
             )->count();
             if ($sinDefinir > 0) {
                 return back()->with('error',
@@ -592,7 +599,10 @@ class OrdenCompraController extends Controller
         $userName = Auth::user()->name;
         $userId   = Auth::id();
 
-        DB::transaction(function () use ($id, $request, $userName, $userId, &$oc) {
+        $productosEmail    = [];
+        $centroCostoEmail  = null;
+
+        DB::transaction(function () use ($id, $request, $userName, $userId, &$oc, &$productosEmail, &$centroCostoEmail) {
             $oc = OrdenCompra::whereKey($id)->lockForUpdate()->firstOrFail();
             $oc->load([
                 'detalles.sicdDetalle.producto',
@@ -613,11 +623,24 @@ class OrdenCompraController extends Controller
                 throw new \RuntimeException('Sube la factura antes de procesar la recepcion.');
             }
 
+            // IDs de sicd_detalles marcados como pendientes — se excluyen de recibidos
+            $sicdDetalleIdsPendientes = \App\Models\OcItemPendiente::where('orden_compra_id', $oc->id)
+                ->whereNull('resuelto_at')
+                ->whereNull('deleted_at')
+                ->pluck('sicd_detalle_id')
+                ->toArray();
+
             // Agrupar los oc_detalles por SICD para poder actualizar el estado de cada SICD
             $sicdIds = [];
 
             foreach ($oc->detalles as $ocDetalle) {
                 $detalle = $ocDetalle->sicdDetalle;
+
+                // Saltar ítems marcados como pendientes de revisión
+                if (in_array($detalle->id, $sicdDetalleIdsPendientes)) {
+                    continue;
+                }
+
                 $sicd    = $detalle->sicd;
                 $recibido = (int) $request->input("recibido.{$ocDetalle->id}", 0);
 
@@ -705,6 +728,17 @@ class OrdenCompraController extends Controller
                         'usuario_ejecutor_id'=> $userId,
                     ]);
 
+                    if (!$centroCostoEmail) {
+                        $centroCostoEmail = $producto->centro_costo_id;
+                    }
+                    $contNombre = Container::withoutGlobalScope('con_cc')->find($producto->contenedor)?->nombre;
+                    $productosEmail[] = [
+                        'nombre'    => $producto->nombre,
+                        'cantidad'  => $recibido,
+                        'stock'     => $producto->stock_actual,
+                        'container' => $contNombre,
+                    ];
+
                     $precioNeto = $ocDetalle->precio_neto ?? $detalle->precio_neto;
                     $totalNeto  = $ocDetalle->total_neto  ?? $detalle->total_neto;
                     if ($precioNeto && $precioNeto > 0) {
@@ -754,6 +788,31 @@ class OrdenCompraController extends Controller
                 $sicd->save();
             }
         });
+
+        if (!empty($productosEmail)) {
+            $pendientesEmail = \App\Models\OcItemPendiente::where('orden_compra_id', $oc->id)
+                ->whereNull('resuelto_at')
+                ->whereNull('deleted_at')
+                ->with('sicdDetalle')
+                ->get()
+                ->map(fn($p) => [
+                    'nombre' => $p->sicdDetalle?->nombre_producto_excel ?? '—',
+                    'motivo' => $p->motivoLabel(),
+                    'notas'  => $p->notas,
+                ])
+                ->toArray();
+
+            \App\Jobs\EnviarNotificacionErpJob::dispatch('recepcion_oc', null, null, [
+                'evento'          => 'recepcion_oc',
+                'centro_costo_id' => $centroCostoEmail,
+                'numero_oc'       => $oc->numero_oc,
+                'orden_compra_id' => $oc->id,
+                'usuario'         => $userName,
+                'productos'       => $productosEmail,
+                'total'           => count($productosEmail),
+                'pendientes'      => $pendientesEmail,
+            ])->afterCommit();
+        }
 
         return redirect()->route('admin.ordenes.show', $oc->id)
             ->with('success', "Recepción de OC {$oc->numero_oc} registrada. Stock actualizado.");
@@ -1366,13 +1425,26 @@ class OrdenCompraController extends Controller
 
     private function recibirOcConFacturaPendiente(OrdenCompra $oc): void
     {
-        $userName = Auth::user()->name;
-        $userId   = Auth::id();
-        $sicds    = [];
+        $userName         = Auth::user()->name;
+        $userId           = Auth::id();
+        $sicds            = [];
+        $productosEmail   = [];
+        $centroCostoEmail = null;
+
+        $sicdDetalleIdsPendientes = \App\Models\OcItemPendiente::where('orden_compra_id', $oc->id)
+            ->whereNull('resuelto_at')
+            ->whereNull('deleted_at')
+            ->pluck('sicd_detalle_id')
+            ->toArray();
 
         foreach ($oc->detalles as $ocDetalle) {
             $detalle = $ocDetalle->sicdDetalle;
             if (!$detalle) {
+                continue;
+            }
+
+            // Saltar ítems marcados como pendientes de revisión
+            if (in_array($detalle->id, $sicdDetalleIdsPendientes)) {
                 continue;
             }
 
@@ -1435,6 +1507,17 @@ class OrdenCompraController extends Controller
                 'usuario_ejecutor_id'=> $userId,
             ]);
 
+            if (!$centroCostoEmail) {
+                $centroCostoEmail = $producto->centro_costo_id;
+            }
+            $contNombre = \App\Models\Container::withoutGlobalScope('con_cc')->find($producto->contenedor)?->nombre;
+            $productosEmail[] = [
+                'nombre'    => $producto->nombre,
+                'cantidad'  => $recibido,
+                'stock'     => $producto->stock_actual,
+                'container' => $contNombre,
+            ];
+
             $precioNeto = $ocDetalle->precio_neto ?? $detalle->precio_neto;
             $totalNeto  = $ocDetalle->total_neto  ?? $detalle->total_neto;
             if ($precioNeto && $precioNeto > 0) {
@@ -1474,6 +1557,31 @@ class OrdenCompraController extends Controller
             'usuario_id' => $userId,
             'fecha_hora' => now()->toDateTimeString(),
         ]);
+
+        if (!empty($productosEmail)) {
+            $pendientesEmail = \App\Models\OcItemPendiente::where('orden_compra_id', $oc->id)
+                ->whereNull('resuelto_at')
+                ->whereNull('deleted_at')
+                ->with('sicdDetalle')
+                ->get()
+                ->map(fn($p) => [
+                    'nombre' => $p->sicdDetalle?->nombre_producto_excel ?? '—',
+                    'motivo' => $p->motivoLabel(),
+                    'notas'  => $p->notas,
+                ])
+                ->toArray();
+
+            \App\Jobs\EnviarNotificacionErpJob::dispatch('recepcion_oc', null, null, [
+                'evento'          => 'recepcion_oc',
+                'centro_costo_id' => $centroCostoEmail,
+                'numero_oc'       => $oc->numero_oc,
+                'orden_compra_id' => $oc->id,
+                'usuario'         => $userName,
+                'productos'       => $productosEmail,
+                'total'           => count($productosEmail),
+                'pendientes'      => $pendientesEmail,
+            ])->afterCommit();
+        }
     }
 
     private function guardarArchivoDocumento(\Illuminate\Http\UploadedFile $archivo, string $directorio): string

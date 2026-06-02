@@ -57,6 +57,20 @@
             'desc'    => 'ALERTA: El stock de este producto ha alcanzado nivel crítico. Se requiere acción inmediata.',
             'badge'   => 'STOCK CRÍTICO',
         ],
+        'carga_masiva' => [
+            'color'   => '#0e7490',
+            'light'   => '#cffafe',
+            'icon'    => '📥',
+            'desc'    => 'Se completó una carga masiva de inventario. A continuación el detalle de productos ingresados.',
+            'badge'   => 'CARGA MASIVA',
+        ],
+        'recepcion_oc' => [
+            'color'   => '#047857',
+            'light'   => '#d1fae5',
+            'icon'    => '✅',
+            'desc'    => 'Se completó la recepción de una Orden de Compra. A continuación el detalle de productos ingresados al inventario.',
+            'badge'   => 'RECEPCIÓN OC',
+        ],
         default => [
             'color'   => '#0f172a',
             'light'   => '#f1f5f9',
@@ -66,9 +80,11 @@
         ],
     };
 
-    $esAlertaStock = in_array($tipo, ['stock_minimo', 'stock_critico']);
-    $esSolicitud   = $tipo === 'solicitud_productos';
-    $esArmado      = $tipo === 'armado_equipos';
+    $esAlertaStock  = in_array($tipo, ['stock_minimo', 'stock_critico']);
+    $esSolicitud    = $tipo === 'solicitud_productos';
+    $esArmado       = $tipo === 'armado_equipos';
+    $esCargaMasiva  = $tipo === 'carga_masiva';
+    $esRecepcionOc  = $tipo === 'recepcion_oc';
 @endphp
 <!doctype html>
 <html lang="es">
@@ -138,22 +154,32 @@
                                 <td style="padding:9px 12px; border-bottom:1px solid #e5e7eb;">{{ $contexto['centro_costo'] ?? 'No informado' }}</td>
                             </tr>
 
-                            {{-- Producto (solo si no es alerta, ya se mostró arriba) --}}
-                            @if(!$esAlertaStock)
+                            {{-- Número OC (solo para recepcion_oc) --}}
+                            @if($esRecepcionOc && !empty($contexto['numero_oc']))
+                            <tr style="background:#f9fafb;">
+                                <td style="padding:9px 12px; border-bottom:1px solid #e5e7eb; color:#6b7280; font-weight:600;">Orden de Compra</td>
+                                <td style="padding:9px 12px; border-bottom:1px solid #e5e7eb; font-family:monospace; font-weight:700; color:#047857;">{{ $contexto['numero_oc'] }}</td>
+                            </tr>
+                            @endif
+
+                            {{-- Producto (solo si no es alerta ni recepcion_oc, ya se muestra en tabla) --}}
+                            @if(!$esAlertaStock && !$esRecepcionOc)
                             <tr style="background:#f9fafb;">
                                 <td style="padding:9px 12px; border-bottom:1px solid #e5e7eb; color:#6b7280; font-weight:600;">Producto</td>
                                 <td style="padding:9px 12px; border-bottom:1px solid #e5e7eb; font-weight:600;">{{ $contexto['producto'] ?? 'No informado' }}</td>
                             </tr>
                             @endif
 
-                            {{-- Cantidad --}}
+                            {{-- Cantidad (no para recepcion_oc, se detalla por producto en la tabla) --}}
+                            @if(!$esRecepcionOc)
                             <tr @if(!$esAlertaStock) style="background:#f9fafb;" @endif>
                                 <td style="padding:9px 12px; border-bottom:1px solid #e5e7eb; color:#6b7280; font-weight:600;">Cantidad</td>
                                 <td style="padding:9px 12px; border-bottom:1px solid #e5e7eb;">{{ $contexto['cantidad'] ?? 'No informado' }}</td>
                             </tr>
+                            @endif
 
-                            {{-- Container (no para alertas de stock) --}}
-                            @if(!$esAlertaStock)
+                            {{-- Container (no para alertas de stock ni recepcion_oc —el detalle va por producto en la tabla) --}}
+                            @if(!$esAlertaStock && !$esRecepcionOc)
                             <tr>
                                 <td style="padding:9px 12px; border-bottom:1px solid #e5e7eb; color:#6b7280; font-weight:600;">Container</td>
                                 <td style="padding:9px 12px; border-bottom:1px solid #e5e7eb;">{{ $contexto['container'] ?? 'No informado' }}</td>
@@ -217,6 +243,94 @@
                         <div style="margin-top:16px; background:#fef3c7; border:1px solid #fcd34d; border-radius:4px; padding:12px 16px; font-size:13px; color:#92400e;">
                             ⚠️ Se recomienda gestionar una orden de reposición a la brevedad.
                         </div>
+                        @endif
+
+                        {{-- Tabla de productos para carga masiva --}}
+                        @if($esCargaMasiva && !empty($contexto['productos']))
+                        <div style="margin-top:18px;">
+                            <div style="font-size:12px; font-weight:700; color:#0e7490; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">
+                                {{ $contexto['total'] ?? count($contexto['productos']) }} producto(s) ingresado(s)
+                                @if(!empty($contexto['codigo_sicd'])) · SICD {{ $contexto['codigo_sicd'] }} @endif
+                            </div>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                                   style="border-collapse:collapse; font-size:12px; border:1px solid #e5e7eb;">
+                                <thead>
+                                    <tr style="background:#0e7490;">
+                                        <th style="padding:7px 10px; text-align:left; color:#fff; font-weight:700;">Producto</th>
+                                        <th style="padding:7px 10px; text-align:center; color:#fff; font-weight:700; width:80px;">Cantidad</th>
+                                        <th style="padding:7px 10px; text-align:center; color:#fff; font-weight:700; width:100px;">Stock</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($contexto['productos'] as $i => $prod)
+                                    <tr style="background:{{ $i % 2 === 0 ? '#f9fafb' : '#ffffff' }};">
+                                        <td style="padding:7px 10px; border-top:1px solid #e5e7eb; color:#111827;">{{ $prod['nombre'] }}</td>
+                                        <td style="padding:7px 10px; border-top:1px solid #e5e7eb; text-align:center; color:#0e7490; font-weight:700;">+{{ $prod['cantidad'] }}</td>
+                                        <td style="padding:7px 10px; border-top:1px solid #e5e7eb; text-align:center; color:#6b7280; font-size:11px;">{{ $prod['stock'] }}</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @endif
+
+                        {{-- Tabla de productos para recepción OC --}}
+                        @if($esRecepcionOc && !empty($contexto['productos']))
+                        <div style="margin-top:18px;">
+                            <div style="font-size:12px; font-weight:700; color:#047857; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">
+                                {{ $contexto['total'] ?? count($contexto['productos']) }} producto(s) recibido(s)
+                                @if(!empty($contexto['numero_oc'])) · OC {{ $contexto['numero_oc'] }} @endif
+                            </div>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                                   style="border-collapse:collapse; font-size:12px; border:1px solid #e5e7eb;">
+                                <thead>
+                                    <tr style="background:#047857;">
+                                        <th style="padding:7px 10px; text-align:left; color:#fff; font-weight:700;">Producto</th>
+                                        <th style="padding:7px 10px; text-align:left; color:#fff; font-weight:700; width:120px;">Lugar</th>
+                                        <th style="padding:7px 10px; text-align:center; color:#fff; font-weight:700; width:70px;">Cant.</th>
+                                        <th style="padding:7px 10px; text-align:center; color:#fff; font-weight:700; width:90px;">Stock actual</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($contexto['productos'] as $i => $prod)
+                                    <tr style="background:{{ $i % 2 === 0 ? '#f9fafb' : '#ffffff' }};">
+                                        <td style="padding:7px 10px; border-top:1px solid #e5e7eb; color:#111827;">{{ $prod['nombre'] }}</td>
+                                        <td style="padding:7px 10px; border-top:1px solid #e5e7eb; color:#6b7280; font-size:11px;">{{ $prod['container'] ?? '—' }}</td>
+                                        <td style="padding:7px 10px; border-top:1px solid #e5e7eb; text-align:center; color:#047857; font-weight:700;">+{{ $prod['cantidad'] }}</td>
+                                        <td style="padding:7px 10px; border-top:1px solid #e5e7eb; text-align:center; color:#6b7280; font-size:11px;">{{ $prod['stock'] }}</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {{-- Tabla de ítems pendientes de revisión --}}
+                        @if(!empty($contexto['pendientes']))
+                        <div style="margin-top:14px;">
+                            <div style="font-size:12px; font-weight:700; color:#92400e; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">
+                                {{ count($contexto['pendientes']) }} ítem(s) pendiente(s) de revisión
+                            </div>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                                   style="border-collapse:collapse; font-size:12px; border:1px solid #fde68a;">
+                                <thead>
+                                    <tr style="background:#d97706;">
+                                        <th style="padding:7px 10px; text-align:left; color:#fff; font-weight:700;">Producto</th>
+                                        <th style="padding:7px 10px; text-align:left; color:#fff; font-weight:700; width:160px;">Motivo</th>
+                                        <th style="padding:7px 10px; text-align:left; color:#fff; font-weight:700; width:180px;">Notas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($contexto['pendientes'] as $i => $pend)
+                                    <tr style="background:{{ $i % 2 === 0 ? '#fffbeb' : '#fef3c7' }};">
+                                        <td style="padding:7px 10px; border-top:1px solid #fde68a; color:#111827;">{{ $pend['nombre'] }}</td>
+                                        <td style="padding:7px 10px; border-top:1px solid #fde68a; color:#92400e; font-weight:600;">{{ $pend['motivo'] }}</td>
+                                        <td style="padding:7px 10px; border-top:1px solid #fde68a; color:#6b7280; font-size:11px;">{{ $pend['notas'] ?? '—' }}</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @endif
                         @endif
 
                         <p style="font-size:11px; color:#94a3b8; line-height:1.5; margin:20px 0 0; border-top:1px solid #f1f5f9; padding-top:14px;">

@@ -83,7 +83,9 @@ class ProductoController extends Controller
             ->get();
 
         // tipo column drives SIN FAMILIA / PYP detection in JS (no hardcoded IDs needed)
-        return view('dashboard', compact('productos', 'containers', 'familias', 'centrosCostoConProductos', 'servicios', 'mantenciones', 'arriendos'));
+        $todosCentrosCosto = CentroCosto::orderBy('acronimo')->get(['id', 'acronimo']);
+
+        return view('dashboard', compact('productos', 'containers', 'familias', 'centrosCostoConProductos', 'servicios', 'mantenciones', 'arriendos', 'todosCentrosCosto'));
     }
 
     public function gestionarArriendo(Request $request, int $id): \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse

@@ -71,7 +71,10 @@ class DashboardController extends Controller
             ")->first();
 
         $facturasPendientesQuery = OrdenCompra::whereDoesntHave('factura')
-            ->whereNotIn('estado', ['recibido', 'cerrado', 'cancelado', 'anulado']);
+            ->where(function ($q) {
+                $q->whereNotIn('estado', ['recibido', 'cerrado', 'cancelado', 'anulado'])
+                  ->orWhere('factura_pendiente', true);
+            });
 
         if ($user->tieneFiltroCC()) {
             $prefix = strtoupper($user->centroCostoPrefix());

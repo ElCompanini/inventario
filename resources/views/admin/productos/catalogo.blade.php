@@ -801,6 +801,16 @@
                         </select>
                     </div>
                 </div>
+                {{-- Centro de costo --}}
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Centro de costo</label>
+                    <select id="bc-cc-sel" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                        <option value="">— Sin asignar —</option>
+                        @foreach($todosCentrosCosto as $cc)
+                        <option value="{{ $cc->id }}" {{ auth()->user()->centro_costo_id == $cc->id ? 'selected' : '' }}>{{ $cc->acronimo }}</option>
+                        @endforeach
+                    </select>
+                </div>
                 {{-- Paquete / Presentación --}}
                 <div>
                     <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer; user-select:none; font-size:0.8rem; font-weight:600; color:#374151;">
@@ -1880,6 +1890,7 @@ async function bcGuardar() {
 
         const unidadMedidaId = document.getElementById('bc-unidad-medida')?.value || '';
         const contenedorId   = document.getElementById('bc-contenedor')?.value || '';
+        const bcCcSelVal     = document.getElementById('bc-cc-sel')?.value || '';
         const params = {
             _token: CSRF,
             nombre,
@@ -1895,6 +1906,7 @@ async function bcGuardar() {
         if (bcMarcaId) params.marca_id = bcMarcaId;
         if (unidadMedidaId) params.unidad_medida_id = unidadMedidaId;
         if (contenedorId) params.contenedor = contenedorId;
+        if (bcCcSelVal) params.centro_costo_id = bcCcSelVal;
         const body = new URLSearchParams(params);
         const res  = await fetch(ROUTE_PROD_STORE, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
         const json = await res.json();
@@ -3171,8 +3183,9 @@ async function cmpImportar() {
             errDiv.style.display = 'block';
         } else {
             var cont = document.getElementById('cmp-contenedor-sel').value || null;
+            var ccSel = document.getElementById('cmp-cc-sel').value || null;
             cerrarModalCargaMasivaProductos();
-            rcmAbrir(json.rows, cont);
+            rcmAbrir(json.rows, cont, ccSel);
             return;
         }
     } catch (e) {
@@ -3191,6 +3204,7 @@ async function cmpImportar() {
 var rcmRows         = [];
 var rcmFamilias     = [];
 var rcmContenedorId = null;
+var rcmCcId         = null;
 var rcmItemData     = []; // per-row wizard results; null = not yet configured
 
 // Wizard state
@@ -3209,10 +3223,11 @@ var RCM_CONFIRM_URL = '{{ route("admin.catalogo.carga-masiva.confirmar") }}';
 
 function rcmIsDark() { return document.documentElement.classList.contains('dark'); }
 
-function rcmAbrir(rows, contenedorId) {
+function rcmAbrir(rows, contenedorId, ccId) {
     RCM_CSRF = document.querySelector('meta[name="csrf-token"]').content;
     rcmRows = rows;
     rcmContenedorId = contenedorId || null;
+    rcmCcId = ccId || null;
     rcmItemData = rows.map(function() { return null; });
 
     rcmFamilias = [];
@@ -3712,7 +3727,7 @@ async function rcmConfirmar() {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 'X-Requested-With': 'XMLHttpRequest',
             },
-            body: JSON.stringify({ contenedor_id: rcmContenedorId || null, items: items }),
+            body: JSON.stringify({ contenedor_id: rcmContenedorId || null, centro_costo_id: rcmCcId || null, items: items }),
         });
         var json = await resp.json();
         var dm   = rcmIsDark();
@@ -3790,6 +3805,21 @@ async function rcmConfirmar() {
                     <option value="">Sin contenedor</option>
                     @foreach($containers as $container)
                     <option value="{{ $container->id }}">{{ $container->nombre }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            {{-- Centro de costo --}}
+            <div>
+                <label style="display:block; font-size:0.78rem; font-weight:600; margin-bottom:0.35rem;" class="cmp-label">
+                    Centro de costo <span style="font-weight:400; color:#9ca3af;">(opcional)</span>
+                </label>
+                <select id="cmp-cc-sel"
+                        style="width:100%; border:1px solid var(--cmp-border); border-radius:0.4rem; padding:0.4rem 0.6rem; font-size:0.83rem; outline:none; box-sizing:border-box;"
+                        class="cmp-input">
+                    <option value="">Sin centro de costo</option>
+                    @foreach($todosCentrosCosto as $cc)
+                    <option value="{{ $cc->id }}" {{ auth()->user()->centro_costo_id == $cc->id ? 'selected' : '' }}>{{ $cc->acronimo }}</option>
                     @endforeach
                 </select>
             </div>

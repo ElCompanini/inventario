@@ -898,6 +898,20 @@ html.dark .cm-search-drop-item:hover { background:#172554; }
 html.dark .cm-search-drop-empty { color:#64748b; }
 html.dark .cm-search-sel-badge { background:#172554; color:#93c5fd; border-color:#1d4ed8; }
 html.dark .cm-chip { background:#1e1b4b; color:#a5b4fc; }
+
+/* ── Step indicator dark mode ───────────────────────────────── */
+html.dark [id^="rw-circle-"]  { background:#1e1b4b !important; color:#a5b4fc !important; }
+html.dark [id^="rw-line-"]    { background:#334155 !important; }
+html.dark [id^="rw-label-"]   { color:#94a3b8 !important; }
+
+/* ── Package / Arriendo fields box dark mode ────────────────── */
+html.dark #resolver-modal-pkg-fields,
+html.dark #resolver-modal-arriendo-fields { background:#162032 !important; border-color:#334155 !important; }
+
+/* ── Mantención fields box dark mode ───────────────────────── */
+html.dark #resolver-modal-mant-fields { background:#162032 !important; border-color:#334155 !important; }
+html.dark #resolver-modal-mant-fields p { color:#94a3b8 !important; }
+html.dark #resolver-modal-arriendo-fields p { color:#94a3b8 !important; }
 </style>
 @endpush
 
