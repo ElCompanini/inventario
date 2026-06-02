@@ -8,12 +8,6 @@
     <p class="text-sm text-gray-500 mt-1">Registro de compras de gasto menor con sus boletas y productos asociados</p>
 </div>
 
-@if(session('success'))
-<div class="mb-4 bg-green-50 border border-green-300 text-green-700 rounded-lg px-4 py-3 text-sm">
-    {{ session('success') }}
-</div>
-@endif
-
 @php
 function formatearRut(string $rut): string {
 $limpio = strtoupper(preg_replace('/[^0-9kK]/', '', $rut));
@@ -32,7 +26,7 @@ if (strlen($limpio) < 2) return $rut;
                       focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
     </div>
 
-    <div id="gm-filtro-chip" class="hidden mb-4 flex items-center gap-2">
+    <div id="gm-filtro-chip" style="display:none" class="mb-4 flex items-center gap-2">
         <span class="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1 rounded-full">
             <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
@@ -42,7 +36,7 @@ if (strlen($limpio) < 2) return $rut;
         <button onclick="gmLimpiarFiltro()" class="text-xs text-gray-400 hover:text-red-500 transition underline">Limpiar filtro</button>
     </div>
 
-    <p id="gm-sin-resultados" class="hidden text-sm text-gray-400 text-center py-6">Sin resultados para la búsqueda.</p>
+    <p id="gm-sin-resultados" style="display:none" class="text-sm text-gray-400 text-center py-6">Sin resultados para la búsqueda.</p>
 
     @if($registros->isEmpty())
     <div class="bg-white rounded-xl shadow py-32 text-center text-gray-400">
@@ -650,13 +644,13 @@ function gmFiltrar(q, etiqueta) {
         card.style.display = match ? '' : 'none';
         if (match) visible++;
     });
-    document.getElementById('gm-sin-resultados').classList.toggle('hidden', visible > 0 || !q);
+    document.getElementById('gm-sin-resultados').style.display = (visible > 0 || !q) ? 'none' : 'block';
     var chip = document.getElementById('gm-filtro-chip');
     if (etiqueta) {
         document.getElementById('gm-filtro-label').textContent = 'Mostrando boleta ' + etiqueta;
-        chip.classList.remove('hidden');
+        chip.style.display = 'flex';
     } else {
-        chip.classList.add('hidden');
+        chip.style.display = 'none';
     }
 }
 

@@ -4,12 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>
-    @if(config('app.name'))
-        {{ config('app.name') }} —
-    @endif
-    @yield('title', 'Inicio')
-</title>
+    <title>@yield('title', 'Inicio')</title>
     <link rel="icon" type="image/jpeg" href="{{ asset('images/hospital.jpg') }}">
     {{-- Dark mode: apply class before paint to avoid flash --}}
     <script>if(localStorage.getItem('darkMode')==='1')document.documentElement.classList.add('dark');</script>
@@ -367,6 +362,55 @@
         transform: translateY(0) scale(.97);
         box-shadow: none;
     }
+
+    /* ── Dark mode: fondos inline #fff / #ffffff / white ───────── */
+    html.dark [style*="background:#fff"],
+    html.dark [style*="background: #fff"],
+    html.dark [style*="background:#ffffff"],
+    html.dark [style*="background: #ffffff"],
+    html.dark [style*="background:white"],
+    html.dark [style*="background: white"]    { background-color: #1e293b !important; }
+
+    html.dark [style*="background:#f3f4f6"]   { background-color: #334155 !important; }
+    html.dark [style*="background:#f9fafb"]   { background-color: #162032 !important; }
+    html.dark [style*="background:#f8fafc"]   { background-color: #162032 !important; }
+    html.dark [style*="background:#fafafa"]   { background-color: #162032 !important; }
+    html.dark [style*="background:#f1f5f9"]   { background-color: #162032 !important; }
+
+    /* ── Dark mode: textos oscuros sobre surface claro ─────────── */
+    html.dark [style*="color:#111827"]        { color: #f1f5f9 !important; }
+    html.dark [style*="color:#1f2937"]        { color: #f1f5f9 !important; }
+    html.dark [style*="color:#374151"]        { color: #e2e8f0 !important; }
+    html.dark [style*="color:#4b5563"]        { color: #cbd5e1 !important; }
+    html.dark [style*="color:#6b7280"]        { color: #94a3b8 !important; }
+
+    /* ── Dark mode: bordes claros ───────────────────────────────── */
+    html.dark [style*="border:1px solid #e5e7eb"]   { border-color: #334155 !important; }
+    html.dark [style*="border:1px solid #f3f4f6"]   { border-color: #1e293b !important; }
+    html.dark [style*="border-bottom:1px solid #f3f4f6"] { border-color: #334155 !important; }
+    html.dark [style*="border-bottom:1px solid #e5e7eb"] { border-color: #334155 !important; }
+
+    /* ── Dark mode: fondos de color (amber/orange/green/red/blue) ── */
+    html.dark [style*="background:#fffbeb"]  { background-color: #1c1a06 !important; }
+    html.dark [style*="background:#fef3c7"]  { background-color: #1c1608 !important; }
+    html.dark [style*="background:#fff7ed"]  { background-color: #1c1208 !important; }
+    html.dark [style*="background:#fef2f2"]  { background-color: #1c0808 !important; }
+    html.dark [style*="background:#fee2e2"]  { background-color: #1c0a0a !important; }
+    html.dark [style*="background:#dcfce7"]  { background-color: #071a0e !important; }
+    html.dark [style*="background:#f0fdf4"]  { background-color: #071a0e !important; }
+    html.dark [style*="background:#dbeafe"]  { background-color: #0c1a2e !important; }
+    html.dark [style*="background:#eff6ff"]  { background-color: #0c1a2e !important; }
+    html.dark [style*="background:#eef2ff"]  { background-color: #1e1b4b !important; }
+
+    /* ── Dark mode: bordes de color (amber/green/red) ── */
+    html.dark [style*="border:1.5px solid #fcd34d"],
+    html.dark [style*="border:1px solid #fcd34d"]   { border-color: #854d0e !important; }
+    html.dark [style*="border:1px solid #86efac"],
+    html.dark [style*="border:1px solid #6ee7b7"]   { border-color: #166534 !important; }
+    html.dark [style*="border:1px solid #fca5a5"],
+    html.dark [style*="border:1px solid #fecaca"]   { border-color: #991b1b !important; }
+    html.dark [style*="border:1px solid #93c5fd"],
+    html.dark [style*="border:1px solid #bfdbfe"]   { border-color: #1e3a5f !important; }
 </style>
 </head>
 <body class="bg-gray-100 font-sans" style="overflow-x:hidden;">
@@ -635,13 +679,19 @@
             @endif
 
             @if($u->tienePermiso('usuarios'))
+            @php $resetPendientes = \App\Models\PasswordResetRequest::where('status', 'pending')->count(); @endphp
             <a href="{{ route('admin.usuarios.index') }}" data-tip="Usuarios"
                class="sb-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                       {{ request()->routeIs('admin.usuarios.*') ? 'bg-indigo-600 text-white' : 'text-slate-300' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                 </svg>
-                <span class="sb-label">Usuarios</span>
+                <span class="sb-label flex-1">Usuarios</span>
+                @if($resetPendientes > 0)
+                    <span class="sb-badge bg-red-500 text-white text-[11px] font-bold rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
+                        {{ $resetPendientes }}
+                    </span>
+                @endif
             </a>
             @endif
 
@@ -722,6 +772,14 @@
 
                     <div id="passwordDefaultQuestion" class="justify-center gap-2" style="display:{{ $mostrarFormularioPasswordDefault ? 'none' : 'flex' }}; margin-top:6.75rem;">
 
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit"
+                                    class="password-default-action text-lg font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg">
+                                Cerrar sesión
+                            </button>
+                        </form>
+
                         <button type="button" onclick="showPasswordDefaultForm()"
                                 class="password-default-action btn-primary text-lg font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
                             Ingresar nueva contraseña
@@ -733,27 +791,27 @@
                         @method('PUT')
 
                         <div>
-                            <label for="modal-password" class="block text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Nueva contrasena</label>
+                            <label for="modal-password" class="block text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Nueva contraseña</label>
                             <input id="modal-password" type="password" name="password" required autocomplete="new-password"
-                                   placeholder="Nueva contrasena"
+                                   placeholder="Nueva contraseña"
                                    class="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-3 text-base bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400">
                             @error('password') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label for="modal-password-confirmation" class="block text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Confirmar contrasena</label>
+                            <label for="modal-password-confirmation" class="block text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Confirmar contraseña</label>
                             <input id="modal-password-confirmation" type="password" name="password_confirmation" required autocomplete="new-password"
-                                   placeholder="Confirmar contrasena"
+                                   placeholder="Confirmar contraseña"
                                    class="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-3 text-base bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400">
                         </div>
 
                         <div class="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-900/60 border border-gray-200 dark:border-slate-700 rounded-lg p-4">
-                            Debe tener minimo 8 caracteres, una mayuscula, un numero y un caracter especial.
+                            Debe tener al menos una mayúscula, un número y un carácter especial (se acepta _).
                         </div>
 
                         <div class="flex justify-center gap-2"> 
                             <button type="submit" class="password-default-action btn-primary text-lg font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
-                                Guardar contrasena
+                                Guardar contraseña
                             </button>
                         </div>
                     </form>

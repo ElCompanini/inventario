@@ -72,10 +72,7 @@ class ComputadorController extends Controller
             'usuario',
         ])->findOrFail($id);
 
-        // Familia "Partes y Piezas" — buscar por ID usando nombre normalizado
-        $familiaPiezas = \App\Models\Familia::whereRaw(
-            "LOWER(REPLACE(REPLACE(nombre,' ',''),'/','')) LIKE ?", ['%partes%piezas%']
-        )->first();
+        $familiaPiezas = \App\Models\Familia::where('tipo', 'partes_piezas')->first();
 
         // Categorías de esa familia para los tabs (ordenadas por nombre)
         $familiaCategorias = $familiaPiezas
@@ -106,10 +103,16 @@ class ComputadorController extends Controller
 
         $catId        = (int) $request->input('cat_id');
         $computadorId = (int) $request->input('computador_id', 0);
+        $ccId         = auth()->user()->ccFiltro();
+
+        if ($ccId === -1) {
+            return response()->json([]);
+        }
 
         $productos = Producto::where('categoria_id', $catId)
             ->where('activo', true)
             ->soloFisicos()
+            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->with(['unidadMedida:id,abreviacion'])
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'stock_actual', 'unidad', 'categoria_id', 'unidad_medida_id']);
@@ -214,9 +217,7 @@ class ComputadorController extends Controller
 
         // Validar que la categoría pertenece a la familia "Partes y Piezas" (por ID)
         $familiaId = $categoria->familia_id;
-        $familiaPiezas = \App\Models\Familia::whereRaw(
-            "LOWER(REPLACE(REPLACE(nombre,' ',''),'/','')) LIKE ?", ['%partes%piezas%']
-        )->value('id');
+        $familiaPiezas = \App\Models\Familia::idPartesYPiezas();
 
         if ($familiaId !== $familiaPiezas) {
             return back()->withErrors([

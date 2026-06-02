@@ -27,17 +27,8 @@
             @error('email') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
         </div>
 
-        <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Contraseña</label>
-            <input type="password" name="password" required
-                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            @error('password') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-        </div>
-
-        <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Confirmar contraseña</label>
-            <input type="password" name="password_confirmation" required
-                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        <div class="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
+            El usuario recibirá una contraseña por defecto y podrá cambiarla al iniciar sesión.
         </div>
 
         <div>

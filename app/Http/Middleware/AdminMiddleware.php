@@ -93,6 +93,7 @@ class AdminMiddleware
             'admin.productos.trasladar' => ['stock'],
             'admin.sicd.' => ['sicd'],
             'admin.ordenes.' => ['ordenes'],
+            'admin.oc-pendientes.' => ['ordenes'],
             'admin.usuarios.' => ['usuarios'],
             'admin.gastos-menores.' => ['gastos_menores'],
             'admin.reportes.' => ['reportes'],

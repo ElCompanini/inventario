@@ -79,9 +79,10 @@ class AuthController extends Controller
             'password' => [
                 'required',
                 'confirmed',
-                Password::min(8)->numbers()->symbols(),
-                'regex:/[A-Z]/',
+                'regex:/^(?=.*[A-Z])(?=.*[0-9])(?=.*[\W_]).+$/',
             ],
+        ], [
+            'password.regex' => 'La contraseña debe tener al menos una mayúscula, un número y un carácter especial (puede ser _).',
         ]);
 
         $user = $request->user();

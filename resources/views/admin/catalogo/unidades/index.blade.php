@@ -18,9 +18,6 @@
     </button>
 </div>
 
-@if(session('success'))
-<div class="mb-4 bg-green-50 border border-green-300 text-green-700 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>
-@endif
 @if($errors->any())
 <div class="mb-4 bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm">{{ $errors->first() }}</div>
 @endif

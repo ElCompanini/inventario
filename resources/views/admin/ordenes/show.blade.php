@@ -653,6 +653,17 @@ html.dark .factura-later-btn:hover {
     border-color:#67e8f9;
     box-shadow:0 14px 30px rgba(34,211,238,0.28);
 }
+/* ── Modal dark mode ── */
+html.dark #modal-adjuntar-sin-factura > div {
+    background: #1e293b !important; border: 1px solid #334155;
+}
+html.dark #modal-adjuntar-sin-factura h2,
+html.dark #modal-adjuntar-sin-factura h3 { color: #f1f5f9 !important; }
+html.dark #modal-adjuntar-sin-factura label { color: #cbd5e1 !important; }
+html.dark #modal-adjuntar-sin-factura select,
+html.dark #modal-adjuntar-sin-factura textarea {
+    background: #0f172a !important; border-color: #475569 !important; color: #e2e8f0 !important;
+}
 </style>
 @endpush
 

@@ -77,6 +77,7 @@ class Sicd extends Model
 
     public function montoNeto(): float
     {
+        $this->loadMissing('detalles');
         return (float) ($this->detalles->sum('total_neto') ?? 0);
     }
 

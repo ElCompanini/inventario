@@ -51,6 +51,7 @@ class User extends Authenticatable
         'rol',
         'centro_costo_id',
         'permisos',
+        'activo',
     ];
 
     protected static function booted(): void
@@ -110,6 +111,15 @@ class User extends Authenticatable
     {
         if ($this->esDev()) return null;
         return $this->centro_costo_id ?? -1;
+    }
+
+    /**
+     * True cuando el usuario no tiene CC asignado y no es dev.
+     * Usar para bloqueos explícitos: if ($user->sinAccesoCc()) abort(403);
+     */
+    public function sinAccesoCc(): bool
+    {
+        return $this->ccFiltro() === -1;
     }
 
     public function tienePermiso(string $permiso): bool

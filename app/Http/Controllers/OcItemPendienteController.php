@@ -20,7 +20,7 @@ class OcItemPendienteController extends Controller
     /** POST /admin/ordenes/{oc}/items-pendientes — marcar ítem como pendiente */
     public function store(Request $request, int $ocId)
     {
-        abort_unless(auth()->user()->tienePermiso('ordenes_compra'), 403);
+        abort_unless(auth()->user()->tienePermiso('ordenes'), 403);
 
         $oc = OrdenCompra::with('sicds')->findOrFail($ocId);
 
@@ -68,16 +68,30 @@ class OcItemPendienteController extends Controller
     {
         abort_unless(auth()->user()->esAdmin(), 403);
 
-        $pendientes = OcItemPendiente::with([
+        $user   = auth()->user();
+        $prefix = $user->centroCostoPrefix();
+
+        $query = OcItemPendiente::with([
             'ordenCompra:id,numero_oc,estado',
             'sicdDetalle',
             'ocDetalle.sicdDetalle',
             'pendienteUser:id,name',
         ])
         ->whereNull('resuelto_at')
-        ->whereNull('deleted_at')
-        ->latest('pendiente_at')
-        ->get();
+        ->whereNull('deleted_at');
+
+        if ($user->tieneFiltroCC()) {
+            if ($prefix) {
+                $query->whereHas('sicdDetalle.sicd', fn($q) =>
+                    $q->withTrashed()->withoutGlobalScope('sin_temporales')
+                      ->whereRaw("REGEXP_REPLACE(codigo_sicd, '[^A-Za-z].*', '') = ?", [$prefix])
+                );
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        $pendientes = $query->latest('pendiente_at')->get();
 
         $familias   = Familia::orderBy('nombre')->get(['id', 'nombre']);
         $categorias = Categoria::orderBy('nombre')->get(['id', 'nombre', 'familia_id']);
@@ -103,8 +117,11 @@ class OcItemPendienteController extends Controller
             return response()->json([]);
         }
 
+        $ccId = auth()->user()->ccFiltro();
+
         $productos = Producto::where('activo', true)
             ->where('es_servicio', false)
+            ->when($ccId, fn($query) => $query->where('centro_costo_id', $ccId))
             ->where(fn($query) => $query
                 ->where('nombre', 'like', "%{$q}%")
                 ->orWhere('codigo_barras', 'like', "%{$q}%")

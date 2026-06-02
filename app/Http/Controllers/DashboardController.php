@@ -53,6 +53,9 @@ class DashboardController extends Controller
 
         // ── KPI 2: Solicitudes ─────────────────────────────────────────────────
         $solicitudesStats = DB::table('solicitudes')
+            ->when($ccId, fn($q) => $q->whereIn('producto_id',
+                fn($sub) => $sub->select('id')->from('productos')->where('centro_costo_id', $ccId)
+            ))
             ->selectRaw("
                 SUM(CASE WHEN estado = 'pendiente'  THEN 1 ELSE 0 END) as pendientes,
                 SUM(CASE WHEN estado = 'aprobado'   THEN 1 ELSE 0 END) as aprobadas,
@@ -125,7 +128,7 @@ class DashboardController extends Controller
 
         // Mantener gastos menores para el resto del sistema (no se muestra en el card ya)
         $gastosBase  = fn() => GastoMenor::where('created_at', '>=', $inicioMes)
-            ->when($ccId, fn($q) => $q->whereHas('user', fn($u) => $u->where('centro_costo_id', $ccId)));
+            ->when($ccId, fn($q) => $q->whereHas('producto', fn($p) => $p->withoutGlobalScopes()->where('centro_costo_id', $ccId)));
         $gastosStats   = $gastosBase()->selectRaw('COUNT(*) as total_registros, COALESCE(SUM(monto), 0) as total_monto')->first();
         $gastosUltimos = $gastosBase()->with('producto:id,nombre', 'user:id,name')
             ->orderByDesc('created_at')->take(5)->get();
@@ -666,7 +669,7 @@ class DashboardController extends Controller
 
             $filas[] = [
                 'sicd_id'    => $sicd->id,
-                'codigo'     => $sicd->codigo,
+                'codigo'     => $sicd->codigo_sicd,
                 'estado'     => $sicd->estado,
                 'proveedor'  => $sicd->proveedor_nombre ?? ($ocs->first()?->api_proveedor_nombre ?? '—'),
                 'fecha'      => $sicd->created_at?->format('d/m/Y'),

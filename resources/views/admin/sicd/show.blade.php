@@ -542,6 +542,27 @@ html.dark .det-btn-edit:hover {
     border-color: #818cf8;
     box-shadow: 0 4px 12px rgba(99,102,241,.25);
 }
+/* ── Modales dark mode ── */
+html.dark #pend-modal > div,
+html.dark #det-modal-picker > div {
+    background: #1e293b !important;
+    border: 1px solid #334155;
+}
+html.dark #pend-modal h3,
+html.dark #det-modal-picker h3 { color: #f1f5f9 !important; }
+html.dark #pend-modal p,
+html.dark #det-modal-picker p { color: #94a3b8 !important; }
+html.dark #pend-modal label,
+html.dark #det-modal-picker label { color: #cbd5e1 !important; }
+html.dark #pend-modal input,
+html.dark #pend-modal select,
+html.dark #det-modal-picker input,
+html.dark #det-modal-picker select {
+    background: #0f172a !important; border-color: #475569 !important; color: #e2e8f0 !important;
+}
+html.dark #pend-card {
+    background: #1c1a08 !important; border-color: #854d0e !important;
+}
 </style>
 @endpush
 

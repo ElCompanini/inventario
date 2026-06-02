@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rules\Password;
 
 class UsuarioController extends Controller
 {
@@ -42,7 +41,6 @@ class UsuarioController extends Controller
         $data = $request->validate([
             'name'            => 'required|string|max:255',
             'email'           => 'required|string|max:255|unique:users,email',
-            'password'        => ['required', 'confirmed', Password::min(10)->letters()->numbers()],
             'centro_costo_id' => 'nullable|integer|exists:centros_costo,id',
         ]);
 
@@ -58,8 +56,8 @@ class UsuarioController extends Controller
         User::create([
             'name'                  => $data['name'],
             'email'                 => $data['email'],
-            'password'              => Hash::make($data['password']),
-            'password_reset_status' => 0,
+            'password'              => Hash::make('123'),
+            'password_reset_status' => 1,
             'rol'                   => $rol,
             'centro_costo_id'       => $ccId,
         ]);
@@ -166,7 +164,7 @@ class UsuarioController extends Controller
             ? 'Tu contrasena fue reseteada a la contrasena por defecto.'
             : "Contrasena de {$usuario->name} reseteada a la contrasena por defecto.";
 
-        return redirect()->route('admin.usuarios.index', ['filtro' => 'reset_pendiente'])
+        return redirect()->route('admin.usuarios.index')
             ->with('success', $mensaje);
     }
 

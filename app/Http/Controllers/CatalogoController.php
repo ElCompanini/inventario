@@ -1,5 +1,6 @@
 <?php
 
+
 namespace App\Http\Controllers;
 
 use App\Models\Categoria;
@@ -22,7 +23,7 @@ class CatalogoController extends Controller
     private function ccId(): ?int
     {
         // Para visibilidad usamos ccFiltro(), pero para CREAR un producto
-        // usamos el CC real del usuario — así los productos creados por devs
+        // usamos el CC real del usuario â€” asÃ­ los productos creados por devs
         // quedan asignados a su CC y son visibles para otros usuarios del mismo CC.
         return auth()->user()->centro_costo_id ?? null;
     }
@@ -43,8 +44,11 @@ class CatalogoController extends Controller
                 'marcas',
                 'productos' => fn($q2) => $q2
                     ->with('marca')
-                    ->when($ccId, fn($q3) => $q3->where('centro_costo_id', $ccId)),
+                    ->when($ccId, fn($q3) => $q3->where(fn($i) => $i->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id'))),
             ]),
+            'productosDirectos' => fn($q) => $q
+                ->with('marca')
+                ->when($ccId, fn($q2) => $q2->where(fn($i) => $i->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id'))),
         ])->where('activo', true)
             ->when($ccId, fn($q) => $q->where(fn($i) => $i->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id')))
             ->orderBy('nombre')
@@ -73,8 +77,8 @@ class CatalogoController extends Controller
                 ->get();
         }
 
-        $familiasBienes    = $familias->filter(fn($f) => ($f->tipo_item ?? 'producto') === 'producto')->values();
-        $familiasServicios = $familias->filter(fn($f) => ($f->tipo_item ?? null) !== 'producto')->values();
+        $familiasBienes    = $familias->filter(fn($f) => ($f->tipo_catalogo ?? 'bien') === 'bien')->values();
+        $familiasServicios = $familias->filter(fn($f) => ($f->tipo_catalogo ?? 'bien') === 'servicio')->values();
 
         return view('admin.productos.catalogo', compact(
             'familias', 'familiasBienes', 'familiasServicios',
@@ -93,17 +97,21 @@ class CatalogoController extends Controller
                 'required', 'string', 'max:100',
                 Rule::unique('familias', 'nombre')->where('centro_costo_id', $ccId)->where('tipo_item', $this->tipoItemValido($request->input('tipo_item'))),
             ],
-            'tipo_item' => ['nullable', Rule::in(['producto', 'servicio', 'mantencion', 'arriendo'])],
+            'tipo_item'          => ['nullable', Rule::in(['producto', 'servicio', 'mantencion', 'arriendo'])],
+            'requiere_categoria' => ['nullable', 'boolean'],
+            'requiere_marca'     => ['nullable', 'boolean'],
         ], [
             'nombre.unique' => 'Ya existe una familia con ese nombre en tu centro de costo.',
         ]);
         $tipoItem = $this->tipoItemValido($data['tipo_item'] ?? 'producto');
 
         $familia = Familia::create([
-            'nombre'          => strtoupper(trim($data['nombre'])),
-            'centro_costo_id' => $ccId,
-            'tipo_item'       => $tipoItem,
-            'tipo_catalogo'   => $tipoItem === 'producto' ? 'bien' : 'servicio',
+            'nombre'             => strtoupper(trim($data['nombre'])),
+            'centro_costo_id'    => $ccId,
+            'tipo_item'          => $tipoItem,
+            'tipo_catalogo'      => $tipoItem === 'producto' ? 'bien' : 'servicio',
+            'requiere_categoria' => $data['requiere_categoria'] ?? true,
+            'requiere_marca'     => $data['requiere_marca'] ?? false,
         ]);
 
         if ($request->ajax()) {
@@ -111,6 +119,20 @@ class CatalogoController extends Controller
         }
 
         return back()->with('success', 'Familia creada correctamente.');
+    }
+
+    public function updateFamilia(Request $request, Familia $familia)
+    {
+        abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
+
+        $data = $request->validate([
+            'requiere_categoria' => ['required', 'boolean'],
+            'requiere_marca'     => ['required', 'boolean'],
+        ]);
+
+        $familia->update($data);
+
+        return response()->json(['ok' => true]);
     }
 
     private function esFamiliaProtegida(int $familiaId): bool
@@ -131,20 +153,20 @@ class CatalogoController extends Controller
             'familia_id' => ['required', 'integer', 'exists:familias,id'],
             'tipo_item'  => ['nullable', Rule::in(['producto', 'servicio', 'mantencion', 'arriendo'])],
         ], [
-            'nombre.unique' => 'Ya existe una categoría con ese nombre en esta familia.',
+            'nombre.unique' => 'Ya existe una categorÃ­a con ese nombre en esta familia.',
         ]);
 
         $familia = Familia::findOrFail($data['familia_id']);
         $tipoItem = $this->tipoItemValido($data['tipo_item'] ?? $familia->tipo_item ?? 'producto');
         if (($familia->tipo_item ?? 'producto') !== $tipoItem) {
-            $err = 'La categorÃ­a debe pertenecer al mismo tipo de Ã­tem que la familia.';
+            $err = 'La categorÃƒÂ­a debe pertenecer al mismo tipo de ÃƒÂ­tem que la familia.';
             return $request->ajax()
                 ? response()->json(['ok' => false, 'error' => $err], 422)
                 : back()->withErrors(['tipo_item' => $err]);
         }
 
         if ($this->esFamiliaProtegida((int) $data['familia_id'])) {
-            $err = 'La familia "Partes y Piezas" está protegida. Sus categorías no pueden ser modificadas.';
+            $err = 'La familia "Partes y Piezas" estÃ¡ protegida. Sus categorÃ­as no pueden ser modificadas.';
             return $request->ajax()
                 ? response()->json(['ok' => false, 'error' => $err], 403)
                 : back()->withErrors(['familia_id' => $err]);
@@ -158,7 +180,7 @@ class CatalogoController extends Controller
             return response()->json(['ok' => true, 'id' => $categoria->id, 'nombre' => $categoria->nombre]);
         }
 
-        return back()->with('success', 'Categoría creada correctamente.');
+        return back()->with('success', 'CategorÃ­a creada correctamente.');
     }
 
     public function updateCategoria(Request $request, Categoria $categoria)
@@ -166,7 +188,7 @@ class CatalogoController extends Controller
         abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
         if ($this->esFamiliaProtegida($categoria->familia_id)) {
-            $err = 'Las categorías de "Partes y Piezas" están protegidas y no pueden ser modificadas.';
+            $err = 'Las categorÃ­as de "Partes y Piezas" estÃ¡n protegidas y no pueden ser modificadas.';
             return $request->ajax()
                 ? response()->json(['ok' => false, 'error' => $err], 403)
                 : back()->withErrors(['nombre' => $err]);
@@ -176,7 +198,7 @@ class CatalogoController extends Controller
             'nombre' => ['required', 'string', 'max:150',
                          Rule::unique('categorias')->where('familia_id', $categoria->familia_id)->ignore($categoria->id)],
         ], [
-            'nombre.unique' => 'Ya existe una categoría con ese nombre en esta familia.',
+            'nombre.unique' => 'Ya existe una categorÃ­a con ese nombre en esta familia.',
         ]);
 
         $data['nombre'] = strtoupper(trim($data['nombre']));
@@ -187,7 +209,7 @@ class CatalogoController extends Controller
             return response()->json(['ok' => true, 'nombre' => $categoria->nombre]);
         }
 
-        return back()->with('success', 'Categoría actualizada.');
+        return back()->with('success', 'CategorÃ­a actualizada.');
     }
 
     public function buscarBarcode(Request $request)
@@ -248,9 +270,17 @@ class CatalogoController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('catalogo'), 403);
 
-        // Pre-check: is this category in the SERVICIOS family?
-        $categoriaObj      = Categoria::with('familia')->find($request->input('categoria_id'));
-        $esFamiliaServicios = $categoriaObj?->familia?->tipo === 'servicios';
+        // Resolve familia first â€” it drives conditional rules
+        $familiaId  = (int) $request->input('familia_id');
+        $familiaObj = Familia::find($familiaId);
+        $esFamiliaServicios = $familiaObj?->tipo === 'servicios';
+        $requiereCategoria  = $familiaObj ? $familiaObj->requiereCategoria() : true;
+        $requiereMarca      = $familiaObj ? $familiaObj->requiereMarca()     : false;
+
+        $categoriaObj = $requiereCategoria
+            ? Categoria::with('familia')->find($request->input('categoria_id'))
+            : null;
+
         $tipoSolicitado = $request->input('tipo_item')
             ?: ($request->boolean('es_servicio', false) ? 'servicio' : ($esFamiliaServicios ? 'servicio' : 'producto'));
         $tipoSolicitado = $this->tipoItemValido($tipoSolicitado);
@@ -264,7 +294,8 @@ class CatalogoController extends Controller
 
         $data = $request->validate([
             'nombre'               => ['required', 'string', 'max:200'],
-            'categoria_id'         => ['required', 'integer', 'exists:categorias,id'],
+            'familia_id'           => ['required', 'integer', 'exists:familias,id'],
+            'categoria_id'         => $requiereCategoria ? ['required', 'integer', 'exists:categorias,id'] : ['nullable', 'integer', 'exists:categorias,id'],
             'marca_id'             => ['nullable', 'integer', 'exists:marcas,id'],
             'stock_minimo'         => $esNoFisico ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
             'stock_critico'        => $esNoFisico ? ['nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'],
@@ -290,28 +321,28 @@ class CatalogoController extends Controller
             'monto_total'          => ['nullable', 'numeric', 'min:0'],
         ], [
             'nombre.required'              => 'El nombre del producto es obligatorio.',
-            'codigo_barras.unique'         => 'Ese código de barras ya está asignado a otro producto.',
+            'codigo_barras.unique'         => 'Ese cÃ³digo de barras ya estÃ¡ asignado a otro producto.',
             'unidad_medida_id.required'    => 'Debes seleccionar una unidad de medida.',
-            'cantidad_presentacion.min'    => 'La cantidad por presentación debe ser al menos 2.',
+            'cantidad_presentacion.min'    => 'La cantidad por presentaciÃ³n debe ser al menos 2.',
         ]);
 
         $sinMarcaId = Marca::idSinMarca();
 
-        // SERVICIOS family: force es_servicio=true and use SIN MARCA — skip brand validation
-        if ($esFamiliaServicios) {
+        // SERVICIOS family or families that don't require brand: force SIN MARCA
+        if ($esFamiliaServicios || !$requiereMarca) {
             $marcaId    = $sinMarcaId;
-            $tipoItem   = $request->input('tipo_item') ?: 'servicio';
+            $tipoItem   = $request->input('tipo_item') ?: ($esFamiliaServicios ? 'servicio' : 'producto');
             if (!in_array($tipoItem, ['producto', 'servicio', 'mantencion', 'arriendo'], true)) {
-                $tipoItem = 'servicio';
+                $tipoItem = $esFamiliaServicios ? 'servicio' : 'producto';
             }
             $esServicio = $tipoItem === 'servicio';
         } else {
             // Validate brand belongs to category (skip check for SIN MARCA)
             $marcaId = ($data['marca_id'] ?? null) ?: $sinMarcaId;
-            if ($marcaId && $marcaId !== $sinMarcaId) {
+            if ($marcaId && $marcaId !== $sinMarcaId && $requiereCategoria && isset($data['categoria_id'])) {
                 $marca = Marca::find($marcaId);
                 if (!$marca || (int) $marca->categoria_id !== (int) $data['categoria_id']) {
-                    $err = 'La marca seleccionada no pertenece a esta categoría.';
+                    $err = 'La marca seleccionada no pertenece a esta categorÃ­a.';
                     return $request->ajax()
                         ? response()->json(['ok' => false, 'errors' => ['marca_id' => [$err]]], 422)
                         : back()->withErrors(['marca_id' => $err]);
@@ -332,7 +363,7 @@ class CatalogoController extends Controller
             $request->validate([
                 'proveedor_nombre' => ['required', 'string', 'max:255'],
             ], [
-                'proveedor_nombre.required' => 'Debes indicar el proveedor de la mantenciÃ³n.',
+                'proveedor_nombre.required' => 'Debes indicar el proveedor de la mantenciÃƒÂ³n.',
             ]);
         }
 
@@ -348,15 +379,15 @@ class CatalogoController extends Controller
             ], [
                 'proveedor_nombre.required'     => 'Debes indicar el proveedor del arriendo.',
                 'fecha_inicio.required'         => 'Debes indicar la fecha de inicio.',
-                'condicion_termino.required'    => 'Debes indicar la condiciÃ³n de tÃ©rmino.',
-                'fecha_termino.required'        => 'Debes indicar la fecha de tÃ©rmino.',
-                'monto_periodo.required'        => 'Debes indicar el monto del perÃ­odo.',
+                'condicion_termino.required'    => 'Debes indicar la condiciÃƒÂ³n de tÃƒÂ©rmino.',
+                'fecha_termino.required'        => 'Debes indicar la fecha de tÃƒÂ©rmino.',
+                'monto_periodo.required'        => 'Debes indicar el monto del perÃƒÂ­odo.',
                 'monto_total.required'          => 'Debes indicar el monto total estimado.',
                 'documento_referencia.required' => 'Debes indicar el documento de referencia.',
             ]);
         }
 
-        $producto = DB::transaction(function () use ($data, $tipoItem, $manejaPresentacion, $marcaId, $ccId, $esServicio, $request) {
+        $producto = DB::transaction(function () use ($data, $tipoItem, $manejaPresentacion, $marcaId, $ccId, $esServicio, $familiaId, $requiereCategoria, $request) {
             $producto = Producto::create([
             'nombre'                => strtoupper(trim($data['nombre'])),
             'codigo_barras'         => $data['codigo_barras'] ?? null,
@@ -365,7 +396,8 @@ class CatalogoController extends Controller
             'stock_critico'         => $tipoItem === 'producto' ? ($data['stock_critico'] ?? 0) : 0,
             'contenedor'            => $tipoItem === 'producto' ? ($data['contenedor'] ?? null) : null,
             'unidad_medida_id'      => $tipoItem === 'producto' ? ($data['unidad_medida_id'] ?? null) : null,
-            'categoria_id'          => $data['categoria_id'],
+            'familia_id'            => $familiaId,
+            'categoria_id'          => $requiereCategoria ? ($data['categoria_id'] ?? null) : null,
             'marca_id'              => $tipoItem === 'producto' ? $marcaId : null,
             'centro_costo_id'       => $ccId,
             'es_servicio'           => $esServicio,
@@ -379,7 +411,7 @@ class CatalogoController extends Controller
             if (in_array($tipoItem, ['servicio', 'mantencion'], true)) {
                 $observacion = trim((string) $request->input('observacion', ''));
                 if ($tipoItem === 'mantencion' && $request->filled('fecha_ejecucion')) {
-                    $observacion = trim($observacion . "\nFecha ejecuciÃ³n: " . $request->input('fecha_ejecucion'));
+                    $observacion = trim($observacion . "\nFecha ejecuciÃƒÂ³n: " . $request->input('fecha_ejecucion'));
                 }
 
                 ServicioEstado::create([
@@ -444,14 +476,23 @@ class CatalogoController extends Controller
         ]);
 
         $nuevo = Producto::create([
-            'nombre'          => $producto->nombre,
-            'codigo_barras'   => $data['codigo_barras'],
-            'stock_actual'    => 0,
-            'stock_minimo'    => $producto->stock_minimo,
-            'stock_critico'   => $producto->stock_critico,
-            'contenedor'      => $producto->contenedor,
-            'categoria_id'    => $producto->categoria_id,
-            'centro_costo_id' => $producto->centro_costo_id,
+            'nombre'                => $producto->nombre,
+            'codigo_barras'         => $data['codigo_barras'],
+            'stock_actual'          => 0,
+            'stock_minimo'          => $producto->stock_minimo,
+            'stock_critico'         => $producto->stock_critico,
+            'contenedor'            => $producto->contenedor,
+            'categoria_id'          => $producto->categoria_id,
+            'centro_costo_id'       => $producto->centro_costo_id,
+            'familia_id'            => $producto->familia_id,
+            'marca_id'              => $producto->marca_id,
+            'unidad_medida_id'      => $producto->unidad_medida_id,
+            'es_servicio'           => $producto->es_servicio,
+            'tipo_item'             => $producto->tipo_item,
+            'maneja_presentacion'   => $producto->maneja_presentacion,
+            'tipo_presentacion'     => $producto->tipo_presentacion,
+            'cantidad_presentacion' => $producto->cantidad_presentacion,
+            'unidad_base'           => $producto->unidad_base,
         ]);
 
         return response()->json(['ok' => true, 'id' => $nuevo->id, 'nombre' => $nuevo->nombre]);
@@ -557,14 +598,14 @@ class CatalogoController extends Controller
             ],
             'tipo_item' => ['nullable', Rule::in(['producto', 'servicio', 'mantencion', 'arriendo'])],
         ], [
-            'nombre.unique' => 'Ya existe una marca con ese nombre en esta categoría.',
+            'nombre.unique' => 'Ya existe una marca con ese nombre en esta categorÃ­a.',
         ]);
 
         $tipoItem = $this->tipoItemValido($data['tipo_item'] ?? $categoria->tipo_item ?? 'producto');
         if (($categoria->tipo_item ?? 'producto') !== $tipoItem || $tipoItem !== 'producto') {
             return response()->json([
                 'ok' => false,
-                'errors' => ['tipo_item' => ['Las marcas solo aplican a categorÃ­as de productos.']],
+                'errors' => ['tipo_item' => ['Las marcas solo aplican a categorÃƒÂ­as de productos.']],
             ], 422);
         }
 
@@ -590,7 +631,7 @@ class CatalogoController extends Controller
         if ($marca->protegido) {
             return response()->json([
                 'ok'      => false,
-                'message' => "El registro \"{$marca->nombre}\" está protegido y no puede eliminarse.",
+                'message' => "El registro \"{$marca->nombre}\" estÃ¡ protegido y no puede eliminarse.",
             ], 403);
         }
 
@@ -629,7 +670,7 @@ class CatalogoController extends Controller
         $rawRows = $this->leerExcelCatalogo($request->file('excel_catalogo'));
 
         if ($rawRows->isEmpty()) {
-            return response()->json(['ok' => false, 'error' => 'El archivo Excel está vacío o no tiene filas de datos.']);
+            return response()->json(['ok' => false, 'error' => 'El archivo Excel estÃ¡ vacÃ­o o no tiene filas de datos.']);
         }
 
         // Validate header row
@@ -659,7 +700,7 @@ class CatalogoController extends Controller
         if ($manejaPres && (!$tipoPres || $cantPres < 1 || !$unidBase)) {
             return response()->json([
                 'ok'    => false,
-                'error' => 'Si los productos manejan paquetes, completa tipo, cantidad (≥ 1) y unidad base.',
+                'error' => 'Si los productos manejan paquetes, completa tipo, cantidad (â‰¥ 1) y unidad base.',
             ]);
         }
 
@@ -686,19 +727,19 @@ class CatalogoController extends Controller
             if ($desc === '') continue;
 
             if ($unidTxt === '') {
-                $errores[] = "Fila {$filaExcel}: la columna 'unidad' está vacía.";
+                $errores[] = "Fila {$filaExcel}: la columna 'unidad' estÃ¡ vacÃ­a.";
                 continue;
             }
             if ($cantidad === null || $cantidad < 0) {
-                $errores[] = "Fila {$filaExcel}: 'cantidad' debe ser un número >= 0.";
+                $errores[] = "Fila {$filaExcel}: 'cantidad' debe ser un nÃºmero >= 0.";
                 continue;
             }
             if ($minimo === null || $minimo < 0) {
-                $errores[] = "Fila {$filaExcel}: 'minimo' debe ser un número >= 0.";
+                $errores[] = "Fila {$filaExcel}: 'minimo' debe ser un nÃºmero >= 0.";
                 continue;
             }
             if ($critico === null || $critico < 0) {
-                $errores[] = "Fila {$filaExcel}: 'critico' debe ser un número >= 0.";
+                $errores[] = "Fila {$filaExcel}: 'critico' debe ser un nÃºmero >= 0.";
                 continue;
             }
 
@@ -770,7 +811,7 @@ class CatalogoController extends Controller
         $rawRows = $this->leerExcelCatalogo($request->file('excel_catalogo'));
 
         if ($rawRows->isEmpty()) {
-            return response()->json(['ok' => false, 'error' => 'El archivo Excel está vacío.']);
+            return response()->json(['ok' => false, 'error' => 'El archivo Excel estÃ¡ vacÃ­o.']);
         }
 
         $encabezado = $rawRows->first()->map(fn($v) => strtolower(trim((string) $v)))->values();
@@ -799,7 +840,7 @@ class CatalogoController extends Controller
         }
 
         if (empty($rows)) {
-            return response()->json(['ok' => false, 'error' => 'No se encontraron productos en el archivo (el cuerpo está vacío).']);
+            return response()->json(['ok' => false, 'error' => 'No se encontraron productos en el archivo (el cuerpo estÃ¡ vacÃ­o).']);
         }
 
         return response()->json(['ok' => true, 'rows' => $rows]);
@@ -840,8 +881,8 @@ class CatalogoController extends Controller
             $cantPres    = $manejaPres ? max(1, (int) ($item['cantidad_presentacion'] ?? 1)) : null;
             $unidBase    = $manejaPres ? trim((string) ($item['unidad_base'] ?? '')) : null;
 
-            if ($nombre === '') { $errores[] = "Fila {$fila}: nombre vacío."; continue; }
-            if ($unidTxt === '') { $errores[] = "Fila {$fila}: unidad vacía."; continue; }
+            if ($nombre === '') { $errores[] = "Fila {$fila}: nombre vacÃ­o."; continue; }
+            if ($unidTxt === '') { $errores[] = "Fila {$fila}: unidad vacÃ­a."; continue; }
 
             $unidMedidaId = $unidIdx[$this->normalizarTextoCatalogo($unidTxt)] ?? null;
 
@@ -912,7 +953,8 @@ class CatalogoController extends Controller
     private function normalizarTextoCatalogo(string $s): string
     {
         $s = mb_strtolower(trim($s), 'UTF-8');
-        $s = str_replace(['á','é','í','ó','ú','ü','ñ'], ['a','e','i','o','u','u','n'], $s);
+        $s = str_replace(['Ã¡','Ã©','Ã­','Ã³','Ãº','Ã¼','Ã±'], ['a','e','i','o','u','u','n'], $s);
         return preg_replace('/[^a-z0-9]/', '', $s);
     }
 }
+

@@ -2102,6 +2102,23 @@ function escHtmlGm(str) {
         background: #1e293b !important; border-color: #334155 !important;
         box-shadow: 0 4px 16px rgba(0,0,0,.45) !important;
     }
+    /* ── Dev CC dropdown — dark mode ── */
+    html.dark #dev-cc-dropdown {
+        background: #1e293b !important; border-color: #334155 !important;
+        box-shadow: 0 12px 40px rgba(0,0,0,.5) !important;
+    }
+    html.dark #dev-cc-dropdown > div {
+        background: #1e293b !important; border-color: #334155 !important;
+    }
+    html.dark #dev-cc-dropdown span { color: #94a3b8 !important; }
+    html.dark #dev-cc-search {
+        background: #0f172a !important; border-color: #475569 !important;
+        color: #e2e8f0 !important;
+    }
+    html.dark #dev-cc-search::placeholder { color: #64748b !important; }
+    html.dark #dev-cc-list { background: #1e293b !important; }
+    html.dark #dev-cc-list label span { color: #cbd5e1 !important; }
+    html.dark #dev-cc-list label:hover { background: #312e81 !important; }
     /* ── File inputs estilizados (carga masiva/manual) ── */
     .ai-file-lbl {
         display:flex; align-items:center; gap:0.5rem;
@@ -4491,7 +4508,7 @@ function aiActualizarTablaManual() {
     sin.style.display  = aiItemsManual.length ? 'none' : '';
 }
 
-function aiAgregar(id, nombre) {
+function aiAgregar(id, nombre, cantidadInicial) {
     if (aiItems.find(function(i) { return i.id === id; })) {
         document.getElementById('ai-buscador').value = '';
         document.getElementById('ai-resultados').style.display = 'none';
@@ -4499,13 +4516,13 @@ function aiAgregar(id, nombre) {
     }
     var idx = aiCounter++;
     aiItems.push({ idx: idx, id: id, nombre: nombre });
-    aiRenderFila(idx, id, nombre);
+    aiRenderFila(idx, id, nombre, cantidadInicial);
     document.getElementById('ai-buscador').value = '';
     document.getElementById('ai-resultados').style.display = 'none';
     aiActualizarTabla();
 }
 
-function aiRenderFila(idx, id, nombre) {
+function aiRenderFila(idx, id, nombre, cantidadInicial) {
     var tbody = document.getElementById('ai-items');
     var tr = document.createElement('tr');
     tr.id = 'ai-row-' + idx;
@@ -4519,7 +4536,7 @@ function aiRenderFila(idx, id, nombre) {
         + '<span style="font-size:0.8rem;font-weight:500;color:#1f2937;">' + escHtmlAi(nombre) + '</span>'
         + '</td>'
         + '<td style="padding:0.4rem 0.4rem;text-align:center;">'
-        + '<input type="number" id="ai-loc-cant-' + idx + '" name="items[' + idx + '][cantidad]" value="1" min="1"'
+        + '<input type="number" id="ai-loc-cant-' + idx + '" name="items[' + idx + '][cantidad]" value="' + (cantidadInicial > 0 ? cantidadInicial : 1) + '" min="1"'
         + ' style="width:62px;text-align:center;border:1px solid #d1d5db;border-radius:0.375rem;padding:0.3rem 0.4rem;font-size:0.8rem;">'
         + '</td>'
         + '<td style="padding:0.4rem 0.6rem;text-align:center;">'
@@ -4638,6 +4655,10 @@ function aiSeleccionarTipoItem(tipo) {
             btn.style.color = dark ? '#cbd5e1' : '#374151';
         }
     });
+    aiCrearFamiliaId = null;
+    aiCrearCatId     = null;
+    aiCrearMarcaId   = null;
+    aiRenderCrearFamilias();
     aiToggleStockPorFamilia();
 }
 
@@ -4859,6 +4880,11 @@ function aiRenderCrearFamilias() {
     cont.innerHTML = '';
     var _dm = document.documentElement.classList.contains('dark');
     var lista = (typeof aiFamilias !== 'undefined') ? aiFamilias : [];
+    lista = lista.filter(function(f) {
+        if (aiCrearTipoItem === 'servicio')   return f.tipo === 'servicios';
+        if (aiCrearTipoItem === 'mantencion') return f.tipo === 'partes_piezas';
+        return f.tipo !== 'servicios'; // producto y arriendo
+    });
     lista.forEach(function(f) {
         var sel = f.id === aiCrearFamiliaId;
         var btn = document.createElement('button');
@@ -5085,7 +5111,7 @@ function aiConfirmarCrearProducto() {
                 aiEditandoIdx = null;
             } else {
                 if (aiCrearContexto === 'local') {
-                    if (typeof aiAgregar === 'function') aiAgregar(p.id, p.nombre);
+                    if (typeof aiAgregar === 'function') aiAgregar(p.id, p.nombre, _cantidadInicial);
                 } else {
                     if (typeof aiAgregarManual === 'function') aiAgregarManual(p.id, p.nombre, null, _cantidadInicial);
                 }

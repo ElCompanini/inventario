@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ config('app.name') }} - Recuperar contrasena</title>
+    <title>{{ config('app.name') }} - Recuperar contraseña</title>
     <link rel="icon" type="image/jpeg" href="{{ asset('images/hospital.jpg') }}">
     <script>if(localStorage.getItem('darkMode')==='1')document.documentElement.classList.add('dark');</script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -20,7 +20,7 @@
 
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 transition-colors duration-300">
             <div class="flex items-center justify-between mb-6">
-                <h2 class="text-gray-800 dark:text-gray-100 text-xl font-semibold">Recuperar contrasena</h2>
+                <h2 class="text-gray-800 dark:text-gray-100 text-xl font-semibold">Recuperar contraseña</h2>
                 <button onclick="dmToggle()" id="dm-btn"
                         class="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-500 dark:text-gray-400 transition-all duration-200 shrink-0"
                         title="Cambiar tema">

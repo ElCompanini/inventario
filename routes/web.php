@@ -218,6 +218,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Catálogo de Productos
     Route::get('/productos/catalogo', [CatalogoController::class, 'index'])->name('productos.catalogo');
     Route::post('/catalogo/familias', [CatalogoController::class, 'storeFamilia'])->name('catalogo.familias.store');
+    Route::patch('/catalogo/familias/{familia}', [CatalogoController::class, 'updateFamilia'])->name('catalogo.familias.update');
     Route::post('/catalogo/categorias', [CatalogoController::class, 'storeCategoria'])->name('catalogo.categorias.store');
     Route::put('/catalogo/categorias/{categoria}', [CatalogoController::class, 'updateCategoria'])->name('catalogo.categorias.update');
     Route::delete('/catalogo/categorias/{categoria}', [CatalogoController::class, 'destroyCategoria'])->name('catalogo.categorias.destroy');

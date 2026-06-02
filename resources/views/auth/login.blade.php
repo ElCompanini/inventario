@@ -112,7 +112,7 @@
 
                 <a href="{{ route('password.forgot') }}"
                    class="block text-center mt-4 text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
-                    Olvidaste tu contrasena?
+                    Olvidaste tu contraseña?
                 </a>
             </form>
         </div>

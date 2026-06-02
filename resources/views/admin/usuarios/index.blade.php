@@ -77,6 +77,49 @@
     html.dark .usr-reset-pending-row {
         background: rgba(225,29,72,.10);
     }
+
+    @keyframes badge-pulse-red {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,.6); }
+        50%       { box-shadow: 0 0 0 6px rgba(220,38,38,0); }
+    }
+    @keyframes badge-pulse-amber {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(180,83,9,.5); }
+        50%       { box-shadow: 0 0 0 6px rgba(180,83,9,0); }
+    }
+    .badge-reset-pendiente {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        background: #fee2e2;
+        color: #dc2626;
+        border: 1.5px solid #fca5a5;
+        white-space: nowrap;
+        animation: badge-pulse-red 1.4s ease-in-out infinite;
+    }
+    .badge-contrasena-reiniciada {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        background: #fef3c7;
+        color: #b45309;
+        border: 1.5px solid #fcd34d;
+        white-space: nowrap;
+        animation: badge-pulse-amber 1.4s ease-in-out infinite;
+    }
+    html.dark .badge-reset-pendiente {
+        background: rgba(220,38,38,.15);
+        color: #fca5a5;
+        border-color: rgba(220,38,38,.4);
+    }
+    html.dark .badge-contrasena-reiniciada {
+        background: rgba(180,83,9,.15);
+        color: #fcd34d;
+        border-color: rgba(180,83,9,.4);
+    }
 </style>
 @endpush
 
@@ -88,11 +131,6 @@
         <p class="text-sm text-gray-500 mt-0.5">Gestiona los accesos y centros de costo del sistema.</p>
     </div>
     <div class="flex items-center gap-2">
-        @if((int) auth()->user()->rol === 2 && $resetPendientesCount > 0)
-            <a href="{{ route('admin.usuarios.index', ['filtro' => 'reset_pendiente']) }}" class="btn-usr-reset">
-                {{ $resetPendientesCount }} reset pendiente(s)
-            </a>
-        @endif
         @if($mostrarPendientes)
             <a href="{{ route('admin.usuarios.index') }}" class="btn-secondary px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
                 Ver todos
@@ -170,15 +208,11 @@
                     @if((int) auth()->user()->rol === 2)
                         <td class="px-5 py-3 text-center">
                             @if($u->pendingPasswordResetRequest)
-                                <span class="inline-block text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300">
-                                    Solicitud de reseteo pendiente
-                                </span>
+                                <span class="badge-reset-pendiente">🔴 Reseteo pendiente</span>
                             @elseif((int) ($u->password_reset_status ?? 0) === 1)
-                                <span class="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
-                                    Contrasena reiniciada
-                                </span>
+                                <span class="badge-contrasena-reiniciada">⚠️ Contraseña reiniciada</span>
                             @else
-                                <span class="text-gray-400 text-xs">Sin solicitud</span>
+                                <span style="font-size:0.75rem; color:#9ca3af;">Sin solicitud</span>
                             @endif
                         </td>
                     @endif
@@ -209,7 +243,7 @@
                             @if((int) auth()->user()->rol === 2)
                                 <button type="button" class="btn-usr-reset"
                                         onclick="abrirModalReset({{ json_encode($u->name) }}, '{{ route('admin.usuarios.reset-password', $u->id) }}', {{ $u->id === auth()->id() ? 'true' : 'false' }})">
-                                    {{ $u->id === auth()->id() ? 'Resetear mi contrasena' : 'Resetear contrasena' }}
+                                    {{ $u->id === auth()->id() ? 'Resetear mi contraseña' : 'Resetear contraseña' }}
                                 </button>
                             @endif
                             @if($u->id !== auth()->id())
@@ -233,11 +267,11 @@
             <svg class="w-6 h-6 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
             </svg>
-            <h2 class="text-lg font-bold text-orange-500 dark:text-orange-400">Resetear contrasena</h2>
+            <h2 class="text-lg font-bold text-orange-500 dark:text-orange-400">Resetear contraseña</h2>
         </div>
 
         <p id="modal-reset-texto" class="text-sm text-gray-600 dark:text-gray-300 mb-2"></p>
-        <p class="text-xs text-gray-400 dark:text-gray-500 mb-6">La contrasena quedara como contrasena por defecto y se guardara hasheada.</p>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mb-6">La contraseña quedara como contraseña por defecto y se guardara hasheada.</p>
 
         <form id="formResetPassword" method="POST" action="">
             @csrf
@@ -308,8 +342,8 @@
 
     function abrirModalReset(nombre, url, esPropio) {
         var texto = esPropio
-            ? 'Confirmas que deseas resetear tu propia contrasena a la contrasena por defecto?'
-            : 'Confirmas que deseas resetear la contrasena de ' + nombre + ' a la contrasena por defecto?';
+            ? 'Confirmas que deseas resetear tu propia contraseña a la contraseña por defecto?'
+            : 'Confirmas que deseas resetear la contraseña de ' + nombre + ' a la contraseña por defecto?';
         document.getElementById('modal-reset-texto').textContent = texto;
         document.getElementById('formResetPassword').action = url;
         document.getElementById('modalResetPassword').style.display = 'flex';

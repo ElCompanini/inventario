@@ -108,7 +108,7 @@
                 <p class="text-[10px] text-gray-400">Solicitud registrada el {{ $usuario->pendingPasswordResetRequest->requested_at?->format('d/m/Y H:i') }}.</p>
             @else
                 <p class="text-xs font-semibold text-amber-600 dark:text-amber-400">Contrasena reiniciada</p>
-                <p class="text-[10px] text-gray-400">El usuario debe cambiar su propia contrasena.</p>
+                <p class="text-[10px] text-gray-400">El usuario debe cambiar su propia contraseña.</p>
             @endif
         </div>
         @endif

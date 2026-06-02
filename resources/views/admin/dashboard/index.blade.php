@@ -288,7 +288,7 @@
 
     @if((int) auth()->user()->rol === 2)
     {{-- RESETEOS DE CONTRASENA --}}
-    <a href="{{ route('admin.usuarios.index', ['filtro' => 'reset_pendiente']) }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
+    <a href="{{ route('admin.usuarios.index') }}" class="kpi-card block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
         <div class="flex items-center justify-between mb-2">
             <span class="dash-section-title">Reseteos</span>
             <div class="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/25 flex items-center justify-center">
@@ -298,7 +298,7 @@
         <p class="text-2xl font-bold {{ $passwordResetPendientes > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-gray-100' }}">
             {{ $num($passwordResetPendientes) }}
         </p>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">usuario(s) olvidaron su contrasena</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">usuario(s) olvidaron su contraseña</p>
         <div class="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700">
             <span class="text-xs font-semibold text-rose-600 dark:text-rose-400">Ver usuarios</span>
         </div>

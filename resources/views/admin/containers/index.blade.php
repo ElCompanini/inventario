@@ -71,7 +71,7 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <span class="badge-cc-guardado-{{ $container->id }} text-green-600 text-xs hidden">✓</span>
+                                <span class="badge-cc-guardado-{{ $container->id }} text-green-600 text-xs" style="display:none">✓</span>
                             </div>
                             @else
                                 <span class="text-xs text-gray-500">{{ $container->centroCosto?->acronimo ?? '—' }}</span>
@@ -387,6 +387,20 @@
         if (e.target === this) cerrarModalEliminar();
     });
 
+    // ── Notificación flash inline (replica estilo del layout) ──
+    function mostrarFlashInline(msg, tipo) {
+        var cls = tipo === 'error'
+            ? 'mb-4 bg-red-100 border border-red-400 text-red-800 px-4 py-3 rounded relative'
+            : 'mb-4 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded relative';
+        var div = document.createElement('div');
+        div.className = cls;
+        div.setAttribute('role', 'alert');
+        div.innerHTML = '<span class="block sm:inline">' + msg + '</span>';
+        var main = document.querySelector('main');
+        main.insertBefore(div, main.firstChild);
+        setTimeout(function() { div.remove(); }, 4000);
+    }
+
     // ── Asignación de CC inline ──
     document.querySelectorAll('.select-cc-container').forEach(function(sel) {
         sel.addEventListener('change', function() {
@@ -401,15 +415,22 @@
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                     'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
                 },
                 body: JSON.stringify({ centro_costo_id: ccId || null }),
             })
             .then(r => r.json())
             .then(d => {
-                if (d.ok && badge) {
-                    badge.classList.remove('hidden');
-                    setTimeout(() => badge.classList.add('hidden'), 2000);
+                if (d.ok) {
+                    mostrarFlashInline('Centro de costo asignado al container y sus productos.');
+                    if (badge) {
+                        badge.style.display = 'inline';
+                        setTimeout(() => badge.style.display = 'none', 2000);
+                    }
                 }
+            })
+            .catch(function() {
+                mostrarFlashInline('Error al asignar el centro de costo. Intente nuevamente.', 'error');
             });
         });
     });

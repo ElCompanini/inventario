@@ -130,7 +130,7 @@ class BincardService
                 } else {
                     // ⚠️ Fallback para registros históricos sin orden_compra_id
                     $ocFromMotivo = null;
-                    if (preg_match('/OC\s+([\w\-\.]+)/i', $mov->motivo ?? '', $m)) {
+                    if (preg_match('/OC[:\s#]+([\w\-\.]+)/i', $mov->motivo ?? '', $m)) {
                         $ocFromMotivo = $ocsPorSicd[$sicd->id]?->ordenesCompra
                             ->firstWhere('numero_oc', $m[1]);
                     }
@@ -194,6 +194,13 @@ class BincardService
                 $tipoDoc = $mov->tipo === 'entrada' ? 'Desmontaje Equipo' : 'Armado Equipos';
                 $nDoc    = 'ARM-' . str_pad($mov->origen_id ?? 0, 6, '0', STR_PAD_LEFT);
                 $nRef    = $mov->doc_referencia; // e.g. "PC-001"
+            } elseif ($mov->origen === 'orden' && $mov->orden_compra_id && isset($ocsDirectas[$mov->orden_compra_id])) {
+                $ocDirecta  = $ocsDirectas[$mov->orden_compra_id];
+                $tipoDoc    = 'OC';
+                $nDoc       = 'OC-' . $ocDirecta->numero_oc;
+                $rutProv    = $ocDirecta->api_proveedor_rut   ?? '—';
+                $proveedor  = $ocDirecta->api_proveedor_nombre ?? '—';
+                $tipoAdqDoc = $ocDirecta->tipoAdquisicionLabel();
             } elseif ($mov->tipo === 'ajuste') {
                 $tipoDoc = 'Ajuste Manual';
                 $nDoc    = 'AJU-' . str_pad($mov->id, 6, '0', STR_PAD_LEFT);

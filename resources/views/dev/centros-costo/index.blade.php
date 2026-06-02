@@ -10,12 +10,6 @@
     </div>
 </div>
 
-@if(session('success'))
-    <div class="mb-4 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3">
-        {{ session('success') }}
-    </div>
-@endif
-
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
     {{-- Formulario nuevo --}}

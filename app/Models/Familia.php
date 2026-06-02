@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class Familia extends Model
 {
     protected $table = 'familias';
-    protected $fillable = ['nombre', 'activo', 'centro_costo_id', 'protegido', 'tipo', 'tipo_catalogo', 'tipo_item'];
+    protected $fillable = ['nombre', 'activo', 'centro_costo_id', 'protegido', 'tipo', 'tipo_catalogo', 'tipo_item', 'requiere_categoria', 'requiere_marca'];
 
-    protected $casts = ['protegido' => 'boolean', 'activo' => 'boolean'];
+    protected $casts = ['protegido' => 'boolean', 'activo' => 'boolean', 'requiere_categoria' => 'boolean', 'requiere_marca' => 'boolean'];
 
     protected static function booted(): void
     {
@@ -55,9 +55,24 @@ class Familia extends Model
         return $this->tipo_catalogo === 'servicio';
     }
 
+    public function requiereCategoria(): bool
+    {
+        return (bool) $this->requiere_categoria;
+    }
+
+    public function requiereMarca(): bool
+    {
+        return (bool) $this->requiere_marca;
+    }
+
     public static function idSinFamilia(): int
     {
         return (int) static::where('tipo', 'sin_familia')->value('id');
+    }
+
+    public static function idPartesYPiezas(): int
+    {
+        return (int) static::where('tipo', 'partes_piezas')->value('id');
     }
 
     public static function idServicios(): int
@@ -73,6 +88,11 @@ class Familia extends Model
     public function categorias()
     {
         return $this->hasMany(Categoria::class)->orderBy('nombre');
+    }
+
+    public function productosDirectos()
+    {
+        return $this->hasMany(\App\Models\Producto::class)->whereNull('categoria_id');
     }
 
     public function scopeTipoItem($query, string $tipo)

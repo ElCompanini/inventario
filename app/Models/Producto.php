@@ -18,6 +18,7 @@ class Producto extends Model
         'stock_minimo',
         'stock_critico',
         'contenedor',
+        'familia_id',
         'categoria_id',
         'marca_id',
         'centro_costo_id',
@@ -73,6 +74,11 @@ class Producto extends Model
         // también se carguen correctamente en la relación
         return $this->belongsTo(Container::class, 'contenedor')
                     ->withoutGlobalScope('con_cc');
+    }
+
+    public function familia()
+    {
+        return $this->belongsTo(Familia::class);
     }
 
     public function categoria()

@@ -145,7 +145,7 @@ class SicdController extends Controller
         if ($codigo === '') return response()->json(['tiene_pdf' => false]);
 
         $cacheKey = 'sicd_tiene_pdf_' . md5($codigo);
-        $tienePdf = Cache::remember($cacheKey, now()->addHours(6), function () use ($codigo) {
+        $tienePdf = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($codigo) {
             try {
                 // MAX_EXECUTION_TIME hint: aborta la query en 4 segundos si la BD externa es lenta
                 $row = DB::connection('sicd_externa')
@@ -618,7 +618,7 @@ class SicdController extends Controller
     public function show(int $id)
     {
         abort_unless(auth()->user()->tienePermiso('sicd'), 403);
-        $sicd  = Sicd::withoutGlobalScope('sin_temporales')->with(['usuario', 'boleta', 'detalles.producto', 'ordenesCompra'])->findOrFail($id);
+        $sicd  = Sicd::withoutGlobalScope('sin_temporales')->with(['usuario', 'boleta', 'detalles.producto', 'detalles.ocDetalles', 'ordenesCompra'])->findOrFail($id);
         $ccId  = auth()->user()->ccFiltro();
         $familias = Familia::with([
             'categorias' => fn($q) => $q->with([

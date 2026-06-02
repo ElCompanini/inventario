@@ -12,10 +12,6 @@
        class="text-sm text-indigo-600 hover:underline">← Volver a Reportes</a>
 </div>
 
-@if(session('success'))
-<div class="mb-4 bg-green-50 border border-green-300 text-green-700 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>
-@endif
-
 {{-- Filtros --}}
 <form method="GET" action="{{ route('admin.reportes.historial') }}"
       class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-5">

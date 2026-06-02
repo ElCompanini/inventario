@@ -463,14 +463,13 @@ class AdminController extends Controller
             ->orderByDesc('created_at');
 
         if ($user->tieneFiltroCC()) {
+            $ccId   = $user->ccFiltro();
             $prefix = $user->centroCostoPrefix();
-            // Entradas sin SICD son visibles; las ligadas a SICD solo si coincide el prefijo
-            $query->where(function ($q) use ($prefix) {
-                $q->where(function ($q2) {
-                    $q2->where('origen', '!=', 'sicd')->orWhereNull('origen');
-                })->orWhereHas('sicd', function ($q2) use ($prefix) {
-                    $q2->whereRaw("REGEXP_REPLACE(codigo_sicd, '[^A-Za-z].*', '') = ?", [$prefix]);
-                });
+            // Mostrar solo entradas cuyo producto pertenece al CC del usuario,
+            // o entradas SICD cuyo código coincide con el prefijo del CC.
+            $query->where(function ($q) use ($ccId, $prefix) {
+                $q->whereHas('producto', fn($p) => $p->withoutGlobalScopes()->where('centro_costo_id', $ccId))
+                  ->orWhereHas('sicd', fn($s) => $s->withTrashed()->whereRaw("REGEXP_REPLACE(codigo_sicd, '[^A-Za-z].*', '') = ?", [$prefix]));
             });
         }
 
@@ -1584,12 +1583,23 @@ class AdminController extends Controller
                         } else {
                             $contDest2 = Container::withoutGlobalScope('con_cc')->find($item['contenedor_id']);
                             $copia = Producto::create([
-                                'nombre'          => $prod->nombre,
-                                'stock_actual'    => 0,
-                                'stock_minimo'    => $prod->stock_minimo,
-                                'stock_critico'   => $prod->stock_critico,
-                                'contenedor'      => $item['contenedor_id'],
-                                'centro_costo_id' => $contDest2?->centro_costo_id ?? $ccId,
+                                'nombre'                => $prod->nombre,
+                                'stock_actual'          => 0,
+                                'stock_minimo'          => $prod->stock_minimo,
+                                'stock_critico'         => $prod->stock_critico,
+                                'contenedor'            => $item['contenedor_id'],
+                                'centro_costo_id'       => $contDest2?->centro_costo_id ?? $ccId,
+                                'categoria_id'          => $prod->categoria_id,
+                                'marca_id'              => $prod->marca_id,
+                                'familia_id'            => $prod->familia_id,
+                                'unidad_medida_id'      => $prod->unidad_medida_id,
+                                'unidad'                => $prod->unidad,
+                                'es_servicio'           => $prod->es_servicio,
+                                'tipo_item'             => $prod->tipo_item,
+                                'maneja_presentacion'   => $prod->maneja_presentacion,
+                                'tipo_presentacion'     => $prod->tipo_presentacion,
+                                'cantidad_presentacion' => $prod->cantidad_presentacion,
+                                'unidad_base'           => $prod->unidad_base,
                             ]);
                             $productoId = $copia->id;
                         }
@@ -1823,13 +1833,23 @@ class AdminController extends Controller
                     } else {
                         $contDest = Container::withoutGlobalScope('con_cc')->find($contenedorId);
                         $producto = Producto::create([
-                            'nombre'          => $producto->nombre,
-                            'unidad'          => $unidad ?? $producto->unidad,
-                            'stock_actual'    => 0,
-                            'stock_minimo'    => $producto->stock_minimo,
-                            'stock_critico'   => $producto->stock_critico,
-                            'contenedor'      => $contenedorId,
-                            'centro_costo_id' => $contDest?->centro_costo_id ?? $ccIdManual,
+                            'nombre'                => $producto->nombre,
+                            'unidad'                => $unidad ?? $producto->unidad,
+                            'stock_actual'          => 0,
+                            'stock_minimo'          => $producto->stock_minimo,
+                            'stock_critico'         => $producto->stock_critico,
+                            'contenedor'            => $contenedorId,
+                            'centro_costo_id'       => $contDest?->centro_costo_id ?? $producto->centro_costo_id ?? $ccIdManual,
+                            'categoria_id'          => $producto->categoria_id,
+                            'marca_id'              => $producto->marca_id,
+                            'familia_id'            => $producto->familia_id,
+                            'unidad_medida_id'      => $producto->unidad_medida_id,
+                            'es_servicio'           => $producto->es_servicio,
+                            'tipo_item'             => $producto->tipo_item,
+                            'maneja_presentacion'   => $producto->maneja_presentacion,
+                            'tipo_presentacion'     => $producto->tipo_presentacion,
+                            'cantidad_presentacion' => $producto->cantidad_presentacion,
+                            'unidad_base'           => $producto->unidad_base,
                         ]);
                     }
                 }

@@ -14,12 +14,6 @@
     </p>
 </div>
 
-@if(session('error'))
-<div class="mb-3 bg-red-50 border border-red-300 text-red-700 rounded-lg px-3 py-2 text-sm" style="max-width:900px; margin-left:auto; margin-right:auto;">
-    {{ session('error') }}
-</div>
-@endif
-
 @if($errors->any())
 <div class="mb-3 bg-red-50 border border-red-300 text-red-700 rounded-lg px-3 py-2 text-sm" style="max-width:900px; margin-left:auto; margin-right:auto;">
     {{ $errors->first() }}

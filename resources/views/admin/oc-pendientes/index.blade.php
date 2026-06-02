@@ -17,17 +17,6 @@
     </a>
 </div>
 
-@if(session('success'))
-    <div style="background:#dcfce7; border:1px solid #86efac; border-radius:0.75rem; padding:0.875rem 1.25rem; margin-bottom:1.25rem; color:#15803d; font-size:0.875rem; font-weight:500;">
-        ✓ {{ session('success') }}
-    </div>
-@endif
-@if(session('error'))
-    <div style="background:#fee2e2; border:1px solid #fca5a5; border-radius:0.75rem; padding:0.875rem 1.25rem; margin-bottom:1.25rem; color:#b91c1c; font-size:0.875rem; font-weight:500;">
-        ✗ {{ session('error') }}
-    </div>
-@endif
-
 @if($pendientes->isEmpty())
     <div style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:1rem; padding:3rem; text-align:center;">
         <div style="font-size:2.5rem; margin-bottom:0.75rem;">✅</div>

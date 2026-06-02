@@ -694,6 +694,24 @@
     .acc-header.has-active .acc-chevron {
         color: #4338ca;
     }
+    /* ── Modales dark mode ── */
+    html.dark #modalDevolucion > div,
+    html.dark #modalRechazoDevolucion > div {
+        background: #1e293b !important;
+        border: 1px solid #334155;
+    }
+    html.dark #modalDevolucion h3,
+    html.dark #modalRechazoDevolucion h3 { color: #f1f5f9 !important; }
+    html.dark #modalDevolucion p,
+    html.dark #modalRechazoDevolucion p { color: #94a3b8 !important; }
+    html.dark #modalDevolucion label,
+    html.dark #modalRechazoDevolucion label { color: #cbd5e1 !important; }
+    html.dark #modalDevolucion input,
+    html.dark #modalDevolucion textarea,
+    html.dark #modalRechazoDevolucion input,
+    html.dark #modalRechazoDevolucion textarea {
+        background: #0f172a !important; border-color: #475569 !important; color: #e2e8f0 !important;
+    }
 </style>
 @endpush
 

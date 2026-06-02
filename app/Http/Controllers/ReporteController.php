@@ -22,6 +22,15 @@ class ReporteController extends Controller
         protected ReporteriaService $reporteria,
     ) {}
 
+    private function verificarAccesoProducto(Producto $producto): void
+    {
+        $ccId = auth()->user()->ccFiltro();
+        if ($ccId === -1) abort(403);
+        if ($ccId && $producto->centro_costo_id !== null && $producto->centro_costo_id !== $ccId) {
+            abort(403);
+        }
+    }
+
     public function index()
     {
         abort_unless(auth()->user()->tienePermiso('reportes'), 403);
@@ -48,7 +57,9 @@ class ReporteController extends Controller
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get(['id', 'nombre']);
 
-        $familias = Familia::orderBy('nombre')->get(['id', 'nombre']);
+        $familias = Familia::orderBy('nombre')
+            ->when($ccId, fn($q) => $q->where(fn($q2) => $q2->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id')))
+            ->get(['id', 'nombre']);
 
         // Mapa producto_id → filtros del BINCARD más reciente (para advertencia)
         $bincardsPorProducto = ReporteriaIndexada::whereNotNull('filtros')
@@ -80,6 +91,14 @@ class ReporteController extends Controller
             'unidadMedida:id,nombre,abreviacion',
             'centroCosto:id,acronimo,nombre_completo',
         ])->findOrFail($request->producto_id);
+
+        $ccId = auth()->user()->ccFiltro();
+        if ($ccId === -1) {
+            abort(403);
+        }
+        if ($ccId && $producto->centro_costo_id !== null && $producto->centro_costo_id !== $ccId) {
+            abort(403);
+        }
 
         $filtros = array_filter([
             'fecha_desde'        => $request->fecha_desde,
@@ -129,7 +148,9 @@ class ReporteController extends Controller
             ->orderBy('nombre')
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get(['id', 'nombre']);
-        $familias = Familia::orderBy('nombre')->get(['id', 'nombre']);
+        $familias = Familia::orderBy('nombre')
+            ->when($ccId, fn($q) => $q->where(fn($q2) => $q2->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id')))
+            ->get(['id', 'nombre']);
         $bincardsPorProducto = [];
 
         return view('admin.reportes.bincard', compact('data', 'productos', 'familias', 'serviciosF', 'mantencionesF', 'arriendosF', 'bincardsPorProducto'));
@@ -150,6 +171,8 @@ class ReporteController extends Controller
             'categoria.familia', 'container',
             'unidadMedida:id,nombre,abreviacion', 'centroCosto:id,acronimo',
         ])->findOrFail($request->producto_id);
+
+        $this->verificarAccesoProducto($producto);
 
         $filtros = array_filter([
             'fecha_desde'        => $request->fecha_desde,
@@ -198,6 +221,8 @@ class ReporteController extends Controller
             'categoria.familia', 'container',
             'unidadMedida:id,nombre,abreviacion', 'centroCosto:id,acronimo,nombre_completo',
         ])->findOrFail($request->producto_id);
+
+        $this->verificarAccesoProducto($producto);
 
         $filtros = array_filter([
             'fecha_desde'        => $request->fecha_desde,
@@ -273,9 +298,11 @@ class ReporteController extends Controller
         ]);
 
         $producto = Producto::withoutGlobalScopes()
-            ->where('es_servicio', true)
+            ->where(fn($q) => $q->where('es_servicio', true)->orWhere('tipo_item', 'servicio'))
             ->with(['categoria.familia', 'centroCosto:id,acronimo,nombre_completo'])
             ->findOrFail($request->producto_id);
+
+        $this->verificarAccesoProducto($producto);
 
         $query = ServicioEstado::with('usuario:id,name')
             ->where('producto_id', $producto->id);
@@ -364,7 +391,9 @@ class ReporteController extends Controller
         $arriendosF = Producto::soloArriendos()->orderBy('nombre')
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get(['id', 'nombre']);
-        $familias = Familia::orderBy('nombre')->get(['id', 'nombre']);
+        $familias = Familia::orderBy('nombre')
+            ->when($ccId, fn($q) => $q->where(fn($q2) => $q2->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id')))
+            ->get(['id', 'nombre']);
         $bincardsPorProducto = [];
 
         if (!$request->filled('producto_id')) {
@@ -382,6 +411,8 @@ class ReporteController extends Controller
             ->where('tipo_item', 'mantencion')
             ->with(['categoria.familia', 'centroCosto:id,acronimo,nombre_completo'])
             ->findOrFail($request->producto_id);
+
+        $this->verificarAccesoProducto($producto);
 
         $query = ServicioEstado::with('usuario:id,name')
             ->where('producto_id', $producto->id);
@@ -457,7 +488,9 @@ class ReporteController extends Controller
         $arriendosF = Producto::soloArriendos()->orderBy('nombre')
             ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
             ->get(['id', 'nombre']);
-        $familias = Familia::orderBy('nombre')->get(['id', 'nombre']);
+        $familias = Familia::orderBy('nombre')
+            ->when($ccId, fn($q) => $q->where(fn($q2) => $q2->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id')))
+            ->get(['id', 'nombre']);
         $bincardsPorProducto = [];
 
         if (!$request->filled('producto_id')) {
@@ -475,6 +508,8 @@ class ReporteController extends Controller
             ->where('tipo_item', 'arriendo')
             ->with(['categoria.familia', 'centroCosto:id,acronimo,nombre_completo'])
             ->findOrFail($request->producto_id);
+
+        $this->verificarAccesoProducto($producto);
 
         $query = ArriendoMovimiento::with(['responsable:id,name', 'ejecutor:id,name', 'ordenCompra:id,numero_oc', 'sicd:id,codigo_sicd'])
             ->where('producto_id', $producto->id);

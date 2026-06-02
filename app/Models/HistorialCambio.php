@@ -34,6 +34,22 @@ class HistorialCambio extends Model
         'referencia_id',
     ];
 
+    protected $casts = [
+        'producto_id'          => 'integer',
+        'contenedor_id'        => 'integer',
+        'usuario_id'           => 'integer',
+        'usuario_ejecutor_id'  => 'integer',
+        'origen_id'            => 'integer',
+        'orden_compra_id'      => 'integer',
+        'referencia_id'        => 'integer',
+        'cantidad'             => 'integer',
+        'stock_anterior'       => 'integer',
+        'stock_posterior'      => 'integer',
+        'created_at'           => 'datetime',
+        'updated_at'           => 'datetime',
+        'deleted_at'           => 'datetime',
+    ];
+
     protected static function booted(): void
     {
         static::created(function (self $mov) {

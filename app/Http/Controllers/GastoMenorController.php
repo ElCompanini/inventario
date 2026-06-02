@@ -32,7 +32,7 @@ class GastoMenorController extends Controller
 
         $ccId = $user->ccFiltro();
         if ($ccId) {
-            $query->whereHas('user', fn($q) => $q->where('centro_costo_id', $ccId));
+            $query->whereHas('producto', fn($q) => $q->withoutGlobalScopes()->where('centro_costo_id', $ccId));
         }
 
         $registros  = $query->get()->groupBy('folio');
@@ -41,7 +41,7 @@ class GastoMenorController extends Controller
         $familias   = Familia::with([
             'categorias' => fn($q) => $q->with(['marcas' => fn($q2) => $q2->activas()]),
         ])->where('activo', true)
-            ->when($ccId, fn($q) => $q->where('centro_costo_id', $ccId))
+            ->when($ccId, fn($q) => $q->where(fn($q2) => $q2->where('centro_costo_id', $ccId)->orWhereNull('centro_costo_id')))
             ->orderBy('nombre')->get();
 
         return view('admin.gastos-menores.index', compact('registros', 'productos', 'containers', 'familias'));
@@ -97,10 +97,31 @@ class GastoMenorController extends Controller
                     ->firstOrFail();
 
                 // Revertir stock anterior y aplicar el nuevo
-                $producto = Producto::withoutGlobalScopes()->whereKey($gasto->producto_id)->lockForUpdate()->firstOrFail();
-                $producto->stock_actual = $producto->stock_actual - $gasto->cantidad + (int) $itemData['cantidad'];
+                $producto    = Producto::withoutGlobalScopes()->whereKey($gasto->producto_id)->lockForUpdate()->firstOrFail();
+                $diferencia  = (int) $itemData['cantidad'] - $gasto->cantidad;
+                $stockAntes  = (int) $producto->stock_actual;
+                $producto->stock_actual = $stockAntes + $diferencia;
                 $producto->actualizarFechasStock();
                 $producto->save();
+
+                if ($diferencia !== 0) {
+                    HistorialCambio::create([
+                        'producto_id'         => $producto->id,
+                        'nombre_producto'     => $producto->nombre,
+                        'contenedor_id'       => $producto->contenedor,
+                        'cantidad'            => abs($diferencia),
+                        'tipo'                => $diferencia > 0 ? 'entrada' : 'salida',
+                        'motivo'              => "Edición gasto menor folio {$gasto->folio}",
+                        'origen'              => 'gasto_menor',
+                        'origen_id'           => $gasto->id,
+                        'origen_tipo'         => 'gasto_menor',
+                        'stock_anterior'      => $stockAntes,
+                        'stock_posterior'     => $producto->stock_actual,
+                        'usuario_id'          => Auth::id(),
+                        'aprobado_por'        => Auth::user()->name,
+                        'usuario_ejecutor_id' => Auth::id(),
+                    ]);
+                }
 
                 $gasto->rut_proveedor = $request->rut_proveedor;
                 $gasto->fecha_emision = $request->fecha_emision;
@@ -136,11 +157,13 @@ class GastoMenorController extends Controller
     {
         abort_unless(auth()->user()->tienePermiso('gastos_menores'), 403);
 
-        // SEC-03: verificar que el gasto pertenece al centro de costo del usuario
+        // SEC-03: verificar que el gasto pertenece al centro de costo del usuario (filtro por producto, no por usuario creador)
         $query = GastoMenor::where('id', $id);
         $ccId  = auth()->user()->ccFiltro();
-        if ($ccId) {
-            $query->whereHas('user', fn($q) => $q->where('centro_costo_id', $ccId));
+        if ($ccId && $ccId !== -1) {
+            $query->whereHas('producto', fn($q) => $q->withoutGlobalScopes()->where('centro_costo_id', $ccId));
+        } elseif ($ccId === -1) {
+            abort(403);
         }
         $gasto = $query->firstOrFail();
 
@@ -193,9 +216,9 @@ class GastoMenorController extends Controller
         }
 
         DB::transaction(function () use ($request, $rutaDoc) {
-            // SEC-06: calcular correlativo dentro de la transacción con lock para evitar race condition
-            DB::table('gastos_menores')->lockForUpdate()->orderByDesc('id_gm')->limit(1)->get(['id_gm']);
-            $nextNumero = (GastoMenor::max('id_gm') ?? 0) + 1;
+            // SEC-06: lock + lectura del max en una sola query para evitar race condition en id_gm
+            $maxIdGm    = DB::table('gastos_menores')->lockForUpdate()->orderByDesc('id_gm')->limit(1)->value('id_gm');
+            $nextNumero = ($maxIdGm ?? 0) + 1;
             foreach ($request->items as $item) {
                 $producto     = Producto::whereKey($item['producto_id'])->lockForUpdate()->firstOrFail();
                 $contenedorId = !empty($item['contenedor_id']) ? (int) $item['contenedor_id'] : null;
